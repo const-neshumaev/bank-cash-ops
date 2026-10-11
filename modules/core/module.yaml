@@ -1,0 +1,17 @@
+name: core
+title: Ядро
+version: 0.1.0
+description: Пользователи, аутентификация, роли и общие справочники.
+
+dependencies: []
+
+provides:
+  contracts: modules.core.contracts
+  api_base: /api/
+  frontend_routes: true
+
+config:
+  - name: DJANGO_SUPERUSER_EMAIL
+    description: Email начального администратора.
+  - name: DJANGO_SUPERUSER_PASSWORD
+    description: Пароль начального администратора.

@@ -1,0 +1,20 @@
+# Keep shell scripts and source files on LF so they run inside Linux containers,
+# even when the repository is checked out on Windows.
+* text=auto
+
+*.sh text eol=lf
+*.py text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+Dockerfile text eol=lf
+Dockerfile.* text eol=lf
+
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.cmd text eol=crlf

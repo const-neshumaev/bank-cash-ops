@@ -1,0 +1,22 @@
+# Пример профиля заказчика: ядро + операции + отчётность.
+# Пока все модули работают в одном процессе (access: inprocess).
+product: bank-cash-ops
+version: 0.1.0
+
+modules:
+  - name: core
+    version: 0.1.0
+
+  - name: operations
+    version: 0.1.0
+    connections:
+      core:
+        access: inprocess
+        # url: http://core:8000    # обязателен при access: http
+
+  - name: reports
+    version: 0.1.0
+    connections:
+      core: { access: inprocess }
+      operations: { access: inprocess }
+      # operations: { access: http, url: "http://operations:8000" }

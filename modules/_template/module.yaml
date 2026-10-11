@@ -1,0 +1,28 @@
+# Манифест модуля. Скопируйте каталог _template в modules/<name> и заполните поля.
+# Формат описан в docs/modules.md.
+#
+# Слои модуля:
+#   backend/    — Django-приложение
+#   frontend/   — страницы, API-клиенты и манифест index.tsx (контракт FrontendModule)
+#   contracts/  — публичный интерфейс модуля
+name: example
+title: Пример модуля
+version: 0.1.0
+description: Краткое назначение модуля.
+
+# Зависимости от других модулей.
+dependencies: []
+# Пример:
+# dependencies:
+#   - name: core
+#     version: ">=0.1,<1"
+#     access: inprocess        # inprocess | http
+
+# Что модуль публикует наружу.
+provides:
+  contracts: modules.example.contracts
+  api_base: /api/example/
+  frontend_routes: false
+
+# Ключи конфигурации, читаемые модулем из окружения.
+config: []

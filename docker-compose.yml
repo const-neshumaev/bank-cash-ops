@@ -1,0 +1,48 @@
+name: bankcashops
+
+# Development stack: Django backend served by the runserver, Vite dev server for
+# the frontend and SQLite for storage. Run PostgreSQL with:
+#   docker compose -f docker-compose.yml -f docker-compose.postgres.yml up
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DJANGO_DEBUG: "${DJANGO_DEBUG:-True}"
+      DJANGO_SECRET_KEY: "${DJANGO_SECRET_KEY:-insecure-development-key-change-me}"
+      DJANGO_ALLOWED_HOSTS: "${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend}"
+      DJANGO_TIME_ZONE: "${DJANGO_TIME_ZONE:-Europe/Moscow}"
+      CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}"
+      CSRF_TRUSTED_ORIGINS: "${CSRF_TRUSTED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}"
+      SQLITE_PATH: /app/data/db.sqlite3
+      DJANGO_SUPERUSER_EMAIL: "${DJANGO_SUPERUSER_EMAIL:-admin@example.com}"
+      DJANGO_SUPERUSER_PASSWORD: "${DJANGO_SUPERUSER_PASSWORD:-admin12345}"
+      DJANGO_SUPERUSER_FIRST_NAME: "${DJANGO_SUPERUSER_FIRST_NAME:-System}"
+      DJANGO_SUPERUSER_LAST_NAME: "${DJANGO_SUPERUSER_LAST_NAME:-Administrator}"
+    volumes:
+      - ./backend:/app
+      - ./modules:/app/modules
+      - sqlite_data:/app/data
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      VITE_API_PROXY_TARGET: "http://backend:8000"
+    volumes:
+      - ./frontend:/app
+      - ./modules:/app/modules
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  sqlite_data:

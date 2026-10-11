@@ -1,0 +1,16 @@
+# Build context for the backend and frontend production images is the repository
+# root (see the Dockerfiles and docker-compose files). Keep it small and
+# deterministic. Note: both builds share this file, so neither `backend/` nor
+# `frontend/` is excluded.
+.git
+.gitignore
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.ruff_cache
+**/node_modules
+**/dist
+docs
+profiles
+.env
+*.sqlite3

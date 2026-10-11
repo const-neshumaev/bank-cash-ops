@@ -1,0 +1,57 @@
+name: bankcashops-prod
+
+# Production stack: PostgreSQL, a gunicorn backend and an nginx-served frontend.
+# A DJANGO_SECRET_KEY must be provided (for example through the shell or a .env
+# file next to this compose file).
+#
+# Usage:
+#   docker compose -f docker-compose.prod.yml up --build -d
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-bankcashops}"
+      POSTGRES_USER: "${POSTGRES_USER:-bankcashops}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-bankcashops}"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bankcashops}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.prod
+    environment:
+      DJANGO_DEBUG: "False"
+      DJANGO_SECRET_KEY: "${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set for production}"
+      DJANGO_ALLOWED_HOSTS: "${DJANGO_ALLOWED_HOSTS:-localhost}"
+      DJANGO_TIME_ZONE: "${DJANGO_TIME_ZONE:-Europe/Moscow}"
+      CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS:-http://localhost:8080}"
+      CSRF_TRUSTED_ORIGINS: "${CSRF_TRUSTED_ORIGINS:-http://localhost:8080}"
+      DATABASE_URL: "postgres://${POSTGRES_USER:-bankcashops}:${POSTGRES_PASSWORD:-bankcashops}@db:5432/${POSTGRES_DB:-bankcashops}"
+      DJANGO_SUPERUSER_EMAIL: "${DJANGO_SUPERUSER_EMAIL:-admin@example.com}"
+      DJANGO_SUPERUSER_PASSWORD: "${DJANGO_SUPERUSER_PASSWORD:-admin12345}"
+      DJANGO_SUPERUSER_FIRST_NAME: "${DJANGO_SUPERUSER_FIRST_NAME:-System}"
+      DJANGO_SUPERUSER_LAST_NAME: "${DJANGO_SUPERUSER_LAST_NAME:-Administrator}"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile.prod
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
