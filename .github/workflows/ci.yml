@@ -34,6 +34,14 @@ jobs:
         # VCS root and treats both `config` and `modules` as first-party.
         run: ruff check --config backend/pyproject.toml backend modules
 
+      - name: Check for missing migrations
+        # Fail when models changed without a matching migration. The throwaway
+        # SQLite file keeps the check off the workspace and its output quiet.
+        env:
+          PYTHONPATH: ${{ github.workspace }}/backend:${{ github.workspace }}
+          SQLITE_PATH: ${{ runner.temp }}/ci.sqlite3
+        run: python backend/manage.py makemigrations --check --dry-run
+
       - name: Tests (pytest)
         # Replicate the container layout, where the Django host project and the
         # `modules` package sit side by side: the host project provides settings
