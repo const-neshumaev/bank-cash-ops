@@ -23,6 +23,11 @@ npm-debug.log*
 .env.local
 .env.*.local
 
+# --- Generated ------------------------------------------------------------- #
+# Module frontends are assembled here at build time (bind mount in development,
+# copy in the production image); the directory is never committed.
+frontend/modules/
+
 # --- Editors / OS ---------------------------------------------------------- #
 .idea/
 .vscode/
