@@ -36,6 +36,65 @@ Vite dev-сервер и `runserver` отслеживают изменения �
 docker compose up --build -d
 ```
 
+## Работа с Git и GitHub
+
+Ветка `main` защищена: прямые изменения в неё запрещены, поэтому любая правка
+идёт через отдельную ветку и pull request (PR). Проверки CI запускаются на
+каждом PR, и влить изменения можно только после их успешного прохождения.
+
+Цикл одной правки:
+
+```bash
+git switch -c my-feature          # 1. новая ветка под задачу
+# ... правки и коммиты ...
+git push -u origin my-feature     # 2. отправить ветку на GitHub
+```
+
+3. Открыть PR: после push `git` печатает ссылку вида
+   `https://github.com/<...>/pull/new/my-feature` — откройте её и нажмите
+   **Create pull request**.
+4. Дождаться зелёных проверок CI (вкладка **Actions** или блок проверок внизу
+   страницы PR).
+5. Нажать **Merge pull request** → **Confirm merge**.
+
+После слияния обновите локальный `main` и уберите рабочую ветку:
+
+```bash
+git switch main
+git pull                          # подтянуть слитые изменения
+git branch -d my-feature          # удалить локальную ветку
+```
+
+Если `main` ушёл вперёд, пока вы работали, и PR просит обновления, влейте
+свежий `main` в свою ветку и отправьте её снова:
+
+```bash
+git switch my-feature
+git merge origin/main
+git push
+```
+
+> При слиянии через *Squash and merge* локальные коммиты формально не попадают
+> в `main`, поэтому `git branch -d` может отказаться удалять ветку — тогда
+> используйте `git branch -D my-feature`.
+
+### Что проверяет CI
+
+Workflow `.github/workflows/ci.yml` состоит из двух заданий:
+
+| Задание | Проверки |
+| --- | --- |
+| Backend (ruff, pytest) | `ruff check`, поиск забытых миграций (`makemigrations --check`), `pytest` |
+| Frontend (build) | `npm ci` и сборка SPA (`npm run build`) |
+
+Те же проверки можно выполнить локально в контейнерах:
+
+```bash
+docker compose exec backend ruff check .
+docker compose exec backend pytest
+docker compose exec frontend npm run build
+```
+
 ## Backend
 
 ### Команды
