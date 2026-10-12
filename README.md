@@ -10,7 +10,7 @@
 | Слой | Технологии |
 | --- | --- |
 | Backend | Python 3.12, Django 5, Django REST Framework, SimpleJWT |
-| База данных | SQLite (разработка) → PostgreSQL (промышленная эксплуатация) |
+| База данных | PostgreSQL (единая для разработки и эксплуатации) |
 | Frontend | React 18, TypeScript, Vite, Mantine |
 | Инфраструктура | Docker, Docker Compose |
 
@@ -69,8 +69,7 @@ BankCashOps/
 ├── profiles/                 # Профили заказчиков (комплектация поставки)
 ├── docs/                     # Документация проекта
 │   ├── adr/                  # Архитектурные решения
-├── docker-compose.yml        # Стек разработки (SQLite)
-├── docker-compose.postgres.yml   # Надстройка: PostgreSQL
+├── docker-compose.yml        # Стек разработки (PostgreSQL, backend, frontend)
 ├── docker-compose.prod.yml   # Промышленный стек
 └── AGENTS.md                 # Правила для AI-агентов
 ```
@@ -100,10 +99,17 @@ docker compose exec backend ruff check .
 docker compose exec frontend npm run build
 ```
 
-## Переключение на PostgreSQL
+## База данных
+
+И разработка, и эксплуатация используют PostgreSQL. В стеке разработки контейнер
+`db` поднимается автоматически, параметры подключения задаются переменными
+`POSTGRES_*` (см. `.env.example`), а backend получает их через `DATABASE_URL`.
+
+Сбросить базу разработки (том `postgres_data` удаляется):
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.postgres.yml up --build -d
+docker compose down -v
+docker compose up -d
 ```
 
 ## Промышленный запуск
