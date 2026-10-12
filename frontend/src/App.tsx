@@ -29,8 +29,8 @@ export default function App() {
             key={route.path}
             path={route.path}
             element={
-              route.access === 'admin' ? (
-                <ProtectedRoute adminOnly>{route.element}</ProtectedRoute>
+              route.permission ? (
+                <ProtectedRoute permission={route.permission}>{route.element}</ProtectedRoute>
               ) : (
                 route.element
               )

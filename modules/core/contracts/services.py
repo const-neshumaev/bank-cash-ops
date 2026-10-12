@@ -12,8 +12,10 @@ from modules.core.contracts.dto import UserDTO
 
 
 class UserDirectory(Protocol):
-    """Read-only access to users, offered to other modules."""
+    """Read-only access to users and their permissions, offered to other modules."""
 
     def get_user(self, user_id: int) -> UserDTO | None: ...
 
     def is_admin(self, user_id: int) -> bool: ...
+
+    def has_permission(self, user_id: int, permission: str) -> bool: ...

@@ -1,0 +1,56 @@
+import { api } from '@app/api/client'
+import type { CashDesk, Paginated } from '@app/api/types'
+
+export interface ListCashDesksParams {
+  page?: number
+  pageSize?: number
+  search?: string
+  branch?: number | ''
+}
+
+export async function listCashDesks(
+  params: ListCashDesksParams = {},
+): Promise<Paginated<CashDesk>> {
+  const query: Record<string, unknown> = {}
+  if (params.page) query.page = params.page
+  if (params.pageSize) query.page_size = params.pageSize
+  if (params.search) query.search = params.search
+  if (params.branch) query.branch = params.branch
+
+  const { data } = await api.get<Paginated<CashDesk>>('/cash-desks/', { params: query })
+  return data
+}
+
+/** Fetch every active cash desk, for select inputs. */
+export async function listAllCashDesks(): Promise<CashDesk[]> {
+  const { data } = await api.get<Paginated<CashDesk>>('/cash-desks/', {
+    params: { page_size: 100, ordering: 'name' },
+  })
+  return data.results
+}
+
+export interface CashDeskPayload {
+  branch: number
+  code: string
+  name: string
+  mac_address?: string | null
+  hostname?: string
+  is_active: boolean
+}
+
+export async function createCashDesk(payload: CashDeskPayload): Promise<CashDesk> {
+  const { data } = await api.post<CashDesk>('/cash-desks/', payload)
+  return data
+}
+
+export async function updateCashDesk(
+  id: number,
+  payload: Partial<CashDeskPayload>,
+): Promise<CashDesk> {
+  const { data } = await api.patch<CashDesk>(`/cash-desks/${id}/`, payload)
+  return data
+}
+
+export async function deleteCashDesk(id: number): Promise<void> {
+  await api.delete(`/cash-desks/${id}/`)
+}

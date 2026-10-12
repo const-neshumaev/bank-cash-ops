@@ -1,11 +1,11 @@
 import { api } from '@app/api/client'
-import type { Paginated, User, UserRole } from '@app/api/types'
+import type { Paginated, User } from '@app/api/types'
 
 export interface ListUsersParams {
   page?: number
   pageSize?: number
   search?: string
-  role?: UserRole | ''
+  roles?: string
   isActive?: boolean | ''
 }
 
@@ -14,7 +14,7 @@ export async function listUsers(params: ListUsersParams = {}): Promise<Paginated
   if (params.page) query.page = params.page
   if (params.pageSize) query.page_size = params.pageSize
   if (params.search) query.search = params.search
-  if (params.role) query.role = params.role
+  if (params.roles) query.roles = params.roles
   if (params.isActive !== undefined && params.isActive !== '') {
     query.is_active = params.isActive
   }
@@ -31,7 +31,7 @@ export interface UserCreatePayload {
   last_name: string
   middle_name?: string
   phone?: string
-  role: UserRole
+  roles: string[]
   is_active: boolean
 }
 

@@ -53,8 +53,8 @@ Content-Type: application/json
 
 ## Пользователи (`/api/users/`)
 
-Доступ только для администраторов (`IsAdminRole`). Для не-администраторов
-возвращается `403`.
+Требуется право `core.users.view` для чтения и `core.users.manage` для
+изменения. Иначе возвращается `403`.
 
 | Метод | Путь | Описание |
 | --- | --- | --- |
@@ -73,7 +73,7 @@ Content-Type: application/json
 | `page` | Номер страницы |
 | `page_size` | Размер страницы (по умолчанию 20, максимум 100) |
 | `search` | Поиск по `email`, имени, фамилии, отчеству, телефону |
-| `role` | Фильтр по роли |
+| `roles` | Фильтр по коду роли (например `cashier`) |
 | `is_active` | Фильтр по активности (`true` / `false`) |
 | `ordering` | Сортировка (`email`, `last_name`, `first_name`, `role`, `date_joined`) |
 
@@ -89,14 +89,18 @@ Content-Type: application/json
   "password_confirm": "strong-pass-123",
   "first_name": "Anna",
   "last_name": "Sidorova",
-  "role": "cashier",
+  "roles": ["cashier"],
   "phone": "+7-900-000-00-00",
   "is_active": true
 }
 ```
 
-Поля `email`, `password`, `password_confirm`, `first_name`, `last_name`, `role`
-обязательны. Пароль проверяется встроенными валидаторами Django.
+Поля `email`, `password`, `password_confirm`, `first_name`, `last_name`
+обязательны. Роли передаются списком кодов. Пароль проверяется встроенными
+валидаторами Django.
+
+В ответе пользователя возвращаются коды ролей (`roles`), их названия
+(`roles_display`) и объединённый список прав (`permissions`).
 
 ### Формат ответа списка
 
@@ -108,6 +112,73 @@ Content-Type: application/json
   "results": [ { "id": 1, "email": "..." } ]
 }
 ```
+
+## Роли (`/api/roles/`)
+
+Требуется право `core.roles.view` для чтения и `core.roles.manage` для
+изменения. Системные роли (`is_system = true`) нельзя удалить.
+
+| Метод | Путь | Описание |
+| --- | --- | --- |
+| GET | `/api/roles/` | Список ролей (поиск по `name`, `code`) |
+| POST | `/api/roles/` | Создание роли: `name`, `description?`, `permissions[]` |
+| GET | `/api/roles/{id}/` | Карточка роли |
+| PATCH | `/api/roles/{id}/` | Изменение роли |
+| DELETE | `/api/roles/{id}/` | Удаление роли (кроме системных) |
+
+Права передаются списком кодов из каталога. Неизвестный код отклоняется (`400`).
+
+## Каталог прав (`/api/permissions/`)
+
+| Метод | Путь | Доступ | Описание |
+| --- | --- | --- | --- |
+| GET | `/api/permissions/` | `core.roles.view` | Каталог прав: `[{ "code", "name" }]` |
+
+## Отделения (`/api/branches/`)
+
+Требуется право `core.structure.view` для чтения и `core.structure.manage` для
+изменения. Отделения образуют дерево с единственным головным офисом.
+
+| Метод | Путь | Описание |
+| --- | --- | --- |
+| GET | `/api/branches/` | Список отделений (поиск по `name`, `code`, `address`) |
+| POST | `/api/branches/` | Создание: `code`, `name`, `parent?`, `is_head_office`, ... |
+| GET | `/api/branches/{id}/` | Карточка отделения |
+| PATCH | `/api/branches/{id}/` | Изменение отделения |
+| DELETE | `/api/branches/{id}/` | Удаление (запрещено при дочерних отделениях или кассах) |
+
+Головной офис создаётся без родителя; любое другое отделение требует `parent`.
+Ветка не может быть своим предком (`400`).
+
+## Кассы (`/api/cash-desks/`)
+
+Требуется право `core.structure.view` для чтения и `core.structure.manage` для
+изменения.
+
+| Метод | Путь | Описание |
+| --- | --- | --- |
+| GET | `/api/cash-desks/` | Список касс (фильтр `branch`, `is_active`; поиск по коду, имени, MAC) |
+| POST | `/api/cash-desks/` | Создание: `branch`, `code`, `name`, `mac_address?`, `hostname?` |
+| GET | `/api/cash-desks/{id}/` | Карточка кассы |
+| PATCH | `/api/cash-desks/{id}/` | Изменение кассы |
+| DELETE | `/api/cash-desks/{id}/` | Удаление (запрещено при наличии смен) |
+
+MAC-адрес хранится в формате `AA:BB:CC:DD:EE:FF` (приводится к верхнему
+регистру) и уникален.
+
+## Кассовые смены (`/api/shifts/`)
+
+| Метод | Путь | Доступ | Описание |
+| --- | --- | --- | --- |
+| GET | `/api/shifts/` | `core.shifts.view` | Список смен (фильтры `status`, `cash_desk`, `cashier`) |
+| POST | `/api/shifts/` | `core.shifts.open` | Открыть смену: `cash_desk` |
+| GET | `/api/shifts/{id}/` | `core.shifts.view` | Карточка смены |
+| GET | `/api/shifts/current/` | `core.shifts.view` | Открытая смена текущего пользователя или `null` |
+| POST | `/api/shifts/{id}/close/` | `core.shifts.close` | Закрыть свою смену |
+| POST | `/api/shifts/{id}/force-close/` | `core.shifts.manage` | Закрыть любую смену |
+
+Смена привязывается к кассе при открытии. Одновременно допускается не более
+одной открытой смены на кассира и на кассу (иначе `400`).
 
 ## Коды ошибок
 

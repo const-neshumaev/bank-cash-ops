@@ -17,7 +17,7 @@ import { useEffect, useState } from 'react'
 import * as authApi from '../api/auth'
 import { extractErrorMessage } from '../api/errors'
 import { useAuth } from '../auth/AuthContext'
-import { ROLE_LABELS } from '../roles'
+import { roleColor } from '../roles'
 
 export function ProfilePage() {
   const { user, refreshUser } = useAuth()
@@ -117,9 +117,19 @@ export function ProfilePage() {
           </Group>
           <Group>
             <Text size="sm" c="dimmed">
-              Роль:
+              Роли:
             </Text>
-            <Text size="sm">{user ? ROLE_LABELS[user.role] : '—'}</Text>
+            <Group gap={6}>
+              {user?.roles.length ? (
+                user.roles.map((code, index) => (
+                  <Badge key={code} color={roleColor(code)} variant="light">
+                    {user.roles_display[index] ?? code}
+                  </Badge>
+                ))
+              ) : (
+                <Text size="sm">—</Text>
+              )}
+            </Group>
           </Group>
         </Stack>
       </Card>

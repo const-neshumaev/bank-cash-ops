@@ -1,22 +1,11 @@
-import type { UserRole } from './api/types'
-
-export const ROLE_LABELS: Record<UserRole, string> = {
-  admin: 'Администратор',
-  manager: 'Руководитель',
-  cashier: 'Кассир',
-  operator: 'Операционист',
-  auditor: 'Аудитор',
+/** Colour hints for the seeded role codes; unknown roles fall back to grey. */
+export const ROLE_COLORS: Record<string, string> = {
+  administrator: 'red',
+  branch_manager: 'grape',
+  specialist: 'orange',
+  cashier: 'blue',
 }
 
-export const ROLE_OPTIONS = (Object.keys(ROLE_LABELS) as UserRole[]).map((value) => ({
-  value,
-  label: ROLE_LABELS[value],
-}))
-
-export const ROLE_COLORS: Record<UserRole, string> = {
-  admin: 'red',
-  manager: 'grape',
-  cashier: 'blue',
-  operator: 'teal',
-  auditor: 'orange',
+export function roleColor(code: string): string {
+  return ROLE_COLORS[code] ?? 'gray'
 }

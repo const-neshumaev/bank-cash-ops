@@ -1,12 +1,12 @@
-import { Button, Group, Modal, PasswordInput, Select, Stack, Switch, TextInput } from '@mantine/core'
+import { Button, Group, Modal, MultiSelect, PasswordInput, Stack, Switch, TextInput } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { notifications } from '@mantine/notifications'
 import { useEffect, useState } from 'react'
 
 import { extractErrorMessage } from '@app/api/errors'
-import type { User, UserRole } from '@app/api/types'
-import { ROLE_OPTIONS } from '@app/roles'
+import type { Role, User } from '@app/api/types'
 
+import * as rolesApi from '../api/roles'
 import * as usersApi from '../api/users'
 
 interface UserFormModalProps {
@@ -22,7 +22,7 @@ interface FormValues {
   last_name: string
   middle_name: string
   phone: string
-  role: string
+  roles: string[]
   is_active: boolean
   password: string
   password_confirm: string
@@ -34,7 +34,7 @@ const EMPTY_VALUES: FormValues = {
   last_name: '',
   middle_name: '',
   phone: '',
-  role: 'cashier',
+  roles: [],
   is_active: true,
   password: '',
   password_confirm: '',
@@ -43,6 +43,7 @@ const EMPTY_VALUES: FormValues = {
 export function UserFormModal({ opened, user, onClose, onSaved }: UserFormModalProps) {
   const isEdit = Boolean(user)
   const [submitting, setSubmitting] = useState(false)
+  const [roles, setRoles] = useState<Role[]>([])
 
   const form = useForm<FormValues>({
     initialValues: EMPTY_VALUES,
@@ -63,6 +64,14 @@ export function UserFormModal({ opened, user, onClose, onSaved }: UserFormModalP
 
   useEffect(() => {
     if (!opened) return
+    void rolesApi
+      .listAllRoles()
+      .then(setRoles)
+      .catch(() => setRoles([]))
+  }, [opened])
+
+  useEffect(() => {
+    if (!opened) return
     if (user) {
       form.setValues({
         email: user.email,
@@ -70,7 +79,7 @@ export function UserFormModal({ opened, user, onClose, onSaved }: UserFormModalP
         last_name: user.last_name,
         middle_name: user.middle_name,
         phone: user.phone,
-        role: user.role,
+        roles: user.roles,
         is_active: user.is_active,
         password: '',
         password_confirm: '',
@@ -82,6 +91,8 @@ export function UserFormModal({ opened, user, onClose, onSaved }: UserFormModalP
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opened, user])
 
+  const roleOptions = roles.map((role) => ({ value: role.code, label: role.name }))
+
   const handleSubmit = form.onSubmit(async (values) => {
     setSubmitting(true)
     try {
@@ -92,7 +103,7 @@ export function UserFormModal({ opened, user, onClose, onSaved }: UserFormModalP
           last_name: values.last_name.trim(),
           middle_name: values.middle_name.trim(),
           phone: values.phone.trim(),
-          role: values.role as UserRole,
+          roles: values.roles,
           is_active: values.is_active,
         })
         notifications.show({ color: 'green', message: 'Пользователь обновлён' })
@@ -105,7 +116,7 @@ export function UserFormModal({ opened, user, onClose, onSaved }: UserFormModalP
           last_name: values.last_name.trim(),
           middle_name: values.middle_name.trim(),
           phone: values.phone.trim(),
-          role: values.role as UserRole,
+          roles: values.roles,
           is_active: values.is_active,
         })
         notifications.show({ color: 'green', message: 'Пользователь создан' })
@@ -142,11 +153,12 @@ export function UserFormModal({ opened, user, onClose, onSaved }: UserFormModalP
             <TextInput label="Отчество" {...form.getInputProps('middle_name')} />
             <TextInput label="Телефон" placeholder="+7-900-000-00-00" {...form.getInputProps('phone')} />
           </Group>
-          <Select
-            label="Роль"
-            data={ROLE_OPTIONS}
-            allowDeselect={false}
-            {...form.getInputProps('role')}
+          <MultiSelect
+            label="Роли"
+            data={roleOptions}
+            searchable
+            placeholder="Выберите роли"
+            {...form.getInputProps('roles')}
           />
           {!isEdit && (
             <Group grow align="flex-start">

@@ -12,7 +12,7 @@ from modules.common.backend.views import health_check
 
 api_patterns = [
     path("auth/", include("modules.core.backend.auth_urls")),
-    path("users/", include("modules.core.backend.urls")),
+    path("", include("modules.core.backend.urls")),
 ]
 
 urlpatterns = [

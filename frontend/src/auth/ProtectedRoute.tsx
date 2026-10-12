@@ -6,11 +6,11 @@ import { useAuth } from './AuthContext'
 
 interface ProtectedRouteProps {
   children: ReactNode
-  adminOnly?: boolean
+  permission?: string
 }
 
-export function ProtectedRoute({ children, adminOnly = false }: ProtectedRouteProps) {
-  const { user, loading, isAdmin } = useAuth()
+export function ProtectedRoute({ children, permission }: ProtectedRouteProps) {
+  const { user, loading, hasPermission } = useAuth()
   const location = useLocation()
 
   if (loading) {
@@ -25,7 +25,7 @@ export function ProtectedRoute({ children, adminOnly = false }: ProtectedRoutePr
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  if (adminOnly && !isAdmin) {
+  if (permission && !hasPermission(permission)) {
     return <Navigate to="/" replace />
   }
 
