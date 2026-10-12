@@ -8,7 +8,7 @@ BankCashOps построен по трёхуровневой архитекту�
 ```mermaid
 graph TD
     A[Frontend SPA<br/>React + TypeScript] -->|REST / JSON| B[Backend<br/>Django + DRF]
-    B -->|ORM| C[(База данных<br/>SQLite / PostgreSQL)]
+    B -->|ORM| C[(PostgreSQL)]
     A -->|JWT| B
 ```
 
@@ -17,8 +17,8 @@ graph TD
   Desktop- и Mobile-клиенты без изменений в backend.
 - **Уровень логики** — Django + Django REST Framework. Отдаёт API, содержит
   бизнес-логику и обеспечивает аутентификацию/авторизацию.
-- **Уровень данных** — реляционная СУБД. В разработке SQLite, в эксплуатации
-  PostgreSQL. Переключение выполняется переменной окружения `DATABASE_URL`.
+- **Уровень данных** — реляционная СУБД PostgreSQL, единая для разработки и
+  эксплуатации. Подключение задаётся переменной окружения `DATABASE_URL`.
 
 ## Модульная архитектура
 
@@ -138,8 +138,7 @@ erDiagram
 | `DJANGO_SECRET_KEY` | Секретный ключ Django |
 | `DJANGO_DEBUG` | Режим отладки |
 | `DJANGO_ALLOWED_HOSTS` | Разрешённые хосты |
-| `DATABASE_URL` | Строка подключения к БД (пусто → SQLite) |
-| `SQLITE_PATH` | Путь к файлу SQLite |
+| `DATABASE_URL` | Строка подключения к БД (PostgreSQL) |
 | `CORS_ALLOWED_ORIGINS` | Разрешённые источники для браузера |
 | `DJANGO_SUPERUSER_*` | Данные начального администратора |
 

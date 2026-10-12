@@ -100,8 +100,11 @@ ASGI_APPLICATION = "config.asgi.application"
 # --------------------------------------------------------------------------- #
 # Database
 # --------------------------------------------------------------------------- #
-# PostgreSQL is used whenever DATABASE_URL is provided, otherwise the project
-# falls back to SQLite which is the default for local development.
+# PostgreSQL is the database for both development and production and is selected
+# through DATABASE_URL. Without it the project falls back to a throwaway SQLite
+# file, kept only as a transitional bootstrap for tooling that does not run a
+# database service yet (the CI backend job); the development stack always sets
+# DATABASE_URL. See docs/adr/0002-postgresql-in-development.md.
 DATABASE_URL = env("DATABASE_URL", default="")
 if DATABASE_URL:
     DATABASES = {"default": env.db_url("DATABASE_URL")}

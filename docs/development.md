@@ -39,19 +39,20 @@ docker compose up --build -d
 ## Работа с Git и GitHub
 
 Ветка `main` защищена: прямые изменения в неё запрещены, поэтому любая правка
-идёт через отдельную ветку и pull request (PR). Проверки CI запускаются на
-каждом PR, и влить изменения можно только после их успешного прохождения.
+идёт через отдельную ветку и pull request (PR). Имя ветки изменения начинается с
+`feature/`, например `feature/postgres-in-development`. Проверки CI запускаются
+на каждом PR, и влить изменения можно только после их успешного прохождения.
 
 Цикл одной правки:
 
 ```bash
-git switch -c my-feature          # 1. новая ветка под задачу
+git switch -c feature/my-feature      # 1. новая ветка под задачу
 # ... правки и коммиты ...
-git push -u origin my-feature     # 2. отправить ветку на GitHub
+git push -u origin feature/my-feature # 2. отправить ветку на GitHub
 ```
 
 3. Открыть PR: после push `git` печатает ссылку вида
-   `https://github.com/<...>/pull/new/my-feature` — откройте её и нажмите
+   `https://github.com/<...>/pull/new/feature/my-feature` — откройте её и нажмите
    **Create pull request**.
 4. Дождаться зелёных проверок CI (вкладка **Actions** или блок проверок внизу
    страницы PR).
@@ -62,21 +63,21 @@ git push -u origin my-feature     # 2. отправить ветку на GitHub
 ```bash
 git switch main
 git pull                          # подтянуть слитые изменения
-git branch -d my-feature          # удалить локальную ветку
+git branch -d feature/my-feature # удалить локальную ветку
 ```
 
 Если `main` ушёл вперёд, пока вы работали, и PR просит обновления, влейте
 свежий `main` в свою ветку и отправьте её снова:
 
 ```bash
-git switch my-feature
+git switch feature/my-feature
 git merge origin/main
 git push
 ```
 
 > При слиянии через *Squash and merge* локальные коммиты формально не попадают
 > в `main`, поэтому `git branch -d` может отказаться удалять ветку — тогда
-> используйте `git branch -D my-feature`.
+> используйте `git branch -D feature/my-feature`.
 
 ### Что проверяет CI
 
@@ -149,21 +150,29 @@ docker compose exec frontend npm run dev       # dev-сервер (уже зап
 
 ## Работа с базами данных
 
-### SQLite → PostgreSQL
+Единственная СУБД проекта — PostgreSQL; контейнер `db` поднимается вместе со
+стеком разработки, а backend подключается к нему через `DATABASE_URL`
+(см. `docs/adr/0002-postgresql-in-development.md`).
+
+### Подключение к базе
 
 ```bash
-docker compose down
-docker compose -f docker-compose.yml -f docker-compose.postgres.yml up --build -d
+# Параметры по умолчанию — из docker-compose.yml / .env
+docker compose exec db psql -U bankcashops -d bankcashops
 ```
 
-Данные SQLite и PostgreSQL хранятся в отдельных томах (`sqlite_data` и
-`postgres_data`), поэтому переключение не удаляет существующие данные.
-
-### Сброс базы данных SQLite
+### Сброс базы данных
 
 ```bash
-docker compose down -v
+docker compose down -v      # удаляет том postgres_data
 docker compose up -d
+```
+
+### Резервная копия и восстановление
+
+```bash
+docker compose exec db pg_dump -U bankcashops bankcashops > backup.sql
+docker compose exec -T db psql -U bankcashops -d bankcashops < backup.sql
 ```
 
 ## Промышленная сборка
