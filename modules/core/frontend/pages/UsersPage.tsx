@@ -28,10 +28,11 @@ import {
 import { useCallback, useEffect, useState } from 'react'
 
 import { extractErrorMessage } from '@app/api/errors'
-import type { User, UserRole } from '@app/api/types'
+import type { Role, User } from '@app/api/types'
 import { useAuth } from '@app/auth/AuthContext'
-import { ROLE_COLORS, ROLE_LABELS, ROLE_OPTIONS } from '@app/roles'
+import { roleColor } from '@app/roles'
 
+import * as rolesApi from '../api/roles'
 import * as usersApi from '../api/users'
 import { UserFormModal } from '../components/UserFormModal'
 
@@ -46,6 +47,7 @@ export function UsersPage() {
   const { user: currentUser } = useAuth()
 
   const [users, setUsers] = useState<User[]>([])
+  const [roles, setRoles] = useState<Role[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -60,6 +62,13 @@ export function UsersPage() {
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null)
   const [deleting, setDeleting] = useState(false)
 
+  useEffect(() => {
+    void rolesApi
+      .listAllRoles()
+      .then(setRoles)
+      .catch(() => setRoles([]))
+  }, [])
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -67,7 +76,7 @@ export function UsersPage() {
         page,
         pageSize: PAGE_SIZE,
         search: debouncedSearch,
-        role: (roleFilter as UserRole) || '',
+        roles: roleFilter ?? '',
         isActive: statusFilter === null ? '' : statusFilter === 'true',
       })
       setUsers(data.results)
@@ -149,11 +158,11 @@ export function UsersPage() {
         />
         <Select
           placeholder="Роль"
-          data={ROLE_OPTIONS}
+          data={roles.map((role) => ({ value: String(role.id), label: role.name }))}
           value={roleFilter}
           onChange={setRoleFilter}
           clearable
-          w={200}
+          w={220}
         />
         <Select
           placeholder="Статус"
@@ -170,7 +179,7 @@ export function UsersPage() {
           <Table.Tr>
             <Table.Th>ФИО</Table.Th>
             <Table.Th>Email</Table.Th>
-            <Table.Th>Роль</Table.Th>
+            <Table.Th>Роли</Table.Th>
             <Table.Th>Телефон</Table.Th>
             <Table.Th>Статус</Table.Th>
             <Table.Th />
@@ -201,9 +210,19 @@ export function UsersPage() {
                   <Table.Td>{user.full_name || '—'}</Table.Td>
                   <Table.Td>{user.email}</Table.Td>
                   <Table.Td>
-                    <Badge color={ROLE_COLORS[user.role]} variant="light">
-                      {ROLE_LABELS[user.role]}
-                    </Badge>
+                    <Group gap={4}>
+                      {user.roles.length === 0 ? (
+                        <Text c="dimmed" size="sm">
+                          —
+                        </Text>
+                      ) : (
+                        user.roles.map((code, index) => (
+                          <Badge key={code} color={roleColor(code)} variant="light">
+                            {user.roles_display[index] ?? code}
+                          </Badge>
+                        ))
+                      )}
+                    </Group>
                   </Table.Td>
                   <Table.Td>{user.phone || '—'}</Table.Td>
                   <Table.Td>

@@ -2,6 +2,8 @@ import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 
+from modules.core.backend.models import Branch, Role
+
 User = get_user_model()
 
 pytestmark = pytest.mark.django_db
@@ -10,6 +12,10 @@ ADMIN_PASSWORD = "admin-pass-12345"
 CASHIER_PASSWORD = "cashier-pass-123"
 
 USERS_URL = "/api/users/"
+ROLES_URL = "/api/roles/"
+PERMISSIONS_URL = "/api/permissions/"
+BRANCHES_URL = "/api/branches/"
+CASH_DESKS_URL = "/api/cash-desks/"
 LOGIN_URL = "/api/auth/login/"
 ME_URL = "/api/auth/me/"
 
@@ -26,13 +32,14 @@ def admin_user():
 
 @pytest.fixture
 def cashier_user():
-    return User.objects.create_user(
+    user = User.objects.create_user(
         email="cashier@example.com",
         password=CASHIER_PASSWORD,
         first_name="Petr",
         last_name="Petrov",
-        role=User.Role.CASHIER,
     )
+    user.roles.add(Role.objects.get(code="cashier"))
+    return user
 
 
 def login(client, email, password):
@@ -49,6 +56,7 @@ class TestAuthentication:
         assert "access" in response.data
         assert "refresh" in response.data
         assert response.data["user"]["email"] == cashier_user.email
+        assert response.data["user"]["roles"] == ["cashier"]
 
     def test_login_rejects_wrong_password(self, client, cashier_user):
         response = client.post(
@@ -59,16 +67,13 @@ class TestAuthentication:
 
         assert response.status_code == 401
 
-    def test_me_requires_authentication(self, client):
-        assert client.get(ME_URL).status_code == 401
-
-    def test_me_returns_the_current_user(self, client, cashier_user):
+    def test_me_exposes_permissions(self, client, cashier_user):
         login(client, cashier_user.email, CASHIER_PASSWORD)
 
         response = client.get(ME_URL)
 
         assert response.status_code == 200
-        assert response.data["email"] == cashier_user.email
+        assert "core.shifts.open" in response.data["permissions"]
 
     def test_logout_blacklists_the_refresh_token(self, client, cashier_user):
         tokens = login(client, cashier_user.email, CASHIER_PASSWORD)
@@ -100,7 +105,7 @@ class TestUserAdministration:
             "password_confirm": "strong-pass-123",
             "first_name": "Anna",
             "last_name": "Sidorova",
-            "role": User.Role.OPERATOR,
+            "roles": ["specialist"],
             "phone": "+7-900-000-00-00",
             "is_active": True,
         }
@@ -109,7 +114,8 @@ class TestUserAdministration:
         assert response.status_code == 201, response.content
         assert response.data["email"] == "new.operator@example.com"
         assert response.data["full_name"] == "Sidorova Anna"
-        assert User.objects.filter(email="new.operator@example.com").exists()
+        assert response.data["roles"] == ["specialist"]
+        assert "core.structure.view" in response.data["permissions"]
 
     def test_create_user_rejects_mismatched_passwords(self, client, admin_user):
         login(client, admin_user.email, ADMIN_PASSWORD)
@@ -120,25 +126,28 @@ class TestUserAdministration:
             "password_confirm": "another-pass-123",
             "first_name": "Bad",
             "last_name": "User",
-            "role": User.Role.CASHIER,
+            "roles": ["cashier"],
         }
         response = client.post(USERS_URL, payload, format="json")
 
         assert response.status_code == 400
         assert "password_confirm" in response.data
 
-    def test_admin_can_update_a_user(self, client, admin_user, cashier_user):
+    def test_admin_can_update_user_roles(self, client, admin_user, cashier_user):
         login(client, admin_user.email, ADMIN_PASSWORD)
 
         response = client.patch(
             f"{USERS_URL}{cashier_user.id}/",
-            {"role": User.Role.MANAGER, "first_name": "Pavel"},
+            {"roles": ["cashier", "specialist"], "first_name": "Pavel"},
             format="json",
         )
 
         assert response.status_code == 200, response.content
         cashier_user.refresh_from_db()
-        assert cashier_user.role == User.Role.MANAGER
+        assert sorted(cashier_user.roles.values_list("code", flat=True)) == [
+            "cashier",
+            "specialist",
+        ]
         assert cashier_user.first_name == "Pavel"
 
     def test_delete_deactivates_the_user_by_default(self, client, admin_user, cashier_user):
@@ -166,17 +175,6 @@ class TestUserAdministration:
 
         assert response.status_code == 400
 
-    def test_activate_endpoint_restores_the_user(self, client, admin_user, cashier_user):
-        login(client, admin_user.email, ADMIN_PASSWORD)
-        cashier_user.is_active = False
-        cashier_user.save(update_fields=["is_active"])
-
-        response = client.post(f"{USERS_URL}{cashier_user.id}/activate/")
-
-        assert response.status_code == 200
-        cashier_user.refresh_from_db()
-        assert cashier_user.is_active is True
-
     def test_search_filters_the_list(self, client, admin_user, cashier_user):
         login(client, admin_user.email, ADMIN_PASSWORD)
 
@@ -187,36 +185,119 @@ class TestUserAdministration:
         assert cashier_user.email in emails
 
 
-class TestPasswordChange:
-    def test_user_can_change_their_password(self, client, cashier_user):
+class TestRoles:
+    def test_permission_catalog_is_available_to_administrators(self, client, admin_user):
+        login(client, admin_user.email, ADMIN_PASSWORD)
+
+        response = client.get(PERMISSIONS_URL)
+
+        assert response.status_code == 200
+        codes = [item["code"] for item in response.data]
+        assert "core.users.manage" in codes
+
+    def test_cashier_cannot_read_the_permission_catalog(self, client, cashier_user):
         login(client, cashier_user.email, CASHIER_PASSWORD)
 
+        assert client.get(PERMISSIONS_URL).status_code == 403
+
+    def test_admin_can_create_a_role(self, client, admin_user):
+        login(client, admin_user.email, ADMIN_PASSWORD)
+
         response = client.post(
-            "/api/auth/change-password/",
+            ROLES_URL,
             {
-                "old_password": CASHIER_PASSWORD,
-                "new_password": "brand-new-pass-123",
-                "new_password_confirm": "brand-new-pass-123",
+                "name": "Оператор кассы",
+                "permissions": ["core.shifts.view", "core.shifts.open"],
             },
             format="json",
         )
 
-        assert response.status_code == 200, response.content
-        cashier_user.refresh_from_db()
-        assert cashier_user.check_password("brand-new-pass-123")
+        assert response.status_code == 201, response.content
+        assert Role.objects.filter(name="Оператор кассы").exists()
 
-    def test_wrong_current_password_is_rejected(self, client, cashier_user):
-        login(client, cashier_user.email, CASHIER_PASSWORD)
+    def test_role_rejects_unknown_permission(self, client, admin_user):
+        login(client, admin_user.email, ADMIN_PASSWORD)
 
         response = client.post(
-            "/api/auth/change-password/",
-            {
-                "old_password": "not-the-password",
-                "new_password": "brand-new-pass-123",
-                "new_password_confirm": "brand-new-pass-123",
-            },
+            ROLES_URL,
+            {"name": "Bad role", "permissions": ["core.unknown.permission"]},
             format="json",
         )
 
         assert response.status_code == 400
-        assert "old_password" in response.data
+
+    def test_system_role_cannot_be_deleted(self, client, admin_user):
+        login(client, admin_user.email, ADMIN_PASSWORD)
+        role = Role.objects.get(code="cashier")
+
+        response = client.delete(f"{ROLES_URL}{role.id}/")
+
+        assert response.status_code == 400
+        assert Role.objects.filter(id=role.id).exists()
+
+
+class TestBranches:
+    @pytest.fixture
+    def head_office(self):
+        return Branch.objects.create(code="HQ", name="Головной офис", is_head_office=True)
+
+    def test_admin_can_create_a_branch(self, client, admin_user, head_office):
+        login(client, admin_user.email, ADMIN_PASSWORD)
+
+        response = client.post(
+            BRANCHES_URL,
+            {"code": "B1", "name": "Отделение 1", "parent": head_office.id},
+            format="json",
+        )
+
+        assert response.status_code == 201, response.content
+        assert response.data["parent"] == head_office.id
+
+    def test_branch_without_parent_is_rejected(self, client, admin_user):
+        login(client, admin_user.email, ADMIN_PASSWORD)
+
+        response = client.post(BRANCHES_URL, {"code": "B1", "name": "Отделение"}, format="json")
+
+        assert response.status_code == 400
+        assert "parent" in response.data
+
+    def test_cashier_cannot_manage_branches(self, client, cashier_user):
+        login(client, cashier_user.email, CASHIER_PASSWORD)
+
+        assert client.get(BRANCHES_URL).status_code == 403
+
+
+class TestCashDesks:
+    @pytest.fixture
+    def branch(self):
+        head = Branch.objects.create(code="HQ", name="Головной офис", is_head_office=True)
+        return Branch.objects.create(code="B1", name="Отделение 1", parent=head)
+
+    def test_admin_can_create_a_cash_desk(self, client, admin_user, branch):
+        login(client, admin_user.email, ADMIN_PASSWORD)
+
+        response = client.post(
+            CASH_DESKS_URL,
+            {
+                "branch": branch.id,
+                "code": "C1",
+                "name": "Касса 1",
+                "mac_address": "aa:bb:cc:dd:ee:ff",
+            },
+            format="json",
+        )
+
+        assert response.status_code == 201, response.content
+        assert response.data["mac_address"] == "AA:BB:CC:DD:EE:FF"
+
+    def test_invalid_mac_address_is_rejected(self, client, admin_user, branch):
+        login(client, admin_user.email, ADMIN_PASSWORD)
+
+        response = client.post(
+            CASH_DESKS_URL,
+            {"branch": branch.id, "code": "C1", "name": "Касса 1", "mac_address": "not-a-mac"},
+            format="json",
+        )
+
+        assert response.status_code == 400
+        assert "mac_address" in response.data

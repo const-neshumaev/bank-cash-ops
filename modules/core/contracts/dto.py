@@ -11,5 +11,5 @@ class UserDTO:
 
     id: int
     email: str
-    role: str
+    role_codes: tuple[str, ...]
     is_active: bool

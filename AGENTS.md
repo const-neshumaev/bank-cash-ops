@@ -17,8 +17,9 @@ frontend, backend и данных и публикует контракт. Осн
 `docs/adr/0001-modular-monolith.md` и `docs/modules.md`.
 
 Текущее состояние: техническая библиотека `common` и доменный модуль `core`
-(пользователи, аутентификация, роли) уже живут в `modules/`. Остальные модули
-добавляются по мере развития.
+уже живут в `modules/`. В `core` реализованы пользователи, аутентификация,
+**управляемые данными роли и права**, оргструктура (отделения и кассы) и
+кассовые смены. Остальные модули добавляются по мере развития.
 
 ## Языковые правила
 
@@ -138,7 +139,8 @@ Frontend собран из хоста (`frontend/src/`) и фронтендов 
 - Настройки: `backend/config/settings.py`
 - Корневые URL: `backend/config/urls.py`
 - Модель пользователя: `modules/core/backend/models.py`
-- API пользователей: `modules/core/backend/views.py`
+- Каталог прав: `modules/core/backend/permission_codes.py`
+- API пользователей и справочников: `modules/core/backend/views.py`
 - HTTP-клиент SPA: `frontend/src/api/client.ts`
 - Контекст аутентификации: `frontend/src/auth/AuthContext.tsx`
 - Реестр модулей SPA: `frontend/src/registry/index.ts`
