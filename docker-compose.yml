@@ -12,7 +12,9 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      # Published for host tools such as pgAdmin. Shifted off the default 5432
+      # so it does not clash with a locally installed PostgreSQL server.
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bankcashops}"]
       interval: 5s
