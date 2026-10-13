@@ -126,7 +126,7 @@ export function BranchesPage() {
                     )}
                   </Group>
                 </Table.Td>
-                <Table.Td>{branch.code}</Table.Td>
+                <Table.Td>{branch.code || '—'}</Table.Td>
                 <Table.Td>{branch.parent_name || '—'}</Table.Td>
                 <Table.Td>{branch.address || '—'}</Table.Td>
                 <Table.Td>

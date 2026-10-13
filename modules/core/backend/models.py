@@ -112,7 +112,7 @@ class Branch(TimeStampedModel):
         related_name="children",
         verbose_name=_("parent branch"),
     )
-    code = models.CharField(_("code"), max_length=32, unique=True)
+    code = models.CharField(_("code"), max_length=32, unique=True, null=True, blank=True)
     name = models.CharField(_("name"), max_length=255)
     address = models.CharField(_("address"), max_length=255, blank=True)
     phone = models.CharField(_("phone number"), max_length=32, blank=True)
@@ -148,6 +148,9 @@ class Branch(TimeStampedModel):
     def clean(self):
         """Validate the branch position in the hierarchy."""
         super().clean()
+        # An empty code means "no internal bank identifier", stored as NULL so
+        # several branches can omit it under the unique constraint.
+        self.code = (self.code or "").strip() or None
         if self.is_head_office and self.parent_id is not None:
             raise ValidationError({"parent": _("The head office cannot have a parent.")})
         if not self.is_head_office and self.parent_id is None:
@@ -170,7 +173,7 @@ class CashDesk(TimeStampedModel):
         related_name="cash_desks",
         verbose_name=_("branch"),
     )
-    code = models.CharField(_("code"), max_length=32, unique=True)
+    code = models.CharField(_("code"), max_length=32, unique=True, null=True, blank=True)
     name = models.CharField(_("name"), max_length=255)
     mac_address = models.CharField(
         _("MAC address"),
@@ -193,8 +196,11 @@ class CashDesk(TimeStampedModel):
         return self.name
 
     def clean(self):
-        """Normalise the MAC address so uniqueness is case insensitive."""
+        """Normalise the code and MAC address so uniqueness is consistent."""
         super().clean()
+        # An empty code means "no internal bank identifier", stored as NULL so
+        # several cash desks can omit it under the unique constraint.
+        self.code = (self.code or "").strip() or None
         if self.mac_address:
             self.mac_address = self.mac_address.upper()
 

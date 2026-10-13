@@ -1,5 +1,5 @@
 import { api } from '@app/api/client'
-import type { CashDesk, Paginated } from '@app/api/types'
+import type { CashDesk, CashDeskOption, Paginated } from '@app/api/types'
 
 export interface ListCashDesksParams {
   page?: number
@@ -29,9 +29,23 @@ export async function listAllCashDesks(): Promise<CashDesk[]> {
   return data.results
 }
 
+/**
+ * Fetch active cash desks of a branch, for the workplace picker. Available to
+ * any authenticated user, including cashiers.
+ */
+export async function listSelectableCashDesks(
+  branchId: number,
+  search = '',
+): Promise<CashDeskOption[]> {
+  const { data } = await api.get<Paginated<CashDeskOption>>('/cash-desks/selectable/', {
+    params: { page_size: 100, branch: branchId, search: search || undefined },
+  })
+  return data.results
+}
+
 export interface CashDeskPayload {
   branch: number
-  code: string
+  code: string | null
   name: string
   mac_address?: string | null
   hostname?: string

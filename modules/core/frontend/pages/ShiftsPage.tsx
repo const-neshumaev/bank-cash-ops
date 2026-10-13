@@ -9,18 +9,22 @@ import {
   Stack,
   Table,
   Text,
+  TextInput,
   Title,
   Tooltip,
 } from '@mantine/core'
+import { useDebouncedValue } from '@mantine/hooks'
 import dayjs from 'dayjs'
 import { notifications } from '@mantine/notifications'
 import { IconLock } from '@tabler/icons-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { extractErrorMessage } from '@app/api/errors'
-import type { Shift } from '@app/api/types'
+import type { BranchOption, CashDeskOption, Shift } from '@app/api/types'
 import { useAuth } from '@app/auth/AuthContext'
 
+import * as branchesApi from '../api/branches'
+import * as cashDesksApi from '../api/cashDesks'
 import * as shiftsApi from '../api/shifts'
 
 const PAGE_SIZE = 20
@@ -30,8 +34,24 @@ const STATUS_OPTIONS = [
   { value: 'closed', label: 'Закрытые' },
 ]
 
+type PeriodValue = '7' | '30' | '90' | 'all' | 'custom'
+
+const PERIOD_OPTIONS = [
+  { value: '7', label: 'Последние 7 дней' },
+  { value: '30', label: 'Последние 30 дней' },
+  { value: '90', label: 'Последние 90 дней' },
+  { value: 'all', label: 'Всё время' },
+  { value: 'custom', label: 'Произвольный период' },
+]
+
+const COLUMN_COUNT = 7
+
 function formatDateTime(value: string | null): string {
   return value ? dayjs(value).format('DD.MM.YYYY HH:mm') : '—'
+}
+
+function cashDeskLabel(name: string, code: string | null): string {
+  return code ? `${name} (${code})` : name
 }
 
 export function ShiftsPage() {
@@ -42,7 +62,57 @@ export function ShiftsPage() {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
+
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
+  const [period, setPeriod] = useState<PeriodValue>('30')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+  const [branchFilter, setBranchFilter] = useState<string | null>(null)
+  const [cashDeskFilter, setCashDeskFilter] = useState<string | null>(null)
+
+  const [branches, setBranches] = useState<BranchOption[]>([])
+  const [cashDesks, setCashDesks] = useState<CashDeskOption[]>([])
+  const [branchSearch, setBranchSearch] = useState('')
+  const [deskSearch, setDeskSearch] = useState('')
+  const [debouncedBranchSearch] = useDebouncedValue(branchSearch, 300)
+  const [debouncedDeskSearch] = useDebouncedValue(deskSearch, 300)
+
+  const { openedFrom, openedTo } = useMemo(() => {
+    if (period === 'all') {
+      return { openedFrom: undefined, openedTo: undefined }
+    }
+    if (period === 'custom') {
+      return {
+        openedFrom: customFrom ? dayjs(customFrom).startOf('day').toISOString() : undefined,
+        openedTo: customTo ? dayjs(customTo).endOf('day').toISOString() : undefined,
+      }
+    }
+    return {
+      openedFrom: dayjs()
+        .subtract(Number(period), 'day')
+        .startOf('day')
+        .toISOString(),
+      openedTo: undefined,
+    }
+  }, [period, customFrom, customTo])
+
+  useEffect(() => {
+    void branchesApi
+      .listSelectableBranches(debouncedBranchSearch)
+      .then(setBranches)
+      .catch(() => setBranches([]))
+  }, [debouncedBranchSearch])
+
+  useEffect(() => {
+    if (!branchFilter) {
+      setCashDesks([])
+      return
+    }
+    void cashDesksApi
+      .listSelectableCashDesks(Number(branchFilter), debouncedDeskSearch)
+      .then(setCashDesks)
+      .catch(() => setCashDesks([]))
+  }, [branchFilter, debouncedDeskSearch])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -51,6 +121,10 @@ export function ShiftsPage() {
         page,
         pageSize: PAGE_SIZE,
         status: statusFilter ?? '',
+        branch: branchFilter ? Number(branchFilter) : '',
+        cashDesk: cashDeskFilter ? Number(cashDeskFilter) : '',
+        openedFrom,
+        openedTo,
       })
       setShifts(data.results)
       setTotal(data.count)
@@ -59,7 +133,7 @@ export function ShiftsPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, statusFilter])
+  }, [page, statusFilter, branchFilter, cashDeskFilter, openedFrom, openedTo])
 
   useEffect(() => {
     void load()
@@ -67,7 +141,7 @@ export function ShiftsPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [statusFilter])
+  }, [statusFilter, branchFilter, cashDeskFilter, openedFrom, openedTo])
 
   const handleForceClose = async (shift: Shift) => {
     try {
@@ -85,19 +159,83 @@ export function ShiftsPage() {
     <Stack>
       <Group justify="space-between">
         <Title order={3}>Кассовые смены</Title>
+      </Group>
+
+      <Group align="flex-end">
         <Select
-          placeholder="Статус"
+          label="Период"
+          data={PERIOD_OPTIONS}
+          value={period}
+          onChange={(value) => setPeriod((value as PeriodValue) ?? '30')}
+          w={200}
+        />
+        {period === 'custom' && (
+          <>
+            <TextInput
+              type="date"
+              label="С"
+              value={customFrom}
+              onChange={(event) => setCustomFrom(event.currentTarget.value)}
+              w={160}
+            />
+            <TextInput
+              type="date"
+              label="По"
+              value={customTo}
+              onChange={(event) => setCustomTo(event.currentTarget.value)}
+              w={160}
+            />
+          </>
+        )}
+        <Select
+          label="Статус"
+          placeholder="Любой"
           data={STATUS_OPTIONS}
           value={statusFilter}
           onChange={setStatusFilter}
           clearable
-          w={200}
+          w={160}
+        />
+        <Select
+          label="Отделение"
+          placeholder="Все отделения"
+          data={branches.map((branch) => ({
+            value: String(branch.id),
+            label: branch.code ? `${branch.name} (${branch.code})` : branch.name,
+          }))}
+          value={branchFilter}
+          onChange={(value) => {
+            setBranchFilter(value)
+            setCashDeskFilter(null)
+          }}
+          searchable
+          searchValue={branchSearch}
+          onSearchChange={setBranchSearch}
+          clearable
+          w={240}
+        />
+        <Select
+          label="Касса"
+          placeholder={branchFilter ? 'Все кассы' : 'Сначала выберите отделение'}
+          data={cashDesks.map((desk) => ({
+            value: String(desk.id),
+            label: cashDeskLabel(desk.name, desk.code),
+          }))}
+          value={cashDeskFilter}
+          onChange={setCashDeskFilter}
+          searchable
+          searchValue={deskSearch}
+          onSearchChange={setDeskSearch}
+          disabled={!branchFilter}
+          clearable
+          w={240}
         />
       </Group>
 
       <Table striped highlightOnHover withTableBorder>
         <Table.Thead>
           <Table.Tr>
+            <Table.Th>Отделение</Table.Th>
             <Table.Th>Касса</Table.Th>
             <Table.Th>Кассир</Table.Th>
             <Table.Th>Открыта</Table.Th>
@@ -109,7 +247,7 @@ export function ShiftsPage() {
         <Table.Tbody>
           {loading ? (
             <Table.Tr>
-              <Table.Td colSpan={6}>
+              <Table.Td colSpan={COLUMN_COUNT}>
                 <Center py="md">
                   <Loader size="sm" />
                 </Center>
@@ -117,7 +255,7 @@ export function ShiftsPage() {
             </Table.Tr>
           ) : shifts.length === 0 ? (
             <Table.Tr>
-              <Table.Td colSpan={6}>
+              <Table.Td colSpan={COLUMN_COUNT}>
                 <Center py="md">
                   <Text c="dimmed">Смены не найдены</Text>
                 </Center>
@@ -126,9 +264,8 @@ export function ShiftsPage() {
           ) : (
             shifts.map((shift) => (
               <Table.Tr key={shift.id}>
-                <Table.Td>
-                  {shift.cash_desk_name} ({shift.cash_desk_code})
-                </Table.Td>
+                <Table.Td>{shift.cash_desk_branch_name}</Table.Td>
+                <Table.Td>{cashDeskLabel(shift.cash_desk_name, shift.cash_desk_code)}</Table.Td>
                 <Table.Td>{shift.cashier_name}</Table.Td>
                 <Table.Td>{formatDateTime(shift.opened_at)}</Table.Td>
                 <Table.Td>{formatDateTime(shift.closed_at)}</Table.Td>

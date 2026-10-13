@@ -1,5 +1,5 @@
 from django.contrib.auth import get_user_model
-from django.db.models import ProtectedError
+from django.db.models import ProtectedError, Q
 from django.utils.translation import gettext_lazy as _
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
@@ -13,6 +13,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from modules.core.backend import serializers, shifts
+from modules.core.backend.filters import ShiftFilter
 from modules.core.backend.models import Branch, CashDesk, Role, Shift
 from modules.core.backend.permission_codes import CATALOG, PermissionCode
 from modules.core.backend.permissions import PermissionRequired
@@ -220,6 +221,28 @@ class BranchViewSet(viewsets.ModelViewSet):
     ordering_fields = ["name", "code"]
     ordering = ["name"]
 
+    def get_permissions(self):
+        # Picking a branch in the workplace dialog must stay available to every
+        # authenticated user, including cashiers without structure permissions.
+        if self.action == "selectable":
+            return [IsAuthenticated()]
+        return super().get_permissions()
+
+    @action(detail=False, methods=["get"])
+    def selectable(self, request):
+        """List active branches that have at least one active cash desk."""
+        queryset = (
+            Branch.objects.filter(is_active=True, cash_desks__is_active=True)
+            .distinct()
+            .order_by("name")
+        )
+        search = request.query_params.get("search")
+        if search:
+            queryset = queryset.filter(Q(name__icontains=search) | Q(code__icontains=search))
+        page = self.paginate_queryset(queryset)
+        serializer = serializers.BranchOptionSerializer(page, many=True)
+        return self.get_paginated_response(serializer.data)
+
     def destroy(self, request, *args, **kwargs):
         branch = self.get_object()
         try:
@@ -250,6 +273,33 @@ class CashDeskViewSet(viewsets.ModelViewSet):
     ordering_fields = ["name", "code"]
     ordering = ["name"]
 
+    def get_permissions(self):
+        # Picking a cash desk in the workplace dialog must stay available to
+        # every authenticated user, including cashiers without structure rights.
+        if self.action == "selectable":
+            return [IsAuthenticated()]
+        return super().get_permissions()
+
+    @action(detail=False, methods=["get"])
+    def selectable(self, request):
+        """List active cash desks, optionally narrowed to a single branch."""
+        queryset = (
+            CashDesk.objects.filter(is_active=True, branch__is_active=True)
+            .select_related("branch")
+            .order_by("branch__name", "name")
+        )
+        branch = request.query_params.get("branch")
+        if branch:
+            if not branch.isdigit():
+                raise ValidationError({"branch": _("A valid integer is required.")})
+            queryset = queryset.filter(branch_id=int(branch))
+        search = request.query_params.get("search")
+        if search:
+            queryset = queryset.filter(Q(name__icontains=search) | Q(code__icontains=search))
+        page = self.paginate_queryset(queryset)
+        serializer = serializers.CashDeskOptionSerializer(page, many=True)
+        return self.get_paginated_response(serializer.data)
+
     def destroy(self, request, *args, **kwargs):
         cash_desk = self.get_object()
         try:
@@ -277,9 +327,17 @@ class ShiftViewSet(
         "close": PermissionCode.SHIFTS_CLOSE,
         "force_close": PermissionCode.SHIFTS_MANAGE,
     }
-    filterset_fields = ["status", "cash_desk", "cashier"]
+    filterset_class = ShiftFilter
     ordering_fields = ["opened_at", "closed_at"]
     ordering = ["-opened_at"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        # Only list and retrieve are scoped: the close/force-close actions need
+        # the unscoped queryset so they can return a precise 403/404.
+        if self.action in ("list", "retrieve"):
+            return shifts.visible_shifts(user=self.request.user, queryset=queryset)
+        return queryset
 
     def get_serializer_class(self):
         if self.action == "create":
