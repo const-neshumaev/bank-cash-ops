@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.utils.translation import gettext_lazy as _
 
-from modules.core.backend.models import Branch, CashDesk, Role, Shift, User
+from modules.core.backend.models import Branch, BranchAccess, CashDesk, Role, Shift, User
 
 
 @admin.register(Role)
@@ -19,11 +19,20 @@ class RoleAdmin(admin.ModelAdmin):
         return obj.users.count()
 
 
+class BranchAccessInline(admin.TabularInline):
+    """Edit a user's branch access grants from the user page."""
+
+    model = BranchAccess
+    extra = 1
+    autocomplete_fields = ("branch",)
+
+
 @admin.register(User)
 class UserAdmin(DjangoUserAdmin):
     """Administration of the custom user model inside the Django admin."""
 
     ordering = ("last_name", "first_name")
+    inlines = (BranchAccessInline,)
     list_display = ("email", "full_name", "is_active", "is_staff", "last_login")
     list_filter = ("roles", "is_active", "is_staff", "is_superuser")
     search_fields = ("email", "first_name", "last_name", "middle_name", "phone")
@@ -62,6 +71,16 @@ class UserAdmin(DjangoUserAdmin):
     @admin.display(description=_("full name"))
     def full_name(self, obj):
         return obj.full_name
+
+
+@admin.register(BranchAccess)
+class BranchAccessAdmin(admin.ModelAdmin):
+    """Administration of the branch access grants."""
+
+    list_display = ("user", "branch", "include_descendants")
+    list_filter = ("include_descendants", "branch")
+    search_fields = ("user__email", "user__last_name", "branch__name", "branch__code")
+    autocomplete_fields = ("user", "branch")
 
 
 @admin.register(Branch)

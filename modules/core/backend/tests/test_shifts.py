@@ -7,7 +7,7 @@ from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.test import APIClient
 
 from modules.core.backend import shifts
-from modules.core.backend.models import Branch, CashDesk, Role, Shift
+from modules.core.backend.models import Branch, BranchAccess, CashDesk, Role, Shift
 
 User = get_user_model()
 
@@ -48,9 +48,10 @@ def other_branch_cash_desk(branch):
 
 
 @pytest.fixture
-def cashier_user():
+def cashier_user(branch):
     user = User.objects.create_user(email="cashier@example.com", password=CASHIER_PASSWORD)
     user.roles.add(Role.objects.get(code="cashier"))
+    grant_access(user, branch, include_descendants=True)
     return user
 
 
@@ -64,6 +65,13 @@ def login(client, email, password):
     assert response.status_code == 200, response.content
     client.credentials(HTTP_AUTHORIZATION=f"Bearer {response.data['access']}")
     return response
+
+
+def grant_access(user, branch, include_descendants=False):
+    """Give ``user`` access to ``branch`` (branch access is deny-by-default)."""
+    return BranchAccess.objects.create(
+        user=user, branch=branch, include_descendants=include_descendants
+    )
 
 
 class TestShiftService:
@@ -82,6 +90,7 @@ class TestShiftService:
 
     def test_cash_desk_cannot_host_two_shifts(self, cashier_user, cash_desk):
         other = User.objects.create_user(email="other@example.com", password=CASHIER_PASSWORD)
+        grant_access(other, cash_desk.branch)
         shifts.open_shift(cashier=cashier_user, cash_desk=cash_desk)
 
         with pytest.raises(DRFValidationError):
@@ -150,6 +159,7 @@ class TestShiftAPI:
     def test_cashier_cannot_close_someone_elses_shift(self, client, cashier_user, cash_desk):
         other = User.objects.create_user(email="other@example.com", password=CASHIER_PASSWORD)
         other.roles.add(Role.objects.get(code="cashier"))
+        grant_access(other, cash_desk.branch)
         shift = shifts.open_shift(cashier=other, cash_desk=cash_desk)
 
         login(client, cashier_user.email, CASHIER_PASSWORD)
@@ -174,6 +184,7 @@ class TestShiftVisibility:
         self, client, cashier_user, cash_desk, other_cash_desk
     ):
         other = User.objects.create_user(email="other@example.com", password=CASHIER_PASSWORD)
+        grant_access(other, other_cash_desk.branch)
         own = shifts.open_shift(cashier=cashier_user, cash_desk=cash_desk)
         shifts.open_shift(cashier=other, cash_desk=other_cash_desk)
 
@@ -187,6 +198,7 @@ class TestShiftVisibility:
         self, client, admin_user, cashier_user, cash_desk, other_cash_desk
     ):
         other = User.objects.create_user(email="other@example.com", password=CASHIER_PASSWORD)
+        grant_access(other, other_cash_desk.branch)
         shifts.open_shift(cashier=cashier_user, cash_desk=cash_desk)
         shifts.open_shift(cashier=other, cash_desk=other_cash_desk)
 
@@ -200,6 +212,7 @@ class TestShiftVisibility:
         self, client, cashier_user, other_cash_desk
     ):
         other = User.objects.create_user(email="other@example.com", password=CASHIER_PASSWORD)
+        grant_access(other, other_cash_desk.branch)
         stranger_shift = shifts.open_shift(cashier=other, cash_desk=other_cash_desk)
 
         login(client, cashier_user.email, CASHIER_PASSWORD)
@@ -214,6 +227,7 @@ class TestShiftFilters:
     ):
         shifts.open_shift(cashier=cashier_user, cash_desk=cash_desk)
         other = User.objects.create_user(email="other@example.com", password=CASHIER_PASSWORD)
+        grant_access(other, other_branch_cash_desk.branch)
         shift = shifts.open_shift(cashier=other, cash_desk=other_branch_cash_desk)
 
         login(client, admin_user.email, ADMIN_PASSWORD)

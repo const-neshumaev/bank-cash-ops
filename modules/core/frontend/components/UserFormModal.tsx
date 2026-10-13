@@ -1,11 +1,25 @@
-import { Button, Group, Modal, MultiSelect, PasswordInput, Stack, Switch, TextInput } from '@mantine/core'
+import {
+  ActionIcon,
+  Button,
+  Group,
+  Modal,
+  MultiSelect,
+  PasswordInput,
+  Select,
+  Stack,
+  Switch,
+  Text,
+  TextInput,
+} from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { notifications } from '@mantine/notifications'
+import { IconPlus, IconTrash } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 
 import { extractErrorMessage } from '@app/api/errors'
-import type { Role, User } from '@app/api/types'
+import type { Branch, Role, User } from '@app/api/types'
 
+import * as branchesApi from '../api/branches'
 import * as rolesApi from '../api/roles'
 import * as usersApi from '../api/users'
 
@@ -28,6 +42,11 @@ interface FormValues {
   password_confirm: string
 }
 
+interface BranchAccessRow {
+  branch: number | null
+  include_descendants: boolean
+}
+
 const EMPTY_VALUES: FormValues = {
   email: '',
   first_name: '',
@@ -40,10 +59,16 @@ const EMPTY_VALUES: FormValues = {
   password_confirm: '',
 }
 
+function branchLabel(branch: Branch): string {
+  return branch.code ? `${branch.name} (${branch.code})` : branch.name
+}
+
 export function UserFormModal({ opened, user, onClose, onSaved }: UserFormModalProps) {
   const isEdit = Boolean(user)
   const [submitting, setSubmitting] = useState(false)
   const [roles, setRoles] = useState<Role[]>([])
+  const [branches, setBranches] = useState<Branch[]>([])
+  const [branchAccess, setBranchAccess] = useState<BranchAccessRow[]>([])
 
   const form = useForm<FormValues>({
     initialValues: EMPTY_VALUES,
@@ -68,6 +93,10 @@ export function UserFormModal({ opened, user, onClose, onSaved }: UserFormModalP
       .listAllRoles()
       .then(setRoles)
       .catch(() => setRoles([]))
+    void branchesApi
+      .listBranchCatalog()
+      .then(setBranches)
+      .catch(() => setBranches([]))
   }, [opened])
 
   useEffect(() => {
@@ -84,18 +113,48 @@ export function UserFormModal({ opened, user, onClose, onSaved }: UserFormModalP
         password: '',
         password_confirm: '',
       })
+      setBranchAccess(
+        user.branch_access.map((entry) => ({
+          branch: entry.branch,
+          include_descendants: entry.include_descendants,
+        })),
+      )
     } else {
       form.setValues(EMPTY_VALUES)
+      setBranchAccess([])
     }
     form.resetDirty()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opened, user])
 
   const roleOptions = roles.map((role) => ({ value: role.code, label: role.name }))
+  const branchOptions = branches.map((branch) => ({
+    value: String(branch.id),
+    label: branchLabel(branch),
+  }))
+
+  const addBranchRow = () => {
+    setBranchAccess((rows) => [...rows, { branch: null, include_descendants: false }])
+  }
+
+  const updateBranchRow = (index: number, patch: Partial<BranchAccessRow>) => {
+    setBranchAccess((rows) => rows.map((row, i) => (i === index ? { ...row, ...patch } : row)))
+  }
+
+  const removeBranchRow = (index: number) => {
+    setBranchAccess((rows) => rows.filter((_, i) => i !== index))
+  }
 
   const handleSubmit = form.onSubmit(async (values) => {
     setSubmitting(true)
     try {
+      const access = branchAccess
+        .filter((row) => row.branch !== null)
+        .map((row) => ({
+          branch: row.branch as number,
+          include_descendants: row.include_descendants,
+        }))
+
       if (user) {
         await usersApi.updateUser(user.id, {
           email: values.email.trim(),
@@ -104,6 +163,7 @@ export function UserFormModal({ opened, user, onClose, onSaved }: UserFormModalP
           middle_name: values.middle_name.trim(),
           phone: values.phone.trim(),
           roles: values.roles,
+          branch_access: access,
           is_active: values.is_active,
         })
         notifications.show({ color: 'green', message: 'Пользователь обновлён' })
@@ -117,6 +177,7 @@ export function UserFormModal({ opened, user, onClose, onSaved }: UserFormModalP
           middle_name: values.middle_name.trim(),
           phone: values.phone.trim(),
           roles: values.roles,
+          branch_access: access,
           is_active: values.is_active,
         })
         notifications.show({ color: 'green', message: 'Пользователь создан' })
@@ -170,6 +231,58 @@ export function UserFormModal({ opened, user, onClose, onSaved }: UserFormModalP
               />
             </Group>
           )}
+
+          <Stack gap="xs">
+            <Group justify="space-between">
+              <Text fw={500} size="sm">
+                Доступные отделения
+              </Text>
+              <Button
+                size="compact-sm"
+                variant="light"
+                leftSection={<IconPlus size={14} />}
+                onClick={addBranchRow}
+              >
+                Добавить
+              </Button>
+            </Group>
+            <Text size="xs" c="dimmed">
+              Пользователь видит только выбранные отделения. «Включая дочерние» добавляет все
+              вложенные отделения.
+            </Text>
+            {branchAccess.length === 0 ? (
+              <Text size="sm" c="dimmed">
+                Отделения не выбраны — доступ отсутствует.
+              </Text>
+            ) : (
+              branchAccess.map((row, index) => (
+                <Group key={index} gap="xs" wrap="nowrap">
+                  <Select
+                    placeholder="Отделение"
+                    data={branchOptions}
+                    value={row.branch === null ? null : String(row.branch)}
+                    onChange={(value) =>
+                      updateBranchRow(index, { branch: value ? Number(value) : null })
+                    }
+                    searchable
+                    style={{ flex: 1 }}
+                  />
+                  <Switch
+                    label="Включая дочерние"
+                    checked={row.include_descendants}
+                    onChange={(event) =>
+                      updateBranchRow(index, { include_descendants: event.currentTarget.checked })
+                    }
+                    style={{ flexShrink: 0 }}
+                  />
+                  <ActionIcon color="red" variant="subtle" onClick={() => removeBranchRow(index)}>
+                    <IconTrash size={16} />
+                  </ActionIcon>
+                </Group>
+              ))
+            )}
+          </Stack>
+
           <Switch label="Активен" {...form.getInputProps('is_active', { type: 'checkbox' })} />
           <Group justify="flex-end">
             <Button variant="default" onClick={onClose}>

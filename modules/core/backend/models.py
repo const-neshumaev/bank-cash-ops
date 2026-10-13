@@ -164,6 +164,48 @@ class Branch(TimeStampedModel):
         return super().save(*args, **kwargs)
 
 
+class BranchAccess(TimeStampedModel):
+    """Grants a user visibility of a branch, optionally with its descendants.
+
+    Access is data-driven and configured by the bank administrator. A user
+    without any record sees no branches (deny-by-default); a superuser always
+    sees every branch. The ``include_descendants`` flag expands the access to
+    the whole subtree of the selected branch.
+    """
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="branch_access",
+        verbose_name=_("user"),
+    )
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.CASCADE,
+        related_name="user_access",
+        verbose_name=_("branch"),
+    )
+    include_descendants = models.BooleanField(
+        _("include child branches"),
+        default=False,
+        help_text=_("Also grant access to every child branch of this branch."),
+    )
+
+    class Meta:
+        verbose_name = _("branch access")
+        verbose_name_plural = _("branch access")
+        ordering = ("branch__name",)
+        constraints = (
+            models.UniqueConstraint(
+                fields=["user", "branch"],
+                name="core_unique_user_branch_access",
+            ),
+        )
+
+    def __str__(self):
+        return f"{self.user} → {self.branch}"
+
+
 class CashDesk(TimeStampedModel):
     """A cashier workstation; one cash desk corresponds to one computer."""
 

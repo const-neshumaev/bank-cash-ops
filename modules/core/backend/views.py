@@ -12,7 +12,7 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from modules.core.backend import serializers, shifts
+from modules.core.backend import scoping, serializers, shifts
 from modules.core.backend.filters import ShiftFilter
 from modules.core.backend.models import Branch, CashDesk, Role, Shift
 from modules.core.backend.permission_codes import CATALOG, PermissionCode
@@ -215,11 +215,20 @@ class BranchViewSet(viewsets.ModelViewSet):
         "update": PermissionCode.STRUCTURE_MANAGE,
         "partial_update": PermissionCode.STRUCTURE_MANAGE,
         "destroy": PermissionCode.STRUCTURE_MANAGE,
+        "catalog": PermissionCode.USERS_MANAGE,
     }
     filterset_fields = ["is_head_office", "is_active", "parent"]
     search_fields = ["name", "code", "address"]
     ordering_fields = ["name", "code"]
     ordering = ["name"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        # The catalog is intentionally unscoped: assigning access needs the full
+        # branch tree, see the ``catalog`` action below.
+        if self.action == "catalog":
+            return queryset
+        return scoping.scope_by_branch(queryset, self.request.user)
 
     def get_permissions(self):
         # Picking a branch in the workplace dialog must stay available to every
@@ -230,17 +239,34 @@ class BranchViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def selectable(self, request):
-        """List active branches that have at least one active cash desk."""
+        """List accessible active branches that have an active cash desk."""
         queryset = (
             Branch.objects.filter(is_active=True, cash_desks__is_active=True)
             .distinct()
             .order_by("name")
         )
+        queryset = scoping.scope_by_branch(queryset, request.user)
         search = request.query_params.get("search")
         if search:
             queryset = queryset.filter(Q(name__icontains=search) | Q(code__icontains=search))
         page = self.paginate_queryset(queryset)
         serializer = serializers.BranchOptionSerializer(page, many=True)
+        return self.get_paginated_response(serializer.data)
+
+    @action(detail=False, methods=["get"])
+    def catalog(self, request):
+        """List every branch for assigning access (permission ``core.users.manage``).
+
+        The caller's own branch scope is ignored on purpose: configuring a user's
+        access requires the full branch tree, otherwise an administrator with an
+        empty scope could not assign anything.
+        """
+        queryset = Branch.objects.select_related("parent").order_by("name")
+        search = request.query_params.get("search")
+        if search:
+            queryset = queryset.filter(Q(name__icontains=search) | Q(code__icontains=search))
+        page = self.paginate_queryset(queryset)
+        serializer = serializers.BranchSerializer(page, many=True)
         return self.get_paginated_response(serializer.data)
 
     def destroy(self, request, *args, **kwargs):
@@ -273,6 +299,10 @@ class CashDeskViewSet(viewsets.ModelViewSet):
     ordering_fields = ["name", "code"]
     ordering = ["name"]
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return scoping.scope_by_branch(queryset, self.request.user, "branch_id")
+
     def get_permissions(self):
         # Picking a cash desk in the workplace dialog must stay available to
         # every authenticated user, including cashiers without structure rights.
@@ -282,12 +312,13 @@ class CashDeskViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def selectable(self, request):
-        """List active cash desks, optionally narrowed to a single branch."""
+        """List accessible active cash desks, optionally narrowed to a branch."""
         queryset = (
             CashDesk.objects.filter(is_active=True, branch__is_active=True)
             .select_related("branch")
             .order_by("branch__name", "name")
         )
+        queryset = scoping.scope_by_branch(queryset, request.user, "branch_id")
         branch = request.query_params.get("branch")
         if branch:
             if not branch.isdigit():
@@ -333,10 +364,15 @@ class ShiftViewSet(
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        # Only list and retrieve are scoped: the close/force-close actions need
-        # the unscoped queryset so they can return a precise 403/404.
+        # list/retrieve use the full visibility rule (branch scope + role scope).
         if self.action in ("list", "retrieve"):
             return shifts.visible_shifts(user=self.request.user, queryset=queryset)
+        # force-close stays within the accessible branches, so a manager cannot
+        # close a shift outside their scope (a precise 404 otherwise).
+        if self.action == "force_close":
+            return scoping.scope_by_branch(queryset, self.request.user, "cash_desk__branch_id")
+        # close acts on one's own shift: it keeps the unscoped queryset and
+        # reports a precise 403/404.
         return queryset
 
     def get_serializer_class(self):

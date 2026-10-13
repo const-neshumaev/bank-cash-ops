@@ -2,7 +2,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 
-from modules.core.backend.models import Branch, CashDesk, Role
+from modules.core.backend.models import Branch, BranchAccess, CashDesk, Role
 
 User = get_user_model()
 
@@ -303,6 +303,7 @@ class TestStructurePickers:
 
     def test_cashier_can_list_selectable_branches(self, client, cashier_user, branch):
         CashDesk.objects.create(branch=branch, code="C1", name="Касса 1")
+        BranchAccess.objects.create(user=cashier_user, branch=branch)
         login(client, cashier_user.email, CASHIER_PASSWORD)
 
         response = client.get(f"{BRANCHES_URL}selectable/")
@@ -314,6 +315,7 @@ class TestStructurePickers:
     def test_selectable_branches_skip_branches_without_cash_desks(
         self, client, cashier_user, branch, head_office
     ):
+        BranchAccess.objects.create(user=cashier_user, branch=branch)
         login(client, cashier_user.email, CASHIER_PASSWORD)
 
         response = client.get(f"{BRANCHES_URL}selectable/")
@@ -327,6 +329,7 @@ class TestStructurePickers:
         desk = CashDesk.objects.create(branch=branch, code="C1", name="Касса 1")
         other_branch = Branch.objects.create(code="B2", name="Отделение 2", parent=head_office)
         CashDesk.objects.create(branch=other_branch, code="C2", name="Касса 2")
+        BranchAccess.objects.create(user=cashier_user, branch=branch)
         login(client, cashier_user.email, CASHIER_PASSWORD)
 
         response = client.get(f"{CASH_DESKS_URL}selectable/", {"branch": branch.id})

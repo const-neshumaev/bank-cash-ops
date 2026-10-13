@@ -26,6 +26,17 @@ export async function listAllBranches(): Promise<Branch[]> {
 }
 
 /**
+ * Fetch the full, unscoped branch catalog for assigning user access.
+ * Requires the `core.users.manage` permission.
+ */
+export async function listBranchCatalog(): Promise<Branch[]> {
+  const { data } = await api.get<Paginated<Branch>>('/branches/catalog/', {
+    params: { page_size: 100 },
+  })
+  return data.results
+}
+
+/**
  * Fetch branches that have an active cash desk, for the workplace picker.
  * Available to any authenticated user, including cashiers.
  */
