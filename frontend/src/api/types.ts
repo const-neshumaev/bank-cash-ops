@@ -25,12 +25,19 @@ export interface User {
   roles: string[]
   roles_display: string[]
   permissions: string[]
+  branch_access: BranchAccessEntry[]
   phone: string
   is_active: boolean
   is_staff: boolean
   is_superuser: boolean
   date_joined: string
   last_login: string | null
+}
+
+/** A branch access grant: the user sees the branch and optionally its children. */
+export interface BranchAccessEntry {
+  branch: number
+  include_descendants: boolean
 }
 
 export interface Branch {

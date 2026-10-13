@@ -80,6 +80,19 @@ graph TD
 | `reports` | Отчётность (read-model) | опционально |
 | `audit` | Журнал аудита | опционально |
 
+## Архитектура модулей
+
+Устройство каждого модуля описано в отдельном документе: сущности, диаграммы и
+бизнес-правила. Общая архитектура (этот файл) и правила построения модулей
+(`docs/modules.md`) — сквозные для всех модулей.
+
+| Модуль | Документ |
+| --- | --- |
+| `core` | `docs/architecture-module-core.md` |
+
+Новый модуль получает файл `docs/architecture-module-<name>.md` и добавляется в
+таблицу выше.
+
 ## Аутентификация
 
 Используется JWT (`djangorestframework-simplejwt`):
@@ -95,108 +108,12 @@ SPA хранит токены в `localStorage` и автоматически о
 
 ## Роли и права
 
-Роли **управляются данными**: они хранятся в таблице `Role` и настраиваются
-администратором в интерфейсе, а не зашиты в код. У пользователя может быть
-**несколько ролей** (`User.roles` — связь многие-ко-многим).
+Роли **управляются данными** (таблица `Role`), у пользователя может быть
+**несколько ролей**, а доступ проверяется по **кодам прав** из каталога, а не по
+названию роли. Это сквозной механизм авторизации: им пользуются все модули.
 
-Каждая роль несёт набор **кодов прав** из каталога
-(`modules/core/backend/permission_codes.py`) — например `core.users.manage`
-или `core.shifts.open`. Права, выданные всеми ролями пользователя,
-объединяются: метод `User.has_permission(code)` возвращает `True`, если код
-входит в объединение (суперпользователь имеет все права).
-
-При поставке создаются четыре системные роли: **Администратор**,
-**Заведующий отделением**, **Специалист**, **Кассир**. Системные роли нельзя
-удалить, но можно переименовать и изменить их права.
-
-Доступ к эндпоинтам проверяет класс `modules.core.backend.permissions.PermissionRequired`,
-который сопоставляет действие с кодом права (карта `permission_map` на вьюхе).
-Меню и маршруты SPA фильтруются по тем же кодам прав.
-
-## Схема данных (модуль core)
-
-```mermaid
-erDiagram
-    USER {
-        bigint id PK
-        string email UK
-        string first_name
-        string last_name
-        string middle_name
-        string phone
-        bool is_active
-        bool is_staff
-        bool is_superuser
-        datetime date_joined
-        datetime last_login
-    }
-    ROLE {
-        bigint id PK
-        string code UK
-        string name
-        string description
-        json permissions
-        bool is_system
-    }
-    BRANCH {
-        bigint id PK
-        bigint parent_id FK
-        string code UK
-        string name
-        string address
-        bool is_head_office
-        bool is_active
-    }
-    CASHDESK {
-        bigint id PK
-        bigint branch_id FK
-        string code UK
-        string name
-        string mac_address UK
-        string hostname
-        bool is_active
-    }
-    SHIFT {
-        bigint id PK
-        bigint cash_desk_id FK
-        bigint cashier_id FK
-        string status
-        datetime opened_at
-        datetime closed_at
-        bigint closed_by_id FK
-    }
-    USER }o--o{ ROLE : roles
-    BRANCH ||--o{ BRANCH : parent
-    BRANCH ||--o{ CASHDESK : has
-    CASHDESK ||--o{ SHIFT : hosts
-    USER ||--o{ SHIFT : cashier
-```
-
-Поле `username` не используется: вход выполняется по `email`.
-
-Удаление пользователя по умолчанию **мягкое** — учётная запись деактивируется
-(`is_active = false`), запись сохраняется для аудита. Полное удаление доступно
-по `?permanent=true`.
-
-### Отделения и кассы
-
-- Отделения образуют **дерево с единственным головным офисом** (`is_head_office`).
-  Ветка не может быть своим предком (проверка при сохранении), глубину не
-  ограничиваем. Код отделения — сквозной (`unique`).
-- **Касса — это компьютер** (одна касса на один ПК). MAC-адрес хранится как
-  учётный атрибут рабочего места (`unique`); автоматическое определение кассы по
-  MAC отложено, кассир выбирает кассу вручную при открытии смены.
-
-### Кассовые смены
-
-Смена — **серверный объект**, независимый от сессии/браузера:
-
-- касса выбирается один раз при **открытии смены** и фиксируется на всю жизнь смены;
-- одновременно допускается не более **одной открытой смены на кассира** и
-  **одной открытой смены на кассу** (частичные уникальные ограничения);
-- перезагрузка ПК, потеря токена, несколько вкладок — не влияют на смену;
-- забытую смену может закрыть администратор или заведующий отделением
-  (право `core.shifts.manage`); авто-закрытия нет.
+Детали реализации модуля `core` (каталог прав, системные роли, класс
+`PermissionRequired`) — в `docs/architecture-module-core.md`.
 
 ## Конфигурация
 

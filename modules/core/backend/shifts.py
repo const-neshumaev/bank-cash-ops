@@ -6,6 +6,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 
+from modules.core.backend import scoping
 from modules.core.backend.models import CashDesk, Shift, User
 from modules.core.backend.permission_codes import PermissionCode
 
@@ -13,12 +14,13 @@ from modules.core.backend.permission_codes import PermissionCode
 def visible_shifts(*, user: User, queryset=None):
     """Return the shifts ``user`` is allowed to see.
 
-    A cashier who runs shifts (may open and/or close them) but cannot manage
-    shifts belongs to the operational floor and only sees their own shifts;
-    everybody else sees every shift. Per-role object scopes will be introduced
-    later, so this is the single place that decides visibility today.
+    Visibility is the intersection of two rules: the branch scope (a shift is
+    visible when its cash desk belongs to an accessible branch) and the role
+    scope (a cashier who runs shifts but cannot manage them sees only their own
+    shifts; everybody else sees every shift within their branches).
     """
     queryset = Shift.objects.all() if queryset is None else queryset
+    queryset = scoping.scope_by_branch(queryset, user, "cash_desk__branch_id")
     if user.has_permission(PermissionCode.SHIFTS_MANAGE):
         return queryset
     runs_shifts = user.has_permission(PermissionCode.SHIFTS_OPEN) or user.has_permission(
@@ -37,6 +39,10 @@ def open_shift(*, cashier: User, cash_desk: CashDesk) -> Shift:
     """
     if not cash_desk.is_active:
         raise ValidationError({"cash_desk": _("The cash desk is not active.")})
+    if not cash_desk.branch.is_active:
+        raise ValidationError({"cash_desk": _("The branch is not active.")})
+    if not scoping.can_access_branch(cashier, cash_desk.branch):
+        raise ValidationError({"cash_desk": _("The cash desk is not available to you.")})
     if Shift.objects.filter(cashier=cashier, status=Shift.Status.OPEN).exists():
         raise ValidationError(_("You already have an open shift."))
     if Shift.objects.filter(cash_desk=cash_desk, status=Shift.Status.OPEN).exists():

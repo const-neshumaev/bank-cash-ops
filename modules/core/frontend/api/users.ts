@@ -1,5 +1,5 @@
 import { api } from '@app/api/client'
-import type { Paginated, User } from '@app/api/types'
+import type { BranchAccessEntry, Paginated, User } from '@app/api/types'
 
 export interface ListUsersParams {
   page?: number
@@ -32,6 +32,7 @@ export interface UserCreatePayload {
   middle_name?: string
   phone?: string
   roles: string[]
+  branch_access: BranchAccessEntry[]
   is_active: boolean
 }
 

@@ -4,10 +4,35 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from modules.core.backend.models import Branch, CashDesk, Role, Shift
+from modules.core.backend.models import Branch, BranchAccess, CashDesk, Role, Shift
 from modules.core.backend.permission_codes import ALL_CODES
 
 User = get_user_model()
+
+
+def _replace_branch_access(user, entries):
+    """Replace the user's branch access grants with ``entries``.
+
+    ``entries`` is a list of validated dicts with a ``branch`` and an optional
+    ``include_descendants`` key. The list is treated as the full desired state.
+    """
+    BranchAccess.objects.filter(user=user).delete()
+    BranchAccess.objects.bulk_create(
+        BranchAccess(
+            user=user,
+            branch=entry["branch"],
+            include_descendants=entry.get("include_descendants", False),
+        )
+        for entry in entries
+    )
+
+
+class BranchAccessSerializer(serializers.ModelSerializer):
+    """Read and write representation of a branch access grant."""
+
+    class Meta:
+        model = BranchAccess
+        fields = ("branch", "include_descendants")
 
 
 class PermissionSerializer(serializers.Serializer):
@@ -51,6 +76,7 @@ class UserSerializer(serializers.ModelSerializer):
     roles = serializers.SlugRelatedField(many=True, slug_field="code", read_only=True)
     roles_display = serializers.SerializerMethodField()
     permissions = serializers.SerializerMethodField()
+    branch_access = BranchAccessSerializer(many=True, read_only=True)
 
     class Meta:
         model = User
@@ -64,6 +90,7 @@ class UserSerializer(serializers.ModelSerializer):
             "roles",
             "roles_display",
             "permissions",
+            "branch_access",
             "phone",
             "is_active",
             "is_staff",
@@ -91,6 +118,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
         queryset=Role.objects.all(),
         required=False,
     )
+    branch_access = BranchAccessSerializer(many=True, required=False)
 
     class Meta:
         model = User
@@ -103,6 +131,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
             "middle_name",
             "phone",
             "roles",
+            "branch_access",
             "is_active",
         )
 
@@ -116,9 +145,11 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         roles = validated_data.pop("roles", [])
+        branch_access = validated_data.pop("branch_access", [])
         password = validated_data.pop("password")
         user = User.objects.create_user(password=password, **validated_data)
         user.roles.set(roles)
+        _replace_branch_access(user, branch_access)
         user.is_staff = user.is_admin
         user.save(update_fields=["is_staff"])
         return user
@@ -133,6 +164,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         queryset=Role.objects.all(),
         required=False,
     )
+    branch_access = BranchAccessSerializer(many=True, required=False)
 
     class Meta:
         model = User
@@ -143,14 +175,18 @@ class UserUpdateSerializer(serializers.ModelSerializer):
             "middle_name",
             "phone",
             "roles",
+            "branch_access",
             "is_active",
         )
 
     def update(self, instance, validated_data):
         roles = validated_data.pop("roles", None)
+        branch_access = validated_data.pop("branch_access", None)
         user = super().update(instance, validated_data)
         if roles is not None:
             user.roles.set(roles)
+        if branch_access is not None:
+            _replace_branch_access(user, branch_access)
         user.is_staff = user.is_admin
         user.save(update_fields=["is_staff"])
         return user
