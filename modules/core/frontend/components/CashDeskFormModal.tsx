@@ -45,7 +45,6 @@ export function CashDeskFormModal({ opened, cashDesk, onClose, onSaved }: CashDe
     initialValues: EMPTY_VALUES,
     validate: {
       name: (value) => (value.trim() ? null : 'Укажите название'),
-      code: (value) => (value.trim() ? null : 'Укажите код'),
       branch: (value) => (value ? null : 'Выберите отделение'),
       mac_address: (value) =>
         !value.trim() || MAC_PATTERN.test(value.trim())
@@ -68,7 +67,7 @@ export function CashDeskFormModal({ opened, cashDesk, onClose, onSaved }: CashDe
       form.setValues({
         branch: String(cashDesk.branch),
         name: cashDesk.name,
-        code: cashDesk.code,
+        code: cashDesk.code ?? '',
         mac_address: cashDesk.mac_address ?? '',
         hostname: cashDesk.hostname,
         is_active: cashDesk.is_active,
@@ -82,7 +81,7 @@ export function CashDeskFormModal({ opened, cashDesk, onClose, onSaved }: CashDe
 
   const branchOptions = branches.map((branch) => ({
     value: String(branch.id),
-    label: `${branch.name} (${branch.code})`,
+    label: branch.code ? `${branch.name} (${branch.code})` : branch.name,
   }))
 
   const handleSubmit = form.onSubmit(async (values) => {
@@ -91,7 +90,7 @@ export function CashDeskFormModal({ opened, cashDesk, onClose, onSaved }: CashDe
       const payload = {
         branch: Number(values.branch),
         name: values.name.trim(),
-        code: values.code.trim(),
+        code: values.code.trim() || null,
         mac_address: values.mac_address.trim() || null,
         hostname: values.hostname.trim(),
         is_active: values.is_active,
@@ -130,7 +129,11 @@ export function CashDeskFormModal({ opened, cashDesk, onClose, onSaved }: CashDe
           />
           <Group grow align="flex-start">
             <TextInput label="Название" required {...form.getInputProps('name')} />
-            <TextInput label="Код" required {...form.getInputProps('code')} />
+            <TextInput
+              label="Код"
+              description="Необязательно: внутренний идентификатор банка"
+              {...form.getInputProps('code')}
+            />
           </Group>
           <TextInput
             label="MAC-адрес"

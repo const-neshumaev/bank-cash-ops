@@ -10,32 +10,43 @@ import {
   Text,
   Title,
 } from '@mantine/core'
+import { useDebouncedValue } from '@mantine/hooks'
 import dayjs from 'dayjs'
 import { notifications } from '@mantine/notifications'
 import { useCallback, useEffect, useState } from 'react'
 
 import { extractErrorMessage } from '@app/api/errors'
-import type { CashDesk, Shift } from '@app/api/types'
+import type { BranchOption, CashDeskOption, Shift } from '@app/api/types'
 
+import * as branchesApi from '../api/branches'
 import * as cashDesksApi from '../api/cashDesks'
 import * as shiftsApi from '../api/shifts'
 
+function branchLabel(branch: BranchOption): string {
+  return branch.code ? `${branch.name} (${branch.code})` : branch.name
+}
+
+function cashDeskLabel(cashDesk: CashDeskOption): string {
+  return cashDesk.code ? `${cashDesk.name} (${cashDesk.code})` : cashDesk.name
+}
+
 export function WorkplacePage() {
   const [shift, setShift] = useState<Shift | null>(null)
-  const [cashDesks, setCashDesks] = useState<CashDesk[]>([])
+  const [branches, setBranches] = useState<BranchOption[]>([])
+  const [cashDesks, setCashDesks] = useState<CashDeskOption[]>([])
+  const [selectedBranch, setSelectedBranch] = useState<string | null>(null)
   const [selectedDesk, setSelectedDesk] = useState<string | null>(null)
+  const [branchSearch, setBranchSearch] = useState('')
+  const [deskSearch, setDeskSearch] = useState('')
+  const [debouncedBranchSearch] = useDebouncedValue(branchSearch, 300)
+  const [debouncedDeskSearch] = useDebouncedValue(deskSearch, 300)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
 
-  const load = useCallback(async () => {
+  const loadCurrent = useCallback(async () => {
     setLoading(true)
     try {
-      const [current, desks] = await Promise.all([
-        shiftsApi.fetchCurrentShift(),
-        cashDesksApi.listAllCashDesks(),
-      ])
-      setShift(current)
-      setCashDesks(desks.filter((desk) => desk.is_active))
+      setShift(await shiftsApi.fetchCurrentShift())
     } catch (error) {
       notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
     } finally {
@@ -44,8 +55,30 @@ export function WorkplacePage() {
   }, [])
 
   useEffect(() => {
-    void load()
-  }, [load])
+    void loadCurrent()
+  }, [loadCurrent])
+
+  useEffect(() => {
+    void branchesApi
+      .listSelectableBranches(debouncedBranchSearch)
+      .then(setBranches)
+      .catch((error) => {
+        notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
+      })
+  }, [debouncedBranchSearch])
+
+  useEffect(() => {
+    if (!selectedBranch) {
+      setCashDesks([])
+      return
+    }
+    void cashDesksApi
+      .listSelectableCashDesks(Number(selectedBranch), debouncedDeskSearch)
+      .then(setCashDesks)
+      .catch((error) => {
+        notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
+      })
+  }, [selectedBranch, debouncedDeskSearch])
 
   const handleOpen = async () => {
     if (!selectedDesk) return
@@ -53,7 +86,9 @@ export function WorkplacePage() {
     try {
       await shiftsApi.openShift(Number(selectedDesk))
       notifications.show({ color: 'green', message: 'Смена открыта' })
-      await load()
+      setSelectedBranch(null)
+      setSelectedDesk(null)
+      await loadCurrent()
     } catch (error) {
       notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
     } finally {
@@ -67,7 +102,7 @@ export function WorkplacePage() {
     try {
       await shiftsApi.closeShift(shift.id)
       notifications.show({ color: 'green', message: 'Смена закрыта' })
-      await load()
+      await loadCurrent()
     } catch (error) {
       notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
     } finally {
@@ -98,10 +133,18 @@ export function WorkplacePage() {
             </Group>
             <Group>
               <Text size="sm" c="dimmed">
+                Отделение:
+              </Text>
+              <Text size="sm">{shift.cash_desk_branch_name}</Text>
+            </Group>
+            <Group>
+              <Text size="sm" c="dimmed">
                 Касса:
               </Text>
               <Text size="sm">
-                {shift.cash_desk_name} ({shift.cash_desk_code})
+                {shift.cash_desk_code
+                  ? `${shift.cash_desk_name} (${shift.cash_desk_code})`
+                  : shift.cash_desk_name}
               </Text>
             </Group>
             <Group>
@@ -125,18 +168,39 @@ export function WorkplacePage() {
           <Stack>
             <Text fw={500}>Смена не открыта</Text>
             <Text size="sm" c="dimmed">
-              Выберите кассу и откройте смену, чтобы начать работу.
+              Выберите отделение и кассу, затем откройте смену, чтобы начать работу.
             </Text>
             <Select
+              label="Отделение"
+              placeholder="Выберите отделение"
+              data={branches.map((branch) => ({
+                value: String(branch.id),
+                label: branchLabel(branch),
+              }))}
+              searchable
+              searchValue={branchSearch}
+              onSearchChange={setBranchSearch}
+              value={selectedBranch}
+              onChange={(value) => {
+                setSelectedBranch(value)
+                setSelectedDesk(null)
+              }}
+              nothingFoundMessage="Отделения не найдены"
+            />
+            <Select
               label="Касса"
-              placeholder="Выберите кассу"
+              placeholder={selectedBranch ? 'Выберите кассу' : 'Сначала выберите отделение'}
               data={cashDesks.map((desk) => ({
                 value: String(desk.id),
-                label: `${desk.name} (${desk.code})`,
+                label: cashDeskLabel(desk),
               }))}
+              searchable
+              searchValue={deskSearch}
+              onSearchChange={setDeskSearch}
               value={selectedDesk}
               onChange={setSelectedDesk}
-              searchable
+              disabled={!selectedBranch}
+              nothingFoundMessage="Кассы не найдены"
             />
             <Group justify="flex-end">
               <Button

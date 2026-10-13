@@ -211,6 +211,12 @@ class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
 class BranchSerializer(serializers.ModelSerializer):
     """Read and write representation of a bank branch."""
 
+    code = serializers.CharField(
+        max_length=32,
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
     parent = serializers.PrimaryKeyRelatedField(
         queryset=Branch.objects.all(),
         allow_null=True,
@@ -237,8 +243,22 @@ class BranchSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ("created_at", "updated_at")
 
+    def validate_code(self, value):
+        """Store an omitted or blank code as ``None`` so it stays optional."""
+        return (value or "").strip() or None
+
     def validate(self, attrs):
         instance = self.instance
+        code = attrs.get("code")
+        if code:
+            queryset = Branch.objects.filter(code=code)
+            if instance is not None:
+                queryset = queryset.exclude(pk=instance.pk)
+            if queryset.exists():
+                raise serializers.ValidationError(
+                    {"code": _("A branch with this code already exists.")}
+                )
+
         parent = attrs.get("parent", getattr(instance, "parent", None))
         is_head_office = attrs.get(
             "is_head_office", getattr(instance, "is_head_office", False)
@@ -262,9 +282,23 @@ class BranchSerializer(serializers.ModelSerializer):
         return attrs
 
 
+class BranchOptionSerializer(serializers.ModelSerializer):
+    """Compact branch representation used by select inputs."""
+
+    class Meta:
+        model = Branch
+        fields = ("id", "name", "code")
+
+
 class CashDeskSerializer(serializers.ModelSerializer):
     """Read and write representation of a cashier workstation."""
 
+    code = serializers.CharField(
+        max_length=32,
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
     branch_name = serializers.CharField(source="branch.name", read_only=True)
 
     class Meta:
@@ -284,8 +318,32 @@ class CashDeskSerializer(serializers.ModelSerializer):
         read_only_fields = ("created_at", "updated_at")
         extra_kwargs = {"mac_address": {"required": False, "allow_null": True}}
 
+    def validate_code(self, value):
+        """Store an omitted or blank code as ``None`` so it stays optional."""
+        return (value or "").strip() or None
+
+    def validate(self, attrs):
+        code = attrs.get("code")
+        if code:
+            queryset = CashDesk.objects.filter(code=code)
+            if self.instance is not None:
+                queryset = queryset.exclude(pk=self.instance.pk)
+            if queryset.exists():
+                raise serializers.ValidationError(
+                    {"code": _("A cash desk with this code already exists.")}
+                )
+        return attrs
+
     def validate_mac_address(self, value):
         return value.upper() if value else value
+
+
+class CashDeskOptionSerializer(serializers.ModelSerializer):
+    """Compact cash desk representation used by select inputs."""
+
+    class Meta:
+        model = CashDesk
+        fields = ("id", "name", "code", "branch")
 
 
 class ShiftSerializer(serializers.ModelSerializer):
@@ -296,6 +354,8 @@ class ShiftSerializer(serializers.ModelSerializer):
     cash_desk = serializers.PrimaryKeyRelatedField(read_only=True)
     cash_desk_name = serializers.CharField(source="cash_desk.name", read_only=True)
     cash_desk_code = serializers.CharField(source="cash_desk.code", read_only=True)
+    cash_desk_branch = serializers.IntegerField(source="cash_desk.branch_id", read_only=True)
+    cash_desk_branch_name = serializers.CharField(source="cash_desk.branch.name", read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
 
     class Meta:
@@ -307,6 +367,8 @@ class ShiftSerializer(serializers.ModelSerializer):
             "cash_desk",
             "cash_desk_name",
             "cash_desk_code",
+            "cash_desk_branch",
+            "cash_desk_branch_name",
             "status",
             "status_display",
             "opened_at",

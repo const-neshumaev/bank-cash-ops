@@ -142,7 +142,7 @@ export function CashDesksPage() {
             cashDesks.map((cashDesk) => (
               <Table.Tr key={cashDesk.id}>
                 <Table.Td>{cashDesk.name}</Table.Td>
-                <Table.Td>{cashDesk.code}</Table.Td>
+                <Table.Td>{cashDesk.code || '—'}</Table.Td>
                 <Table.Td>{cashDesk.branch_name}</Table.Td>
                 <Table.Td>{cashDesk.mac_address || '—'}</Table.Td>
                 <Table.Td>

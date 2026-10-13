@@ -7,6 +7,26 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 
 from modules.core.backend.models import CashDesk, Shift, User
+from modules.core.backend.permission_codes import PermissionCode
+
+
+def visible_shifts(*, user: User, queryset=None):
+    """Return the shifts ``user`` is allowed to see.
+
+    A cashier who runs shifts (may open and/or close them) but cannot manage
+    shifts belongs to the operational floor and only sees their own shifts;
+    everybody else sees every shift. Per-role object scopes will be introduced
+    later, so this is the single place that decides visibility today.
+    """
+    queryset = Shift.objects.all() if queryset is None else queryset
+    if user.has_permission(PermissionCode.SHIFTS_MANAGE):
+        return queryset
+    runs_shifts = user.has_permission(PermissionCode.SHIFTS_OPEN) or user.has_permission(
+        PermissionCode.SHIFTS_CLOSE
+    )
+    if runs_shifts:
+        return queryset.filter(cashier=user)
+    return queryset
 
 
 def open_shift(*, cashier: User, cash_desk: CashDesk) -> Shift:

@@ -5,6 +5,11 @@ export interface ListShiftsParams {
   page?: number
   pageSize?: number
   status?: string
+  branch?: number | ''
+  cashDesk?: number | ''
+  cashier?: number | ''
+  openedFrom?: string
+  openedTo?: string
 }
 
 export async function listShifts(params: ListShiftsParams = {}): Promise<Paginated<Shift>> {
@@ -12,6 +17,11 @@ export async function listShifts(params: ListShiftsParams = {}): Promise<Paginat
   if (params.page) query.page = params.page
   if (params.pageSize) query.page_size = params.pageSize
   if (params.status) query.status = params.status
+  if (params.branch) query.branch = params.branch
+  if (params.cashDesk) query.cash_desk = params.cashDesk
+  if (params.cashier) query.cashier = params.cashier
+  if (params.openedFrom) query.opened_from = params.openedFrom
+  if (params.openedTo) query.opened_to = params.openedTo
 
   const { data } = await api.get<Paginated<Shift>>('/shifts/', { params: query })
   return data

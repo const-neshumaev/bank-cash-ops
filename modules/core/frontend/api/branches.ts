@@ -1,5 +1,5 @@
 import { api } from '@app/api/client'
-import type { Branch, Paginated } from '@app/api/types'
+import type { Branch, BranchOption, Paginated } from '@app/api/types'
 
 export interface ListBranchesParams {
   page?: number
@@ -25,9 +25,20 @@ export async function listAllBranches(): Promise<Branch[]> {
   return data.results
 }
 
+/**
+ * Fetch branches that have an active cash desk, for the workplace picker.
+ * Available to any authenticated user, including cashiers.
+ */
+export async function listSelectableBranches(search = ''): Promise<BranchOption[]> {
+  const { data } = await api.get<Paginated<BranchOption>>('/branches/selectable/', {
+    params: { page_size: 100, search: search || undefined },
+  })
+  return data.results
+}
+
 export interface BranchPayload {
   parent: number | null
-  code: string
+  code: string | null
   name: string
   address?: string
   phone?: string

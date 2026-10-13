@@ -2,7 +2,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 
-from modules.core.backend.models import Branch, Role
+from modules.core.backend.models import Branch, CashDesk, Role
 
 User = get_user_model()
 
@@ -261,10 +261,87 @@ class TestBranches:
         assert response.status_code == 400
         assert "parent" in response.data
 
+    def test_branch_code_is_optional(self, client, admin_user, head_office):
+        login(client, admin_user.email, ADMIN_PASSWORD)
+
+        response = client.post(
+            BRANCHES_URL,
+            {"name": "Отделение без кода", "parent": head_office.id},
+            format="json",
+        )
+
+        assert response.status_code == 201, response.content
+        assert response.data["code"] is None
+
+    def test_duplicate_branch_code_is_rejected(self, client, admin_user, head_office):
+        login(client, admin_user.email, ADMIN_PASSWORD)
+        Branch.objects.create(code="B1", name="Отделение 1", parent=head_office)
+
+        response = client.post(
+            BRANCHES_URL,
+            {"code": "B1", "name": "Отделение два", "parent": head_office.id},
+            format="json",
+        )
+
+        assert response.status_code == 400
+        assert "code" in response.data
+
     def test_cashier_cannot_manage_branches(self, client, cashier_user):
         login(client, cashier_user.email, CASHIER_PASSWORD)
 
         assert client.get(BRANCHES_URL).status_code == 403
+
+
+class TestStructurePickers:
+    @pytest.fixture
+    def head_office(self):
+        return Branch.objects.create(code="HQ", name="Головной офис", is_head_office=True)
+
+    @pytest.fixture
+    def branch(self, head_office):
+        return Branch.objects.create(code="B1", name="Отделение 1", parent=head_office)
+
+    def test_cashier_can_list_selectable_branches(self, client, cashier_user, branch):
+        CashDesk.objects.create(branch=branch, code="C1", name="Касса 1")
+        login(client, cashier_user.email, CASHIER_PASSWORD)
+
+        response = client.get(f"{BRANCHES_URL}selectable/")
+
+        assert response.status_code == 200, response.content
+        ids = [item["id"] for item in response.data["results"]]
+        assert ids == [branch.id]
+
+    def test_selectable_branches_skip_branches_without_cash_desks(
+        self, client, cashier_user, branch, head_office
+    ):
+        login(client, cashier_user.email, CASHIER_PASSWORD)
+
+        response = client.get(f"{BRANCHES_URL}selectable/")
+
+        assert response.status_code == 200, response.content
+        assert response.data["results"] == []
+
+    def test_cashier_can_list_selectable_cash_desks_of_a_branch(
+        self, client, cashier_user, branch, head_office
+    ):
+        desk = CashDesk.objects.create(branch=branch, code="C1", name="Касса 1")
+        other_branch = Branch.objects.create(code="B2", name="Отделение 2", parent=head_office)
+        CashDesk.objects.create(branch=other_branch, code="C2", name="Касса 2")
+        login(client, cashier_user.email, CASHIER_PASSWORD)
+
+        response = client.get(f"{CASH_DESKS_URL}selectable/", {"branch": branch.id})
+
+        assert response.status_code == 200, response.content
+        assert [item["id"] for item in response.data["results"]] == [desk.id]
+
+    def test_selectable_cash_desks_reject_a_non_numeric_branch(
+        self, client, cashier_user
+    ):
+        login(client, cashier_user.email, CASHIER_PASSWORD)
+
+        response = client.get(f"{CASH_DESKS_URL}selectable/", {"branch": "abc"})
+
+        assert response.status_code == 400
 
 
 class TestCashDesks:
@@ -289,6 +366,18 @@ class TestCashDesks:
 
         assert response.status_code == 201, response.content
         assert response.data["mac_address"] == "AA:BB:CC:DD:EE:FF"
+
+    def test_cash_desk_code_is_optional(self, client, admin_user, branch):
+        login(client, admin_user.email, ADMIN_PASSWORD)
+
+        response = client.post(
+            CASH_DESKS_URL,
+            {"branch": branch.id, "name": "Касса без кода"},
+            format="json",
+        )
+
+        assert response.status_code == 201, response.content
+        assert response.data["code"] is None
 
     def test_invalid_mac_address_is_rejected(self, client, admin_user, branch):
         login(client, admin_user.email, ADMIN_PASSWORD)

@@ -44,7 +44,6 @@ export function BranchFormModal({ opened, branch, onClose, onSaved }: BranchForm
     initialValues: EMPTY_VALUES,
     validate: {
       name: (value) => (value.trim() ? null : 'Укажите название'),
-      code: (value) => (value.trim() ? null : 'Укажите код'),
       parent: (value, values) =>
         values.is_head_office || value ? null : 'Выберите вышестоящее отделение',
     },
@@ -63,7 +62,7 @@ export function BranchFormModal({ opened, branch, onClose, onSaved }: BranchForm
     if (branch) {
       form.setValues({
         name: branch.name,
-        code: branch.code,
+        code: branch.code ?? '',
         parent: branch.parent ? String(branch.parent) : null,
         address: branch.address,
         phone: branch.phone,
@@ -80,14 +79,17 @@ export function BranchFormModal({ opened, branch, onClose, onSaved }: BranchForm
   const isHeadOffice = form.values.is_head_office
   const parentOptions = branches
     .filter((item) => item.id !== branch?.id)
-    .map((item) => ({ value: String(item.id), label: `${item.name} (${item.code})` }))
+    .map((item) => ({
+      value: String(item.id),
+      label: item.code ? `${item.name} (${item.code})` : item.name,
+    }))
 
   const handleSubmit = form.onSubmit(async (values) => {
     setSubmitting(true)
     try {
       const payload = {
         name: values.name.trim(),
-        code: values.code.trim(),
+        code: values.code.trim() || null,
         parent: values.is_head_office ? null : Number(values.parent),
         address: values.address.trim(),
         phone: values.phone.trim(),
@@ -121,7 +123,11 @@ export function BranchFormModal({ opened, branch, onClose, onSaved }: BranchForm
         <Stack>
           <Group grow align="flex-start">
             <TextInput label="Название" required {...form.getInputProps('name')} />
-            <TextInput label="Код" required {...form.getInputProps('code')} />
+            <TextInput
+              label="Код"
+              description="Необязательно: внутренний идентификатор банка"
+              {...form.getInputProps('code')}
+            />
           </Group>
           <Switch
             label="Головной офис"

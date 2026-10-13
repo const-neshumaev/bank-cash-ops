@@ -37,7 +37,7 @@ export interface Branch {
   id: number
   parent: number | null
   parent_name: string | null
-  code: string
+  code: string | null
   name: string
   address: string
   phone: string
@@ -48,17 +48,32 @@ export interface Branch {
   updated_at: string
 }
 
+/** Compact branch returned by the picker endpoint for select inputs. */
+export interface BranchOption {
+  id: number
+  name: string
+  code: string | null
+}
+
 export interface CashDesk {
   id: number
   branch: number
   branch_name: string
-  code: string
+  code: string | null
   name: string
   mac_address: string | null
   hostname: string
   is_active: boolean
   created_at: string
   updated_at: string
+}
+
+/** Compact cash desk returned by the picker endpoint for select inputs. */
+export interface CashDeskOption {
+  id: number
+  name: string
+  code: string | null
+  branch: number
 }
 
 export type ShiftStatus = 'open' | 'closed'
@@ -69,7 +84,9 @@ export interface Shift {
   cashier_name: string
   cash_desk: number
   cash_desk_name: string
-  cash_desk_code: string
+  cash_desk_code: string | null
+  cash_desk_branch: number
+  cash_desk_branch_name: string
   status: ShiftStatus
   status_display: string
   opened_at: string
