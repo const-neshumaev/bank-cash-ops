@@ -124,6 +124,7 @@ nginx. Интерфейс доступен на http://localhost:8080.
 ## Документация
 
 - `docs/architecture.md` — архитектура и принципы модульности.
+- `docs/architecture-module-core.md` — устройство модуля `core`.
 - `docs/modules.md` — модули, контракты, манифест и профили.
 - `docs/adr/` — архитектурные решения (ADR).
 - `docs/api.md` — описание REST API.

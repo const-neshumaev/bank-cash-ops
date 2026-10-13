@@ -13,6 +13,8 @@ modules/<name>/
 
 Правила построения модулей, контракты, формат манифеста и профилей описаны в
 `docs/modules.md`. Архитектурное обоснование — `docs/adr/0001-modular-monolith.md`.
+Устройство конкретного модуля описано в `docs/architecture-module-<name>.md`
+(для ядра — `docs/architecture-module-core.md`).
 
 `_template/` — заготовка для нового модуля.
 
