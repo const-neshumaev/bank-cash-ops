@@ -103,6 +103,8 @@ docker compose exec frontend npm run build
 ```bash
 docker compose exec backend python manage.py makemigrations
 docker compose exec backend python manage.py migrate
+docker compose exec backend python manage.py sync_operation_types
+docker compose exec backend python manage.py dispatch_outbox
 docker compose exec backend python manage.py createsuperuser
 docker compose exec backend python manage.py shell
 docker compose exec backend pytest
@@ -110,6 +112,15 @@ docker compose exec backend pytest modules/core/backend/tests/test_api.py -v
 docker compose exec backend ruff check .
 docker compose exec backend black .
 ```
+
+`sync_operation_types` создаёт и обновляет типы кассовых операций, объявленные
+установленными модулями (движок и базовый набор). Команда идемпотентна и уже
+выполняется при старте backend (entrypoint, после миграций); вручную нужна после
+изменения объявлений без перезапуска контейнера.
+
+`dispatch_outbox` доставляет доменные события (outbox) подписчикам. С флагом
+`--loop` работает непрерывно (воркер): `python manage.py dispatch_outbox --loop`.
+Одиночный запуск годится для cron.
 
 ### Добавление модуля
 

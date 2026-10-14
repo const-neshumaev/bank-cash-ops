@@ -154,6 +154,11 @@ Content-Type: application/json
 | --- | --- | --- | --- |
 | GET | `/api/permissions/` | `core.roles.view` | Каталог прав: `[{ "code", "name" }]` |
 
+Каталог **собирается из модулей**: каждый модуль объявляет свои коды
+(например, `operations.*`), а эндпоинт отдаёт объединение (см.
+`docs/adr/0012-permission-catalog-aggregation.md`). Новые коды назначаются ролям
+через интерфейс ролей.
+
 ## Отделения (`/api/branches/`)
 
 Требуется право `core.structure.view` для чтения и `core.structure.manage` для
@@ -214,6 +219,75 @@ Content-Type: application/json
 активных касс активных отделений. Параметр `branch` сужает выбор до одного
 отделения, `search` ищет по названию и коду.
 
+### Валюты кассы (`/api/cash-desks/{id}/currencies/`)
+
+| Метод | Путь | Право | Описание |
+| --- | --- | --- | --- |
+| GET | `/api/cash-desks/{id}/currencies/` | `core.structure.view` | Доступные валюты кассы |
+| PUT | `/api/cash-desks/{id}/currencies/` | `core.structure.manage` | Задать доступные валюты |
+
+Набор валют кассы — **opt-in**: пока он не задан, кассе доступны все активные
+валюты (`configured: false`); после настройки — только перечисленные.
+
+```http
+PUT /api/cash-desks/7/currencies/
+Content-Type: application/json
+
+{ "currencies": ["USD", "BYN"] }
+```
+
+```json
+{
+  "cash_desk": 7,
+  "configured": true,
+  "currencies": [
+    { "code": "BYN", "name": "Белорусский рубль", "symbol": "Br", "minor_units": 2 },
+    { "code": "USD", "name": "Доллар США", "symbol": "$", "minor_units": 2 }
+  ]
+}
+```
+
+Неизвестный код валюты отклоняется (`400`). Пустой список снимает настройку
+(касса снова без ограничений). Наличие валюты на кассе проверяется при
+проведении операции (см. «Кассовые операции»).
+
+## Валюты (`/api/currencies/`)
+
+Справочник валют банка. Требуется право `core.structure.view` для чтения и
+`core.structure.manage` для изменения.
+
+| Метод | Путь | Описание |
+| --- | --- | --- |
+| GET | `/api/currencies/` | Список валют (фильтр `is_active`, поиск по `code`, `name`) |
+| POST | `/api/currencies/` | Добавить валюту: `code`, `name`, `symbol?`, `minor_units?` |
+| GET | `/api/currencies/{code}/` | Карточка валюты |
+| PATCH | `/api/currencies/{code}/` | Изменение валюты |
+| DELETE | `/api/currencies/{code}/` | Удаление (запрещено, если валюта включена на кассе) |
+
+Код валюты приводится к верхнему регистру и уникален. При поставке добавляются
+`BYN`, `USD`, `EUR`, `RUB`.
+
+## Курсы валют (`/api/currency-rates/`)
+
+Курсы валют банка и отдельных касс. Требуется право `core.structure.view` для
+чтения и `core.structure.manage` для изменения.
+
+| Метод | Путь | Описание |
+| --- | --- | --- |
+| GET | `/api/currency-rates/` | Список курсов (фильтры `currency`, `base_currency`, `rate_type`, `cash_desk`) |
+| POST | `/api/currency-rates/` | Добавить курс |
+| GET | `/api/currency-rates/{id}/` | Карточка курса |
+| PATCH | `/api/currency-rates/{id}/` | Изменение курса |
+| DELETE | `/api/currency-rates/{id}/` | Удаление курса |
+
+Поля: `currency` и `base_currency` (коды из справочника валют), `rate_type`
+(`buy` / `sell` / `central`), `value`, `effective_from` (ISO 8601), `cash_desk`
+(необязательно; пусто — курс банка). Базовая валюта должна отличаться от валюты.
+
+Курсы **действуют по времени**: применяется запись с наибольшим
+`effective_from` не в будущем. Курс кассы **перекрывает** курс банка. Разрешение
+курса доступно модулям через контракт `core.references`.
+
 ## Кассовые смены (`/api/shifts/`)
 
 | Метод | Путь | Доступ | Описание |
@@ -254,6 +328,169 @@ Content-Type: application/json
 Принудительное закрытие (`force-close`) доступно только в пределах доступных
 отделений. Открыть смену можно только на кассе активного отделения и активной
 кассы, к которым у пользователя есть доступ (иначе `400`).
+
+## Кассовые операции (`/api/operations/`)
+
+Движок кассовых операций. Требуется право `operations.view` для чтения,
+`operations.create` для проведения, `operations.reverse` для сторнирования,
+`operations.config.manage` для изменения настроек. Если у типа операции задан
+`permission_code`, он проверяется дополнительно.
+
+Коды `operations.*` назначаются ролям через интерфейс ролей (каталог прав
+агрегируется из модулей, см. `docs/adr/0012-permission-catalog-aggregation.md`).
+
+**Касса и смена операции не передаются в запросе.** Они определяются по открытой
+смене кассира (см. «Кассовые смены»): операция проводится на кассе открытой
+смены. Чтение ограничено доступными пользователю отделениями (доступными кассами).
+
+### Типы операций (`/api/operations/types/`)
+
+| Метод | Путь | Право | Описание |
+| --- | --- | --- | --- |
+| GET | `/api/operations/types/` | `operations.view` | Каталог типов операций |
+| GET | `/api/operations/types/{code}/` | `operations.view` | Тип операции со слотами сумм |
+
+Параметры списка: `kind`, `is_active`, `is_external`, `requires_client` (фильтры),
+`search` (по `code`, `name`), `ordering` (`name`, `code`).
+
+В ответе тип содержит массив `slots` (`code`, `name`, `required`,
+`fixed_currency`, `order`) — по нему строится форма проведения.
+
+### Остатки наличных (`/api/operations/balances/`)
+
+| Метод | Путь | Право | Описание |
+| --- | --- | --- | --- |
+| GET | `/api/operations/balances/` | `operations.view` | Остатки наличных по кассам и валютам |
+| GET | `/api/operations/balances/{id}/` | `operations.view` | Один остаток |
+
+Остаток ведётся по паре (касса, валюта). Параметры: `cash_desk`, `currency`.
+Список ограничен доступными кассами. Остаток не может быть отрицательным: расход
+сверх наличия отклоняется при проведении.
+
+### Журнал операций (`/api/operations/operations/`)
+
+| Метод | Путь | Право | Описание |
+| --- | --- | --- | --- |
+| GET | `/api/operations/operations/` | `operations.view` | Журнал операций (см. параметры) |
+| POST | `/api/operations/operations/` | `operations.create` | Провести операцию |
+| GET | `/api/operations/operations/{id}/` | `operations.view` | Карточка операции (строки и проводки) |
+| POST | `/api/operations/operations/{id}/reverse/` | `operations.reverse` | Сторнировать операцию |
+
+Параметры списка: `cash_desk`, `shift`, `cashier`, `operation_type` (код),
+`direction` (вид: `income` / `expense` / `exchange` / `internal`), `status`,
+`posted_from` / `posted_to` (ISO 8601), `ordering` (`posted_at`, `number`, `id`).
+
+#### Проведение операции
+
+```http
+POST /api/operations/operations/
+Content-Type: application/json
+
+{
+  "operation_type": "cash_receipt",
+  "lines": [
+    { "slot": "amount", "currency": "USD", "amount": "500.00", "rate": null }
+  ],
+  "client_name": "Иванов И. И.",
+  "client_document": "AB 1234567",
+  "comment": "",
+  "idempotency_key": "<уникальный ключ операции>"
+}
+```
+
+Правила:
+
+- тип операции должен быть активным, а его `permission_code` (если задан) —
+  выдан пользователю, иначе `403`;
+- операция должна быть доступна на кассе (комплектация кассы) — иначе `400`;
+- валюты строк должны быть доступны на кассе — иначе `400`;
+- суммы проверяются по слотам типа (обязательные, известные, фиксированные валюты) —
+  иначе `400`;
+- расход не может превысить остаток наличных в кассе — иначе `400` (и ничего не
+  записывается);
+- повтор запроса с тем же `idempotency_key` на той же кассе возвращает уже
+  проведённую операцию (`201`), дубля не создаётся;
+- без открытой смены у кассира — `400`.
+
+#### Сторнирование
+
+Создаёт обратную операцию (со ссылкой на исходную) и помечает исходную как
+`reversed`. Повторное сторно и сторно-сторно запрещены (`400`). Расход сверх
+остатка при сторно также отклоняется.
+
+### Рабочее место кассира (`/api/operations/workplace/`)
+
+| Метод | Путь | Право | Описание |
+| --- | --- | --- | --- |
+| GET | `/api/operations/workplace/` | `operations.view` | Контекст экрана кассира |
+
+Возвращает всё, что нужно экрану: открытую смену и кассу, остатки наличных,
+доступные на кассе операции (со слотами) и доступные валюты. Если смены нет —
+пустой контекст (`shift_id: null`).
+
+```json
+{
+  "shift_id": 11,
+  "cash_desk_id": 7,
+  "currencies": [ { "code": "USD", "name": "Доллар США", "symbol": "$", "minor_units": 2 } ],
+  "rates": [
+    { "currency": "USD", "base_currency": "BYN", "rate_type": "buy", "value": "3.250000", "effective_from": "..." }
+  ],
+  "balances": [
+    { "cash_desk_id": 7, "currency": "USD", "amount": "500.00", "updated_at": "..." }
+  ],
+  "operations": [
+    {
+      "code": "cash_receipt",
+      "name": "Приход наличных",
+      "kind": "income",
+      "requires_client": true,
+      "client_id_threshold": null,
+      "slots": [ { "code": "amount", "name": "Сумма", "required": true, "fixed_currency": "", "order": 0 } ]
+    }
+  ]
+}
+```
+
+### Комплектация кассы (`/api/operations/cash-desks/{cash_desk}/operations/`)
+
+| Метод | Путь | Право | Описание |
+| --- | --- | --- | --- |
+| GET | `/api/operations/cash-desks/{cash_desk}/operations/` | `operations.view` | Операции, доступные на кассе |
+| PUT | `/api/operations/cash-desks/{cash_desk}/operations/` | `operations.config.manage` | Задать доступные операции |
+
+Набор операций кассы — **opt-in**: пока он не задан, кассе доступны все активные
+операции (`configured: false`); после настройки — только перечисленные.
+
+```http
+PUT /api/operations/cash-desks/7/operations/
+Content-Type: application/json
+
+{ "operations": ["cash_receipt", "cash_disbursement"] }
+```
+
+```json
+{
+  "cash_desk_id": 7,
+  "configured": true,
+  "operations": [
+    { "code": "cash_receipt", "name": "Приход наличных", "kind": "income" }
+  ]
+}
+```
+
+Неизвестный код операции отклоняется (`400`). Пустой список снимает настройку
+(касса снова без ограничений).
+
+### Настройки (`/api/operations/settings/`)
+
+| Метод | Путь | Право | Описание |
+| --- | --- | --- | --- |
+| GET | `/api/operations/settings/` | `operations.view` | Настройки операций |
+| PATCH | `/api/operations/settings/` | `operations.config.manage` | Изменить настройки |
+
+Единственный объект настроек банка: `base_currency`, `client_id_threshold`,
+`require_client`.
 
 ## Коды ошибок
 

@@ -54,6 +54,8 @@ INSTALLED_APPS = [
     # Local modules
     "modules.common.backend",
     "modules.core.backend",
+    "modules.operations.backend",
+    "modules.operations_standard.backend",
 ]
 
 MIDDLEWARE = [

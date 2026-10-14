@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 
+from modules.common.backend import outbox
 from modules.core.backend import scoping
 from modules.core.backend.models import CashDesk, Shift, User
 from modules.core.backend.permission_codes import PermissionCode
@@ -47,15 +49,35 @@ def open_shift(*, cashier: User, cash_desk: CashDesk) -> Shift:
         raise ValidationError(_("You already have an open shift."))
     if Shift.objects.filter(cash_desk=cash_desk, status=Shift.Status.OPEN).exists():
         raise ValidationError({"cash_desk": _("The cash desk already has an open shift.")})
-    return Shift.objects.create(cashier=cashier, cash_desk=cash_desk)
+    with transaction.atomic():
+        shift = Shift.objects.create(cashier=cashier, cash_desk=cash_desk)
+        outbox.publish(
+            "core.shift.opened",
+            {
+                "shift_id": shift.id,
+                "cash_desk_id": shift.cash_desk_id,
+                "cashier_id": shift.cashier_id,
+            },
+        )
+        return shift
 
 
 def close_shift(*, shift: Shift, closed_by: User) -> Shift:
     """Close an open shift, recording who closed it and when."""
     if shift.status != Shift.Status.OPEN:
         raise ValidationError(_("The shift is already closed."))
-    shift.status = Shift.Status.CLOSED
-    shift.closed_at = timezone.now()
-    shift.closed_by = closed_by
-    shift.save(update_fields=["status", "closed_at", "closed_by", "updated_at"])
-    return shift
+    with transaction.atomic():
+        shift.status = Shift.Status.CLOSED
+        shift.closed_at = timezone.now()
+        shift.closed_by = closed_by
+        shift.save(update_fields=["status", "closed_at", "closed_by", "updated_at"])
+        outbox.publish(
+            "core.shift.closed",
+            {
+                "shift_id": shift.id,
+                "cash_desk_id": shift.cash_desk_id,
+                "cashier_id": shift.cashier_id,
+                "closed_by_id": closed_by.id,
+            },
+        )
+        return shift

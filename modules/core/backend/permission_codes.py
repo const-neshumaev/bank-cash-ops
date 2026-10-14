@@ -1,9 +1,10 @@
-"""Catalog of permission codes used across the application.
+"""Catalog of the permission codes owned by the ``core`` module.
 
 Permissions are code-defined capabilities: the code that *enforces* a
 permission declares it here. Roles are data (administrators create and edit
-them) and reference these codes, so this module is the single source of truth
-for the catalog rendered in the administration UI.
+them) and reference these codes. Each module declares the codes it owns; the
+administration UI renders the aggregation of all modules' catalogs
+(``modules.common.backend.permissions_catalog``).
 """
 
 from __future__ import annotations

@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.db.models import ProtectedError, Q
 from django.utils.translation import gettext_lazy as _
 from rest_framework import mixins, status, viewsets
@@ -12,13 +13,53 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
+from modules.common.backend import permissions_catalog
+from modules.common.backend.permissions import PermissionRequired
 from modules.core.backend import scoping, serializers, shifts
 from modules.core.backend.filters import ShiftFilter
-from modules.core.backend.models import Branch, CashDesk, Role, Shift
-from modules.core.backend.permission_codes import CATALOG, PermissionCode
-from modules.core.backend.permissions import PermissionRequired
+from modules.core.backend.models import (
+    Branch,
+    CashDesk,
+    CashDeskCurrency,
+    Currency,
+    CurrencyRate,
+    Role,
+    Shift,
+)
+from modules.core.backend.permission_codes import PermissionCode
 
 User = get_user_model()
+
+
+def _cash_desk_currencies_payload(cash_desk):
+    """Return the currencies enabled on ``cash_desk`` (all active when unset)."""
+    configured = list(
+        CashDeskCurrency.objects.filter(cash_desk=cash_desk).select_related("currency")
+    )
+    currencies = [row.currency for row in configured] or list(
+        Currency.objects.filter(is_active=True)
+    )
+    return {
+        "cash_desk": cash_desk.id,
+        "configured": bool(configured),
+        "currencies": serializers.CurrencySerializer(currencies, many=True).data,
+    }
+
+
+def _set_cash_desk_currencies(cash_desk, codes):
+    """Replace the currencies enabled on ``cash_desk`` with ``codes``."""
+    normalised = [code.strip().upper() for code in codes]
+    found = Currency.objects.filter(code__in=normalised)
+    currencies = {currency.code: currency for currency in found}
+    unknown = sorted(set(normalised) - set(currencies))
+    if unknown:
+        raise ValidationError(
+            {"currencies": _("Unknown currencies: %(codes)s.") % {"codes": ", ".join(unknown)}}
+        )
+    with transaction.atomic():
+        CashDeskCurrency.objects.filter(cash_desk=cash_desk).delete()
+        for code in dict.fromkeys(normalised):
+            CashDeskCurrency.objects.create(cash_desk=cash_desk, currency=currencies[code])
 
 
 class LoginView(TokenObtainPairView):
@@ -84,7 +125,8 @@ class PermissionCatalogView(APIView):
     required_permission = PermissionCode.ROLES_VIEW
 
     def get(self, request):
-        return Response(serializers.PermissionSerializer(CATALOG, many=True).data)
+        entries = permissions_catalog.all_entries()
+        return Response(serializers.PermissionSerializer(entries, many=True).data)
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -293,6 +335,7 @@ class CashDeskViewSet(viewsets.ModelViewSet):
         "update": PermissionCode.STRUCTURE_MANAGE,
         "partial_update": PermissionCode.STRUCTURE_MANAGE,
         "destroy": PermissionCode.STRUCTURE_MANAGE,
+        "currencies": PermissionCode.STRUCTURE_VIEW,
     }
     filterset_fields = ["branch", "is_active"]
     search_fields = ["name", "code", "mac_address", "hostname"]
@@ -331,6 +374,18 @@ class CashDeskViewSet(viewsets.ModelViewSet):
         serializer = serializers.CashDeskOptionSerializer(page, many=True)
         return self.get_paginated_response(serializer.data)
 
+    @action(detail=True, methods=["get", "put"], url_path="currencies")
+    def currencies(self, request, pk=None):
+        """Read or replace the currencies enabled on a cash desk."""
+        cash_desk = self.get_object()
+        if request.method == "PUT":
+            if not request.user.has_permission(PermissionCode.STRUCTURE_MANAGE):
+                raise PermissionDenied(_("You do not have permission to perform this action."))
+            serializer = serializers.CashDeskCurrenciesSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            _set_cash_desk_currencies(cash_desk, serializer.validated_data["currencies"])
+        return Response(_cash_desk_currencies_payload(cash_desk))
+
     def destroy(self, request, *args, **kwargs):
         cash_desk = self.get_object()
         try:
@@ -338,6 +393,56 @@ class CashDeskViewSet(viewsets.ModelViewSet):
         except ProtectedError:
             raise ValidationError({"detail": _("The cash desk has shifts.")}) from None
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class CurrencyViewSet(viewsets.ModelViewSet):
+    """CRUD administration of the currency reference data."""
+
+    queryset = Currency.objects.all()
+    serializer_class = serializers.CurrencySerializer
+    permission_classes = [PermissionRequired]
+    permission_map = {
+        "list": PermissionCode.STRUCTURE_VIEW,
+        "retrieve": PermissionCode.STRUCTURE_VIEW,
+        "create": PermissionCode.STRUCTURE_MANAGE,
+        "update": PermissionCode.STRUCTURE_MANAGE,
+        "partial_update": PermissionCode.STRUCTURE_MANAGE,
+        "destroy": PermissionCode.STRUCTURE_MANAGE,
+    }
+    lookup_field = "code"
+    filterset_fields = ["is_active"]
+    search_fields = ["code", "name"]
+    ordering_fields = ["code", "name"]
+    ordering = ["code"]
+
+    def destroy(self, request, *args, **kwargs):
+        currency = self.get_object()
+        try:
+            currency.delete()
+        except ProtectedError:
+            raise ValidationError(
+                {"detail": _("The currency is used by a cash desk.")}
+            ) from None
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class CurrencyRateViewSet(viewsets.ModelViewSet):
+    """CRUD administration of the currency rates."""
+
+    queryset = CurrencyRate.objects.select_related("currency", "base_currency", "cash_desk").all()
+    serializer_class = serializers.CurrencyRateSerializer
+    permission_classes = [PermissionRequired]
+    permission_map = {
+        "list": PermissionCode.STRUCTURE_VIEW,
+        "retrieve": PermissionCode.STRUCTURE_VIEW,
+        "create": PermissionCode.STRUCTURE_MANAGE,
+        "update": PermissionCode.STRUCTURE_MANAGE,
+        "partial_update": PermissionCode.STRUCTURE_MANAGE,
+        "destroy": PermissionCode.STRUCTURE_MANAGE,
+    }
+    filterset_fields = ["currency", "base_currency", "rate_type", "cash_desk"]
+    ordering_fields = ["currency", "rate_type", "effective_from"]
+    ordering = ["currency", "rate_type", "-effective_from"]
 
 
 class ShiftViewSet(

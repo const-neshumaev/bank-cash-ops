@@ -2,7 +2,17 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.utils.translation import gettext_lazy as _
 
-from modules.core.backend.models import Branch, BranchAccess, CashDesk, Role, Shift, User
+from modules.core.backend.models import (
+    Branch,
+    BranchAccess,
+    CashDesk,
+    CashDeskCurrency,
+    Currency,
+    CurrencyRate,
+    Role,
+    Shift,
+    User,
+)
 
 
 @admin.register(Role)
@@ -93,6 +103,14 @@ class BranchAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at")
 
 
+class CashDeskCurrencyInline(admin.TabularInline):
+    """Edit the currencies enabled on a cash desk from its page."""
+
+    model = CashDeskCurrency
+    extra = 1
+    autocomplete_fields = ("currency",)
+
+
 @admin.register(CashDesk)
 class CashDeskAdmin(admin.ModelAdmin):
     """Administration of the cashier workstations."""
@@ -100,6 +118,35 @@ class CashDeskAdmin(admin.ModelAdmin):
     list_display = ("name", "code", "branch", "mac_address", "is_active")
     list_filter = ("is_active", "branch")
     search_fields = ("name", "code", "mac_address", "hostname")
+    readonly_fields = ("created_at", "updated_at")
+    inlines = (CashDeskCurrencyInline,)
+
+
+@admin.register(Currency)
+class CurrencyAdmin(admin.ModelAdmin):
+    """Administration of the currency reference data."""
+
+    list_display = ("code", "name", "symbol", "minor_units", "is_active")
+    list_filter = ("is_active",)
+    search_fields = ("code", "name")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(CurrencyRate)
+class CurrencyRateAdmin(admin.ModelAdmin):
+    """Administration of the currency rates."""
+
+    list_display = (
+        "currency",
+        "base_currency",
+        "rate_type",
+        "value",
+        "cash_desk",
+        "effective_from",
+    )
+    list_filter = ("rate_type", "cash_desk", "currency", "base_currency")
+    search_fields = ("currency__code", "base_currency__code")
+    autocomplete_fields = ("currency", "base_currency", "cash_desk")
     readonly_fields = ("created_at", "updated_at")
 
 

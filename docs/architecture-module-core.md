@@ -19,13 +19,32 @@
 метод `User.has_permission(code)` возвращает `True`, если код входит в объединение
 (суперпользователь имеет все права).
 
+Каталог прав **собирается из модулей**: `core` объявляет свои коды, соседние
+модули — свои (например, `operations.*`), а интерфейс ролей и валидация роли
+показывают объединение (`docs/adr/0012-permission-catalog-aggregation.md`).
+
 При поставке создаются четыре системные роли: **Администратор**,
 **Заведующий отделением**, **Специалист**, **Кассир**. Системные роли нельзя
 удалить, но можно переименовать и изменить их права.
 
-Доступ к эндпоинтам проверяет класс `modules.core.backend.permissions.PermissionRequired`,
-который сопоставляет действие с кодом права (карта `permission_map` на вьюхе).
-Меню и маршруты SPA фильтруются по тем же кодам прав.
+Доступ к эндпоинтам проверяет класс
+`modules.common.backend.permissions.PermissionRequired`, который сопоставляет
+действие с кодом права (карта `permission_map` на вьюхе). Класс общий: им
+пользуются все модули. Меню и маршруты SPA фильтруются по тем же кодам прав.
+
+## Публичный контракт
+
+Модуль публикует в реестре (`modules.common.contracts.registry`) три сервиса;
+другие модули используют только их, а не модели `core`:
+
+- `core.users` (`UserDirectory`) — чтение пользователя, проверка прав и админа;
+- `core.org` (`OrgDirectory`) — открытая смена кассира, доступные кассы и проверка
+  доступа к кассе;
+- `core.references` (`ReferenceDirectory`) — справочник валют, валюты, включённые
+  на кассе, и действующие курсы (в том числе кассовые).
+
+`core.users` и `core.org` нужны модулю `operations`; `core.references` — для
+проверки доступных кассе валют при проведении.
 
 ## Схема данных
 
@@ -113,6 +132,47 @@ erDiagram
   учётный атрибут рабочего места (`unique`); автоматическое определение кассы по
   MAC отложено, кассир выбирает кассу вручную при открытии смены.
 
+### Валюты
+
+Справочник валют банка и валюты, включённые на конкретной кассе. Набор валют
+кассы — **opt-in**: пусто означает «без ограничений».
+
+```mermaid
+erDiagram
+    CURRENCY {
+        string code UK
+        string name
+        string symbol
+        int minor_units
+        bool is_active
+    }
+    CASH_DESK_CURRENCY {
+        bigint id PK
+        bigint cash_desk_id FK
+        bigint currency_id FK
+    }
+    CURRENCY_RATE {
+        bigint id PK
+        bigint currency_id FK
+        bigint base_currency_id FK
+        bigint cash_desk_id FK
+        string rate_type
+        decimal value
+        datetime effective_from
+    }
+    CASH_DESK ||--o{ CASH_DESK_CURRENCY : allows
+    CURRENCY ||--o{ CASH_DESK_CURRENCY : "enabled on"
+    CURRENCY ||--o{ CURRENCY_RATE : quotes
+    CASH_DESK ||--o{ CURRENCY_RATE : "scoped to"
+```
+
+При поставке добавляются `BYN`, `USD`, `EUR`, `RUB`. Курсы (`CurrencyRate`)
+действуют **по времени** (применяется запись с наибольшим `effective_from` не в
+будущем), задаются как для банка, так и для отдельной кассы; курс кассы
+**перекрывает** курс банка. Разрешение курса доступно модулям через контракт
+`core.references` (`rate`, `cash_desk_rates`) — см.
+`docs/adr/0007-currencies-and-rates-in-core.md`.
+
 ### Кассовые смены
 
 Смена — серверный объект, независимый от сессии/браузера; она привязана к кассе
@@ -139,7 +199,10 @@ erDiagram
   **одной открытой смены на кассу** (частичные уникальные ограничения);
 - перезагрузка ПК, потеря токена, несколько вкладок — не влияют на смену;
 - забытую смену может закрыть администратор или заведующий отделением
-  (право `core.shifts.manage`); авто-закрытия нет.
+  (право `core.shifts.manage`); авто-закрытия нет;
+- открытие и закрытие смены публикуют доменные события `core.shift.opened` /
+  `core.shift.closed` (outbox, `docs/adr/0009-domain-events-outbox.md`) — на них
+  может подписаться модуль `operations`.
 
 ## Доступные отделения
 
