@@ -1,0 +1,368 @@
+"""Domain models of the ``operations`` module.
+
+The module owns the operation engine data: the catalogue of operation types and
+their amount slots, the immutable operation journal (operation + lines),
+register movements and the materialised cash balances.
+
+Cross-module references (cash desk, shift, cashier) are stored as stable
+identifiers, never as ORM relations — see ``docs/modules.md`` and
+``docs/adr/0004-operational-accounting-registers.md``.
+"""
+
+from __future__ import annotations
+
+import os
+from decimal import Decimal
+
+from django.db import models
+from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
+
+from modules.common.backend.models import TimeStampedModel
+from modules.operations.backend.registers import RegisterCode
+from modules.operations.contracts.dto import OperationKind
+
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    return os.environ.get(name, str(default)).strip().lower() in {"1", "true", "yes", "on"}
+
+
+class OperationType(TimeStampedModel):
+    """Metadata of an operation kind: how it is posted and what it requires.
+
+    Operation types are data: the base set lives in ``operations-standard`` and
+    bank specific operations come from extension modules. A type without a
+    registered handler is posted from its declarative ``template``.
+    """
+
+    class Kind(models.TextChoices):
+        INCOME = OperationKind.INCOME, _("Income")
+        EXPENSE = OperationKind.EXPENSE, _("Expense")
+        EXCHANGE = OperationKind.EXCHANGE, _("Exchange")
+        INTERNAL = OperationKind.INTERNAL, _("Internal")
+
+    code = models.SlugField(_("code"), max_length=64, unique=True)
+    name = models.CharField(_("name"), max_length=150)
+    kind = models.CharField(_("kind"), max_length=16, choices=Kind.choices)
+    is_external = models.BooleanField(
+        _("external operation"),
+        default=False,
+        help_text=_("The operation calls a bank subsystem over REST."),
+    )
+    requires_client = models.BooleanField(_("requires client data"), default=False)
+    client_id_threshold = models.DecimalField(
+        _("client document threshold"),
+        max_digits=18,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=_("Amount in the base currency above which a client document is required."),
+    )
+    permission_code = models.CharField(
+        _("required permission"),
+        max_length=64,
+        blank=True,
+        help_text=_("Permission code a user needs to perform the operation."),
+    )
+    template = models.JSONField(
+        _("posting template"),
+        default=dict,
+        blank=True,
+        help_text=_("Declarative postings for operations without a handler."),
+    )
+    is_active = models.BooleanField(_("active"), default=True)
+
+    class Meta:
+        verbose_name = _("operation type")
+        verbose_name_plural = _("operation types")
+        ordering = ("name",)
+
+    def __str__(self):
+        return self.name
+
+
+class SlotDef(TimeStampedModel):
+    """An amount slot an operation type expects (its input shape)."""
+
+    operation_type = models.ForeignKey(
+        OperationType,
+        on_delete=models.CASCADE,
+        related_name="slots",
+        verbose_name=_("operation type"),
+    )
+    code = models.SlugField(_("code"), max_length=64)
+    name = models.CharField(_("name"), max_length=150)
+    required = models.BooleanField(_("required"), default=True)
+    fixed_currency = models.CharField(
+        _("currency"),
+        max_length=8,
+        blank=True,
+        help_text=_("When set, the slot only accepts this currency."),
+    )
+    order = models.PositiveSmallIntegerField(_("order"), default=0)
+
+    class Meta:
+        verbose_name = _("slot")
+        verbose_name_plural = _("slots")
+        ordering = ("order", "id")
+        constraints = (
+            models.UniqueConstraint(
+                fields=["operation_type", "code"],
+                name="operations_unique_slot_code",
+            ),
+        )
+
+    def __str__(self):
+        return f"{self.operation_type.code}.{self.code}"
+
+
+class Operation(TimeStampedModel):
+    """An immutable operation document.
+
+    A posted operation is never edited; a mistake is corrected by posting a
+    reversal (``reversal_of``) and marking the original as ``reversed``.
+    """
+
+    class Status(models.TextChoices):
+        POSTED = "posted", _("Posted")
+        REVERSED = "reversed", _("Reversed")
+
+    operation_type = models.ForeignKey(
+        OperationType,
+        on_delete=models.PROTECT,
+        related_name="operations",
+        verbose_name=_("operation type"),
+    )
+    number = models.PositiveBigIntegerField(
+        _("number"),
+        help_text=_("Running number within the cash desk."),
+    )
+    cash_desk_id = models.PositiveBigIntegerField(_("cash desk"))
+    shift_id = models.PositiveBigIntegerField(_("shift"))
+    cashier_id = models.PositiveBigIntegerField(_("cashier"))
+    status = models.CharField(
+        _("status"),
+        max_length=16,
+        choices=Status.choices,
+        default=Status.POSTED,
+    )
+    idempotency_key = models.CharField(_("idempotency key"), max_length=128, blank=True)
+    client_name = models.CharField(_("client name"), max_length=255, blank=True)
+    client_document = models.CharField(_("client document"), max_length=64, blank=True)
+    comment = models.CharField(_("comment"), max_length=255, blank=True)
+    posted_at = models.DateTimeField(_("posted at"), default=timezone.now)
+    reversal_of = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="reversals",
+        verbose_name=_("reversal of"),
+    )
+
+    class Meta:
+        verbose_name = _("operation")
+        verbose_name_plural = _("operations")
+        ordering = ("-posted_at", "-id")
+        indexes = (
+            models.Index(fields=["cash_desk_id", "posted_at"]),
+            models.Index(fields=["shift_id"]),
+            models.Index(fields=["operation_type", "posted_at"]),
+        )
+        constraints = (
+            models.UniqueConstraint(
+                fields=["cash_desk_id", "number"],
+                name="operations_unique_number_per_cash_desk",
+            ),
+            models.UniqueConstraint(
+                fields=["cash_desk_id", "idempotency_key"],
+                condition=~models.Q(idempotency_key=""),
+                name="operations_unique_idempotency_key",
+            ),
+        )
+
+    def __str__(self):
+        return f"{self.operation_type.code} #{self.number} @ {self.cash_desk_id}"
+
+
+class OperationLine(TimeStampedModel):
+    """A filled amount slot of an operation (one currency and amount)."""
+
+    operation = models.ForeignKey(
+        Operation,
+        on_delete=models.CASCADE,
+        related_name="lines",
+        verbose_name=_("operation"),
+    )
+    slot = models.CharField(_("slot"), max_length=64)
+    currency = models.CharField(_("currency"), max_length=8)
+    amount = models.DecimalField(_("amount"), max_digits=18, decimal_places=2)
+    rate = models.DecimalField(_("rate"), max_digits=18, decimal_places=8, null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("operation line")
+        verbose_name_plural = _("operation lines")
+        ordering = ("id",)
+
+    def __str__(self):
+        return f"{self.slot}: {self.amount} {self.currency}"
+
+
+class Movement(TimeStampedModel):
+    """A signed register movement produced by an operation."""
+
+    operation = models.ForeignKey(
+        Operation,
+        on_delete=models.CASCADE,
+        related_name="movements",
+        verbose_name=_("operation"),
+    )
+    register = models.CharField(_("register"), max_length=32)
+    cash_desk_id = models.PositiveBigIntegerField(_("cash desk"))
+    currency = models.CharField(_("currency"), max_length=8)
+    operation_type_code = models.CharField(_("operation type"), max_length=64, blank=True)
+    amount = models.DecimalField(_("amount"), max_digits=18, decimal_places=2)
+
+    class Meta:
+        verbose_name = _("movement")
+        verbose_name_plural = _("movements")
+        ordering = ("id",)
+        indexes = (models.Index(fields=["register", "cash_desk_id", "currency"]),)
+
+    def __str__(self):
+        return f"{self.register} {self.amount} {self.currency}"
+
+
+class CashBalance(TimeStampedModel):
+    """Materialised cash on hand at a cash desk, per currency.
+
+    The movements are the source of truth; this table is a derived, quickly
+    readable balance that the engine keeps consistent and that can always be
+    rebuilt. Negative balances are rejected both by the engine and by a check
+    constraint — see ``docs/adr/0005-multicurrency-cash-balances.md``.
+    """
+
+    cash_desk_id = models.PositiveBigIntegerField(_("cash desk"))
+    currency = models.CharField(_("currency"), max_length=8)
+    amount = models.DecimalField(_("amount"), max_digits=18, decimal_places=2, default=Decimal("0"))
+
+    class Meta:
+        verbose_name = _("cash balance")
+        verbose_name_plural = _("cash balances")
+        ordering = ("cash_desk_id", "currency")
+        constraints = (
+            models.UniqueConstraint(
+                fields=["cash_desk_id", "currency"],
+                name="operations_unique_cash_balance",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(amount__gte=0),
+                name="operations_non_negative_cash_balance",
+            ),
+        )
+
+    def __str__(self):
+        return f"{self.cash_desk_id}/{self.currency}: {self.amount}"
+
+
+class OperationNumberSequence(models.Model):
+    """Running operation number per cash desk (the numbering source)."""
+
+    cash_desk_id = models.PositiveBigIntegerField(_("cash desk"), unique=True)
+    last_number = models.PositiveBigIntegerField(_("last number"), default=0)
+
+    class Meta:
+        verbose_name = _("operation number sequence")
+        verbose_name_plural = _("operation number sequences")
+
+    def __str__(self):
+        return f"{self.cash_desk_id}: {self.last_number}"
+
+
+class OperationsSettings(TimeStampedModel):
+    """Bank-wide operation settings (a singleton row).
+
+    Holds the editable defaults the engine and the administration read: the base
+    currency and the client data policy. The row is created on first access from
+    the environment defaults declared in ``module.yaml``.
+    """
+
+    base_currency = models.CharField(_("base currency"), max_length=8, default="BYN")
+    client_id_threshold = models.DecimalField(
+        _("client document threshold"),
+        max_digits=18,
+        decimal_places=2,
+        default=Decimal("0"),
+    )
+    require_client = models.BooleanField(_("require client data"), default=False)
+
+    class Meta:
+        verbose_name = _("operations settings")
+        verbose_name_plural = _("operations settings")
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        return super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls) -> OperationsSettings:
+        """Return the singleton, creating it from environment defaults if needed."""
+        settings, _ = cls.objects.get_or_create(
+            pk=1,
+            defaults={
+                "base_currency": os.environ.get("BCO_OPERATIONS_BASE_CURRENCY", "BYN"),
+                "client_id_threshold": Decimal(
+                    os.environ.get("BCO_OPERATIONS_CLIENT_ID_THRESHOLD", "0")
+                ),
+                "require_client": _env_flag("BCO_OPERATIONS_REQUIRE_CLIENT"),
+            },
+        )
+        return settings
+
+    def __str__(self):
+        return _("Operations settings")
+
+
+class CashDeskOperation(TimeStampedModel):
+    """An operation type enabled on a specific cash desk.
+
+    An empty set means the cash desk is not restricted (any active operation type
+    is allowed); configuring operations narrows the desk to that list.
+    """
+
+    cash_desk_id = models.PositiveBigIntegerField(_("cash desk"))
+    operation_type = models.ForeignKey(
+        OperationType,
+        on_delete=models.CASCADE,
+        related_name="cash_desks",
+        verbose_name=_("operation type"),
+    )
+
+    class Meta:
+        verbose_name = _("cash desk operation")
+        verbose_name_plural = _("cash desk operations")
+        ordering = ("operation_type__name",)
+        constraints = (
+            models.UniqueConstraint(
+                fields=["cash_desk_id", "operation_type"],
+                name="operations_unique_cash_desk_operation",
+            ),
+        )
+
+    def __str__(self):
+        return f"{self.cash_desk_id} — {self.operation_type}"
+
+
+# Re-exported for convenience of callers that build movements.
+__all__ = [
+    "CashBalance",
+    "CashDeskOperation",
+    "Movement",
+    "Operation",
+    "OperationLine",
+    "OperationNumberSequence",
+    "OperationsSettings",
+    "OperationType",
+    "RegisterCode",
+    "SlotDef",
+]

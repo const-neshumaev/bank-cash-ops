@@ -9,6 +9,9 @@ python manage.py migrate --noinput
 echo ">> Creating the initial administrator (if configured)"
 python manage.py ensure_superuser
 
+echo ">> Syncing the declared operation types"
+python manage.py sync_operation_types
+
 if [ "${DJANGO_COLLECTSTATIC:-0}" = "1" ]; then
     echo ">> Collecting static files"
     python manage.py collectstatic --noinput

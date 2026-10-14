@@ -4,8 +4,16 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from modules.core.backend.models import Branch, BranchAccess, CashDesk, Role, Shift
-from modules.core.backend.permission_codes import ALL_CODES
+from modules.common.backend import permissions_catalog
+from modules.core.backend.models import (
+    Branch,
+    BranchAccess,
+    CashDesk,
+    Currency,
+    CurrencyRate,
+    Role,
+    Shift,
+)
 
 User = get_user_model()
 
@@ -46,7 +54,7 @@ class RoleSerializer(serializers.ModelSerializer):
     """Read and write representation of a role."""
 
     permissions = serializers.ListField(
-        child=serializers.ChoiceField(choices=ALL_CODES),
+        child=serializers.CharField(),
         allow_empty=True,
         required=False,
     )
@@ -67,6 +75,14 @@ class RoleSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ("is_system", "created_at", "updated_at")
         extra_kwargs = {"code": {"required": False, "allow_blank": True}}
+
+    def validate_permissions(self, value):
+        unknown = sorted(code for code in value if not permissions_catalog.is_known_code(code))
+        if unknown:
+            raise serializers.ValidationError(
+                _("Unknown permission codes: %(codes)s.") % {"codes": ", ".join(unknown)}
+            )
+        return value
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -417,3 +433,60 @@ class ShiftOpenSerializer(serializers.Serializer):
     """Input for opening a shift: the cash desk the cashier starts working at."""
 
     cash_desk = serializers.PrimaryKeyRelatedField(queryset=CashDesk.objects.all())
+
+
+class CurrencySerializer(serializers.ModelSerializer):
+    """Read and write representation of a currency."""
+
+    class Meta:
+        model = Currency
+        fields = ("code", "name", "symbol", "minor_units", "is_active")
+
+    def validate_code(self, value):
+        return (value or "").strip().upper()
+
+
+class CashDeskCurrenciesSerializer(serializers.Serializer):
+    """Input for replacing the currencies enabled on a cash desk."""
+
+    currencies = serializers.ListField(
+        child=serializers.CharField(max_length=8), allow_empty=True
+    )
+
+
+class CurrencyRateSerializer(serializers.ModelSerializer):
+    """Read and write representation of a currency rate."""
+
+    currency = serializers.SlugRelatedField(slug_field="code", queryset=Currency.objects.all())
+    base_currency = serializers.SlugRelatedField(
+        slug_field="code", queryset=Currency.objects.all()
+    )
+    cash_desk = serializers.PrimaryKeyRelatedField(
+        queryset=CashDesk.objects.all(), required=False, allow_null=True, default=None
+    )
+
+    class Meta:
+        model = CurrencyRate
+        fields = (
+            "id",
+            "currency",
+            "base_currency",
+            "rate_type",
+            "value",
+            "cash_desk",
+            "effective_from",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = ("created_at", "updated_at")
+
+    def validate(self, attrs):
+        currency = attrs.get("currency", getattr(self.instance, "currency", None))
+        base_currency = attrs.get(
+            "base_currency", getattr(self.instance, "base_currency", None)
+        )
+        if currency is not None and currency == base_currency:
+            raise serializers.ValidationError(
+                {"base_currency": _("The base currency must differ from the currency.")}
+            )
+        return attrs

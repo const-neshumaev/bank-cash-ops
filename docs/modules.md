@@ -129,6 +129,11 @@ outbox.publish(
 
 Подписчик (`reports`) получает событие и обновляет свой read-model.
 
+Реализация живёт в `modules/common/backend/outbox.py` (`publish`, `subscribe`,
+`dispatch_pending`); доставку выполняет команда `dispatch_outbox` (`--loop` —
+непрерывный воркер). Доставка — at-least-once: подписчик идемпотентен по
+`event_id`.
+
 ## Владение данными и БД
 
 Одна СУБД, но **каждый модуль владеет своим набором таблиц**.

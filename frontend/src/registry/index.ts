@@ -1,4 +1,5 @@
 import { coreFrontend } from '@modules/core/frontend'
+import { operationsFrontend } from '@modules/operations/frontend'
 
 import type { FrontendModule } from './contract'
 
@@ -8,7 +9,7 @@ import type { FrontendModule } from './contract'
  * It mirrors the backend composition (`INSTALLED_APPS` / customer profile).
  * Add a module here to plug its routes and navigation into the shell.
  */
-export const enabledModules: FrontendModule[] = [coreFrontend]
+export const enabledModules: FrontendModule[] = [coreFrontend, operationsFrontend]
 
 /** Routes contributed by every enabled module. */
 export const moduleRoutes = enabledModules.flatMap((module) => module.routes)

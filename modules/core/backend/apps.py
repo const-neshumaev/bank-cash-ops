@@ -11,8 +11,22 @@ class CoreConfig(AppConfig):
     verbose_name = _("Core")
 
     def ready(self):
-        """Publish the module contract to the in-process service registry."""
+        """Publish the module contracts to the in-process service registry."""
+        from modules.common.backend import permissions_catalog
         from modules.common.contracts import registry
-        from modules.core.backend.services import UserDirectoryService
+        from modules.core.backend.permission_codes import CATALOG
+        from modules.core.backend.services import (
+            OrgDirectoryService,
+            ReferenceDirectoryService,
+            UserDirectoryService,
+        )
+        from modules.core.contracts import (
+            ORG_DIRECTORY,
+            REFERENCE_DIRECTORY,
+            USER_DIRECTORY,
+        )
 
-        registry.register("core.users", UserDirectoryService())
+        permissions_catalog.register(CATALOG)
+        registry.register(USER_DIRECTORY, UserDirectoryService())
+        registry.register(ORG_DIRECTORY, OrgDirectoryService())
+        registry.register(REFERENCE_DIRECTORY, ReferenceDirectoryService())

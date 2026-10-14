@@ -311,3 +311,129 @@ class Shift(TimeStampedModel):
 
     def __str__(self):
         return f"{self.cash_desk} @ {self.opened_at:%Y-%m-%d %H:%M}"
+
+
+class Currency(TimeStampedModel):
+    """A currency the bank works with (reference data).
+
+    The code is the stable identifier stored in operations; the name, symbol and
+    number of minor units are presentation data.
+    """
+
+    code = models.CharField(_("code"), max_length=8, unique=True)
+    name = models.CharField(_("name"), max_length=100)
+    symbol = models.CharField(_("symbol"), max_length=8, blank=True)
+    minor_units = models.PositiveSmallIntegerField(_("minor units"), default=2)
+    is_active = models.BooleanField(_("active"), default=True)
+
+    class Meta:
+        verbose_name = _("currency")
+        verbose_name_plural = _("currencies")
+        ordering = ("code",)
+
+    def __str__(self):
+        return self.code
+
+    def save(self, *args, **kwargs):
+        self.code = (self.code or "").strip().upper()
+        return super().save(*args, **kwargs)
+
+
+class CashDeskCurrency(TimeStampedModel):
+    """A currency enabled on a specific cash desk.
+
+    An empty set means the cash desk is not restricted (any active currency is
+    allowed); configuring currencies narrows the desk to that list.
+    """
+
+    cash_desk = models.ForeignKey(
+        CashDesk,
+        on_delete=models.CASCADE,
+        related_name="allowed_currencies",
+        verbose_name=_("cash desk"),
+    )
+    currency = models.ForeignKey(
+        Currency,
+        on_delete=models.PROTECT,
+        related_name="cash_desks",
+        verbose_name=_("currency"),
+    )
+
+    class Meta:
+        verbose_name = _("cash desk currency")
+        verbose_name_plural = _("cash desk currencies")
+        ordering = ("currency__code",)
+        constraints = (
+            models.UniqueConstraint(
+                fields=["cash_desk", "currency"],
+                name="core_unique_cash_desk_currency",
+            ),
+        )
+
+    def __str__(self):
+        return f"{self.cash_desk} — {self.currency}"
+
+
+class CurrencyRate(TimeStampedModel):
+    """An exchange rate of a currency against a base currency.
+
+    Rates are dated: the effective rate is the row with the greatest
+    ``effective_from`` not in the future. A rate scoped to a cash desk overrides
+    the bank-wide one (``cash_desk`` is null).
+    """
+
+    class RateType(models.TextChoices):
+        BUY = "buy", _("Buy")
+        SELL = "sell", _("Sell")
+        CENTRAL = "central", _("Central")
+
+    currency = models.ForeignKey(
+        Currency,
+        on_delete=models.CASCADE,
+        related_name="rates",
+        verbose_name=_("currency"),
+    )
+    base_currency = models.ForeignKey(
+        Currency,
+        on_delete=models.CASCADE,
+        related_name="base_rates",
+        verbose_name=_("base currency"),
+    )
+    cash_desk = models.ForeignKey(
+        CashDesk,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="currency_rates",
+        verbose_name=_("cash desk"),
+    )
+    rate_type = models.CharField(
+        _("rate type"),
+        max_length=16,
+        choices=RateType.choices,
+        default=RateType.CENTRAL,
+    )
+    value = models.DecimalField(_("value"), max_digits=18, decimal_places=6)
+    effective_from = models.DateTimeField(_("effective from"))
+
+    class Meta:
+        verbose_name = _("currency rate")
+        verbose_name_plural = _("currency rates")
+        ordering = ("currency__code", "rate_type", "-effective_from")
+        constraints = (
+            models.UniqueConstraint(
+                fields=["currency", "base_currency", "cash_desk", "rate_type", "effective_from"],
+                name="core_unique_currency_rate",
+                nulls_distinct=False,
+            ),
+        )
+
+    def __str__(self):
+        return f"{self.currency}/{self.base_currency} {self.rate_type} = {self.value}"
+
+    def clean(self):
+        super().clean()
+        if self.currency_id and self.currency_id == self.base_currency_id:
+            raise ValidationError(
+                {"base_currency": _("The base currency must differ from the currency.")}
+            )

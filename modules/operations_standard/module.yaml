@@ -1,0 +1,12 @@
+name: operations_standard
+title: Базовые кассовые операции
+version: 0.1.0
+description: Базовый набор типов кассовых операций (приход, расход, обмен).
+
+dependencies:
+  - name: operations
+    version: ">=0.1,<1"
+    access: inprocess        # inprocess | http
+
+provides:
+  frontend_routes: false
