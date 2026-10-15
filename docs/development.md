@@ -131,7 +131,9 @@ docker compose exec backend black .
 Кратко:
 
 1. Создайте каталог `modules/<name>/backend/` — Django-приложение; в `AppConfig`
-   задайте `name = "modules.<name>.backend"` и явный `label`.
+   задайте `name = "modules.<name>.backend"` и явный `label` (он же — имя схемы
+   БД). Моделям задайте `db_table` через
+   `modules.common.backend.schemas.qualified_table`.
 2. Зарегистрируйте приложение в `INSTALLED_APPS` и подключите URL в
    `config/urls.py`.
 3. Опишите контракт в `modules/<name>/contracts/` и зарегистрируйте его реализацию
@@ -163,7 +165,10 @@ docker compose exec frontend npm run dev       # dev-сервер (уже зап
 
 Единственная СУБД проекта — PostgreSQL; контейнер `db` поднимается вместе со
 стеком разработки, а backend подключается к нему через `DATABASE_URL`
-(см. `docs/adr/0002-postgresql-in-development.md`).
+(см. `docs/adr/0002-postgresql-in-development.md`). Каждый модуль хранит данные в
+своей схеме (`core`, `operations`, `common`); схемы создаются автоматически перед
+миграциями, а ядро Django остаётся в `public`
+(см. `docs/adr/0013-postgresql-schemas-per-module.md`).
 
 ### Подключение к базе
 
@@ -184,6 +189,12 @@ docker compose up -d
 ```bash
 docker compose exec db pg_dump -U bankcashops bankcashops > backup.sql
 docker compose exec -T db psql -U bankcashops -d bankcashops < backup.sql
+```
+
+Выгрузить данные одного модуля можно по его схеме:
+
+```bash
+docker compose exec db pg_dump -U bankcashops -n core bankcashops > core.sql
 ```
 
 ## Промышленная сборка

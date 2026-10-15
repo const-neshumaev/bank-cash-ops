@@ -13,4 +13,3 @@
 docs
 profiles
 .env
-*.sqlite3
