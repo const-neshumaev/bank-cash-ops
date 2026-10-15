@@ -7,6 +7,7 @@ from modules.operations.backend.models import (
     Operation,
     OperationLine,
     OperationsSettings,
+    OperationTemplate,
     OperationType,
     SlotDef,
 )
@@ -157,9 +158,18 @@ class OperationsSettingsSerializer(serializers.ModelSerializer):
 class CashDeskOperationsSerializer(serializers.Serializer):
     """Input for replacing the operation types enabled on a cash desk."""
 
-    operations = serializers.ListField(
-        child=serializers.CharField(max_length=64), allow_empty=True
-    )
+    operations = serializers.ListField(child=serializers.CharField(max_length=64), allow_empty=True)
+
+
+class OperationTemplateSerializer(serializers.ModelSerializer):
+    """Read representation of an operation template (bank or branch)."""
+
+    branch_id = serializers.IntegerField(read_only=True)
+    operations = OperationTypeOptionSerializer(source="operation_types", many=True, read_only=True)
+
+    class Meta:
+        model = OperationTemplate
+        fields = ("id", "branch_id", "operations")
 
 
 class WorkplaceOperationSerializer(serializers.ModelSerializer):

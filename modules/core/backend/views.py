@@ -1,10 +1,9 @@
 from django.contrib.auth import get_user_model
-from django.db import transaction
 from django.db.models import ProtectedError, Q
 from django.utils.translation import gettext_lazy as _
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -15,14 +14,14 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 
 from modules.common.backend import permissions_catalog
 from modules.common.backend.permissions import PermissionRequired
-from modules.core.backend import scoping, serializers, shifts
+from modules.core.backend import currency_config, scoping, serializers, shifts
 from modules.core.backend.filters import ShiftFilter
 from modules.core.backend.models import (
     Branch,
     CashDesk,
-    CashDeskCurrency,
     Currency,
     CurrencyRate,
+    CurrencyTemplate,
     Role,
     Shift,
 )
@@ -32,34 +31,32 @@ User = get_user_model()
 
 
 def _cash_desk_currencies_payload(cash_desk):
-    """Return the currencies enabled on ``cash_desk`` (all active when unset)."""
-    configured = list(
-        CashDeskCurrency.objects.filter(cash_desk=cash_desk).select_related("currency")
-    )
-    currencies = [row.currency for row in configured] or list(
-        Currency.objects.filter(is_active=True)
-    )
+    """Return the effective currencies of ``cash_desk`` and where they come from."""
+    effective = currency_config.effective_currency_config(cash_desk.id)
+    currencies = Currency.objects.filter(code__in=effective.codes).order_by("code")
     return {
         "cash_desk": cash_desk.id,
-        "configured": bool(configured),
+        "configured": effective.source == currency_config.OWN,
+        "source": effective.source,
+        "template_branch_id": effective.template_branch_id,
         "currencies": serializers.CurrencySerializer(currencies, many=True).data,
     }
 
 
-def _set_cash_desk_currencies(cash_desk, codes):
-    """Replace the currencies enabled on ``cash_desk`` with ``codes``."""
-    normalised = [code.strip().upper() for code in codes]
-    found = Currency.objects.filter(code__in=normalised)
-    currencies = {currency.code: currency for currency in found}
-    unknown = sorted(set(normalised) - set(currencies))
-    if unknown:
-        raise ValidationError(
-            {"currencies": _("Unknown currencies: %(codes)s.") % {"codes": ", ".join(unknown)}}
-        )
-    with transaction.atomic():
-        CashDeskCurrency.objects.filter(cash_desk=cash_desk).delete()
-        for code in dict.fromkeys(normalised):
-            CashDeskCurrency.objects.create(cash_desk=cash_desk, currency=currencies[code])
+def _can_configure_currencies(user, branch_id):
+    """Whether ``user`` may configure currencies of ``branch_id`` (``None`` = bank).
+
+    The bank-wide permission grants everything; the branch-level permission is
+    limited to the branches the user may access and never covers the bank default.
+    """
+    if user.has_permission(PermissionCode.CURRENCIES_CONFIG_MANAGE):
+        return True
+    if branch_id is None:
+        return False
+    if not user.has_permission(PermissionCode.CURRENCIES_CONFIG_MANAGE_BRANCH):
+        return False
+    branch_ids = scoping.accessible_branch_ids(user)
+    return branch_ids is not None and branch_id in branch_ids
 
 
 class LoginView(TokenObtainPairView):
@@ -168,9 +165,7 @@ class UserViewSet(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
-        serializer = serializers.UserUpdateSerializer(
-            instance, data=request.data, partial=partial
-        )
+        serializer = serializers.UserUpdateSerializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         return Response(serializers.UserSerializer(user).data)
@@ -238,9 +233,7 @@ class RoleViewSet(viewsets.ModelViewSet):
         try:
             role.delete()
         except ProtectedError:
-            raise ValidationError(
-                {"detail": _("The role is assigned to users.")}
-            ) from None
+            raise ValidationError({"detail": _("The role is assigned to users.")}) from None
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -376,14 +369,20 @@ class CashDeskViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["get", "put"], url_path="currencies")
     def currencies(self, request, pk=None):
-        """Read or replace the currencies enabled on a cash desk."""
+        """Read the effective currencies of a cash desk, or replace its own set.
+
+        A ``PUT`` with an empty list removes the cash desk's override so it falls
+        back to the effective template.
+        """
         cash_desk = self.get_object()
         if request.method == "PUT":
-            if not request.user.has_permission(PermissionCode.STRUCTURE_MANAGE):
+            if not _can_configure_currencies(request.user, cash_desk.branch_id):
                 raise PermissionDenied(_("You do not have permission to perform this action."))
             serializer = serializers.CashDeskCurrenciesSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
-            _set_cash_desk_currencies(cash_desk, serializer.validated_data["currencies"])
+            currency_config.set_cash_desk_currencies(
+                cash_desk, serializer.validated_data["currencies"]
+            )
         return Response(_cash_desk_currencies_payload(cash_desk))
 
     def destroy(self, request, *args, **kwargs):
@@ -420,9 +419,7 @@ class CurrencyViewSet(viewsets.ModelViewSet):
         try:
             currency.delete()
         except ProtectedError:
-            raise ValidationError(
-                {"detail": _("The currency is used by a cash desk.")}
-            ) from None
+            raise ValidationError({"detail": _("The currency is used by a cash desk.")}) from None
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -500,11 +497,7 @@ class ShiftViewSet(
     @action(detail=False, methods=["get"])
     def current(self, request):
         """Return the open shift of the authenticated user, if any."""
-        shift = (
-            self.get_queryset()
-            .filter(cashier=request.user, status=Shift.Status.OPEN)
-            .first()
-        )
+        shift = self.get_queryset().filter(cashier=request.user, status=Shift.Status.OPEN).first()
         if shift is None:
             return Response(None)
         return Response(serializers.ShiftSerializer(shift).data)
@@ -524,3 +517,123 @@ class ShiftViewSet(
         shift = self.get_object()
         shift = shifts.close_shift(shift=shift, closed_by=request.user)
         return Response(serializers.ShiftSerializer(shift).data)
+
+
+def _currency_template_payload(template, branch_id):
+    """Return a currency template payload; ``defined`` is false when none exists."""
+    if template is None:
+        return {"branch_id": branch_id, "defined": False, "currencies": []}
+    return {
+        "branch_id": branch_id,
+        "defined": True,
+        "currencies": serializers.CurrencySerializer(
+            template.currencies.order_by("code"), many=True
+        ).data,
+    }
+
+
+def _branch_template_or_404(user, branch_id):
+    """Return the branch, or raise ``NotFound`` when it is unknown or out of scope.
+
+    A holder of the bank-wide currency permission may read any existing branch;
+    everyone else is limited to the branches they may access.
+    """
+    branch = Branch.objects.filter(pk=branch_id).first()
+    if branch is None:
+        raise NotFound(_("No branch matches the given query."))
+    if user.has_permission(PermissionCode.CURRENCIES_CONFIG_MANAGE):
+        return branch
+    branch_ids = scoping.accessible_branch_ids(user)
+    if branch_ids is not None and branch_id not in branch_ids:
+        raise NotFound(_("No branch matches the given query."))
+    return branch
+
+
+class CurrencyTemplateListView(APIView):
+    """List the currency templates visible to the caller (bank and branches)."""
+
+    permission_classes = [PermissionRequired]
+    required_permission = PermissionCode.STRUCTURE_VIEW
+
+    def get(self, request):
+        queryset = CurrencyTemplate.objects.prefetch_related("currencies")
+        branch_ids = scoping.accessible_branch_ids(request.user)
+        if branch_ids is not None:
+            queryset = queryset.filter(Q(branch__isnull=True) | Q(branch_id__in=branch_ids))
+        return Response(
+            {
+                "results": [
+                    {
+                        "branch_id": template.branch_id,
+                        "currencies": serializers.CurrencySerializer(
+                            template.currencies.order_by("code"), many=True
+                        ).data,
+                    }
+                    for template in queryset.order_by("branch_id")
+                ]
+            }
+        )
+
+
+class BankCurrencyTemplateView(APIView):
+    """Read, set or remove the bank-wide currency template."""
+
+    permission_classes = [PermissionRequired]
+    required_permission = PermissionCode.STRUCTURE_VIEW
+
+    def get(self, request):
+        template = (
+            CurrencyTemplate.objects.prefetch_related("currencies")
+            .filter(branch__isnull=True)
+            .first()
+        )
+        return Response(_currency_template_payload(template, None))
+
+    def put(self, request):
+        if not _can_configure_currencies(request.user, None):
+            raise PermissionDenied(_("You do not have permission to perform this action."))
+        serializer = serializers.CashDeskCurrenciesSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        template = currency_config.set_template_currencies(
+            None, serializer.validated_data["currencies"]
+        )
+        return Response(_currency_template_payload(template, None))
+
+    def delete(self, request):
+        if not _can_configure_currencies(request.user, None):
+            raise PermissionDenied(_("You do not have permission to perform this action."))
+        currency_config.delete_template(None)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class BranchCurrencyTemplateView(APIView):
+    """Read, set or remove the currency template of a single branch."""
+
+    permission_classes = [PermissionRequired]
+    required_permission = PermissionCode.STRUCTURE_VIEW
+
+    def get(self, request, branch_id):
+        _branch_template_or_404(request.user, branch_id)
+        template = (
+            CurrencyTemplate.objects.prefetch_related("currencies")
+            .filter(branch_id=branch_id)
+            .first()
+        )
+        return Response(_currency_template_payload(template, branch_id))
+
+    def put(self, request, branch_id):
+        if not _can_configure_currencies(request.user, branch_id):
+            raise PermissionDenied(_("You do not have permission to perform this action."))
+        _branch_template_or_404(request.user, branch_id)
+        serializer = serializers.CashDeskCurrenciesSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        template = currency_config.set_template_currencies(
+            branch_id, serializer.validated_data["currencies"]
+        )
+        return Response(_currency_template_payload(template, branch_id))
+
+    def delete(self, request, branch_id):
+        if not _can_configure_currencies(request.user, branch_id):
+            raise PermissionDenied(_("You do not have permission to perform this action."))
+        currency_config.delete_template(branch_id)
+        return Response(status=status.HTTP_204_NO_CONTENT)

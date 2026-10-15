@@ -16,6 +16,7 @@ from modules.common.contracts import registry
 from modules.core.contracts import (
     ORG_DIRECTORY,
     REFERENCE_DIRECTORY,
+    CashDeskDTO,
     CurrencyDTO,
     ShiftDTO,
 )
@@ -26,6 +27,7 @@ User = get_user_model()
 
 CASH_DESK = 7
 OTHER_CASH_DESK = 99
+CASH_DESK_BRANCH = 3
 SHIFT = 11
 
 DEFAULT_CURRENCIES = (
@@ -37,28 +39,39 @@ DEFAULT_CURRENCIES = (
 class FakeOrgDirectory:
     """Minimal ``OrgDirectory`` used instead of the real ``core`` service."""
 
-    def __init__(self, *, shift=None, accessible=None):
+    def __init__(self, *, shift=None, accessible=None, branch_id=CASH_DESK_BRANCH, ancestors=None):
         self.shift = shift
         self.accessible = accessible
+        self.branch_id = branch_id
+        self.ancestors = ancestors if ancestors is not None else ((branch_id,) if branch_id else ())
+        self.accessible_branches = None
 
     def get_open_shift(self, cashier_id):
         return self.shift
 
     def get_cash_desk(self, cash_desk_id):
-        return None
+        if cash_desk_id != CASH_DESK or self.branch_id is None:
+            return None
+        return CashDeskDTO(id=cash_desk_id, branch_id=self.branch_id, is_active=True)
 
     def accessible_cash_desk_ids(self, user_id):
         return self.accessible
+
+    def accessible_branch_ids(self, user_id):
+        return self.accessible_branches
+
+    def branch_ancestor_ids(self, branch_id):
+        return self.ancestors
 
     def user_can_access_cash_desk(self, user_id, cash_desk_id):
         return self.accessible is None or cash_desk_id in self.accessible
 
 
 class FakeReferenceDirectory:
-    """Minimal ``ReferenceDirectory``; ``allowed=None`` means unrestricted."""
+    """Minimal ``ReferenceDirectory``; by default every currency is allowed."""
 
     def __init__(self, allowed=None, rates=()):
-        self.allowed = allowed
+        self.allowed = allowed if allowed is not None else {c.code for c in DEFAULT_CURRENCIES}
         self.rates = rates
 
     def currencies(self):

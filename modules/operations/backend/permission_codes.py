@@ -20,6 +20,7 @@ class PermissionCode:
     REVERSE = "operations.reverse"
     TYPES_MANAGE = "operations.types.manage"
     CONFIG_MANAGE = "operations.config.manage"
+    CONFIG_MANAGE_BRANCH = "operations.config.manage.branch"
 
 
 @dataclass(frozen=True)
@@ -35,7 +36,11 @@ CATALOG: tuple[Permission, ...] = (
     Permission(PermissionCode.CREATE, "Выполнение кассовых операций"),
     Permission(PermissionCode.REVERSE, "Сторнирование операций"),
     Permission(PermissionCode.TYPES_MANAGE, "Управление типами операций"),
-    Permission(PermissionCode.CONFIG_MANAGE, "Настройка операций и касс"),
+    Permission(PermissionCode.CONFIG_MANAGE, "Настройка операций касс"),
+    Permission(
+        PermissionCode.CONFIG_MANAGE_BRANCH,
+        "Настройка операций касс своего отделения",
+    ),
 )
 
 ALL_CODES: tuple[str, ...] = tuple(permission.code for permission in CATALOG)

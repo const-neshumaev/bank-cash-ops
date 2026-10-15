@@ -9,6 +9,7 @@ from modules.core.backend.models import (
     CashDeskCurrency,
     Currency,
     CurrencyRate,
+    CurrencyTemplate,
     Role,
     Shift,
     User,
@@ -130,6 +131,16 @@ class CurrencyAdmin(admin.ModelAdmin):
     list_filter = ("is_active",)
     search_fields = ("code", "name")
     readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(CurrencyTemplate)
+class CurrencyTemplateAdmin(admin.ModelAdmin):
+    """Administration of the bank-wide and per-branch currency templates."""
+
+    list_display = ("__str__", "branch")
+    list_filter = ("branch",)
+    autocomplete_fields = ("branch",)
+    filter_horizontal = ("currencies",)
 
 
 @admin.register(CurrencyRate)

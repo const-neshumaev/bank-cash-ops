@@ -6,7 +6,7 @@ from decimal import Decimal
 import pytest
 
 from modules.core.contracts import CurrencyRateDTO
-from modules.operations.backend.models import CashBalance
+from modules.operations.backend.models import CashBalance, OperationTemplate
 
 pytestmark = pytest.mark.django_db
 
@@ -27,6 +27,7 @@ def test_workplace_without_a_shift_returns_an_empty_context(auth_client, contrac
 
 
 def test_workplace_returns_the_desk_context(auth_client, income_type):
+    OperationTemplate.objects.create(branch_id=None).operation_types.set([income_type])
     CashBalance.objects.create(cash_desk_id=CASH_DESK, currency="USD", amount=Decimal("500"))
 
     response = auth_client.get(WORKPLACE_URL)

@@ -5,7 +5,12 @@ from decimal import Decimal
 import pytest
 from django.contrib.auth import get_user_model
 
-from modules.operations.backend.models import CashBalance, Operation, OperationsSettings
+from modules.operations.backend.models import (
+    CashBalance,
+    Operation,
+    OperationsSettings,
+    OperationTemplate,
+)
 from modules.operations.backend.permission_codes import PermissionCode
 
 User = get_user_model()
@@ -41,6 +46,8 @@ def test_types_endpoint_lists_the_catalogue(auth_client, income_type):
 
 
 def test_posting_an_operation_updates_the_balance(auth_client, income_type):
+    OperationTemplate.objects.create(branch_id=None).operation_types.set([income_type])
+
     response = auth_client.post(OPERATIONS_URL, _post_payload(income_type), format="json")
 
     assert response.status_code == 201, response.content
@@ -60,6 +67,7 @@ def test_posting_without_an_open_shift_is_rejected(auth_client, contracts, incom
 
 
 def test_reversing_an_operation_closes_it(auth_client, income_type):
+    OperationTemplate.objects.create(branch_id=None).operation_types.set([income_type])
     posted = auth_client.post(OPERATIONS_URL, _post_payload(income_type), format="json").data
 
     response = auth_client.post(f"{OPERATIONS_URL}{posted['id']}/reverse/", {}, format="json")

@@ -17,6 +17,7 @@ interface AuthContextValue {
   loading: boolean
   isAdmin: boolean
   hasPermission: (permission: string) => boolean
+  hasAnyPermission: (requirement: string | string[]) => boolean
   signIn: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
   refreshUser: () => Promise<void>
@@ -71,6 +72,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin: Boolean(user?.is_superuser || user?.permissions.includes('core.users.manage')),
       hasPermission: (permission: string) =>
         Boolean(user?.is_superuser || user?.permissions.includes(permission)),
+      hasAnyPermission: (requirement: string | string[]) => {
+        const codes = Array.isArray(requirement) ? requirement : [requirement]
+        return Boolean(
+          user?.is_superuser || codes.some((code) => user?.permissions.includes(code)),
+        )
+      },
       signIn,
       signOut,
       refreshUser,

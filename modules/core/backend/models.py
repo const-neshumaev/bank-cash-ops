@@ -348,10 +348,11 @@ class Currency(TimeStampedModel):
 
 
 class CashDeskCurrency(TimeStampedModel):
-    """A currency enabled on a specific cash desk.
+    """A currency enabled on a specific cash desk (an explicit override).
 
-    An empty set means the cash desk is not restricted (any active currency is
-    allowed); configuring currencies narrows the desk to that list.
+    When a cash desk has its own currencies, they replace the effective template;
+    a cash desk without its own currencies inherits the nearest currency template
+    (see :class:`CurrencyTemplate`). With neither, no currency is allowed.
     """
 
     cash_desk = models.ForeignKey(
@@ -381,6 +382,47 @@ class CashDeskCurrency(TimeStampedModel):
 
     def __str__(self):
         return f"{self.cash_desk} — {self.currency}"
+
+
+class CurrencyTemplate(TimeStampedModel):
+    """A default set of cash desk currencies, for the bank or a branch.
+
+    A template without a branch is the bank-wide default; a template with a branch
+    applies to that branch and its descendants, and a closer template overrides a
+    farther one. A template that exists but lists no currencies means "no currency
+    is allowed" — the absence of any template denies by default as well.
+    """
+
+    branch = models.ForeignKey(
+        Branch,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="currency_templates",
+        verbose_name=_("branch"),
+        help_text=_("Empty for the bank-wide template."),
+    )
+    currencies = models.ManyToManyField(
+        Currency,
+        related_name="templates",
+        blank=True,
+        verbose_name=_("currencies"),
+    )
+
+    class Meta:
+        verbose_name = _("currency template")
+        verbose_name_plural = _("currency templates")
+        db_table = qualified_table("core", "core_currencytemplate")
+        constraints = (
+            models.UniqueConstraint(
+                fields=["branch"],
+                name="core_unique_currency_template_scope",
+                nulls_distinct=False,
+            ),
+        )
+
+    def __str__(self):
+        return _("Bank template") if self.branch_id is None else str(self.branch)
 
 
 class CurrencyRate(TimeStampedModel):

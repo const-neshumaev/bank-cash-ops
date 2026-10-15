@@ -7,12 +7,13 @@ contract. Reads are narrowed to the cash desks the caller may access.
 
 from __future__ import annotations
 
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -26,6 +27,7 @@ from modules.operations.backend.models import (
     CashBalance,
     Operation,
     OperationsSettings,
+    OperationTemplate,
     OperationType,
 )
 from modules.operations.backend.permission_codes import PermissionCode
@@ -40,18 +42,63 @@ def _reference_directory():
     return registry.get(REFERENCE_DIRECTORY)
 
 
-def _ensure_cash_desk_access(user, cash_desk_id):
-    if not _org_directory().user_can_access_cash_desk(user.id, cash_desk_id):
-        raise PermissionDenied(_("The cash desk is not available to you."))
+def _can_view_cash_desk_config(user, cash_desk_id) -> bool:
+    """Whether ``user`` may read the configuration of a cash desk."""
+    if user.has_permission(PermissionCode.CONFIG_MANAGE):
+        return True
+    return _org_directory().user_can_access_cash_desk(user.id, cash_desk_id)
+
+
+def _can_configure_operations(user, branch_id) -> bool:
+    """Whether ``user`` may configure operations of ``branch_id`` (``None`` = bank).
+
+    The bank-wide permission grants everything; the branch-level permission is
+    limited to the branches the user may access and never covers the bank default.
+    """
+    if user.has_permission(PermissionCode.CONFIG_MANAGE):
+        return True
+    if branch_id is None:
+        return False
+    if not user.has_permission(PermissionCode.CONFIG_MANAGE_BRANCH):
+        return False
+    branch_ids = _org_directory().accessible_branch_ids(user.id)
+    return branch_ids is not None and branch_id in branch_ids
+
+
+def _ensure_branch_readable(user, branch_id) -> None:
+    """Raise ``NotFound`` when a branch template is outside the user's scope."""
+    branch_ids = _org_directory().accessible_branch_ids(user.id)
+    if branch_ids is not None and branch_id not in branch_ids:
+        raise NotFound(_("No such branch."))
 
 
 def _cash_desk_operations_payload(cash_desk_id):
-    configured = config.configured_operation_codes(cash_desk_id)
+    effective = config.effective_operation_config(cash_desk_id)
     operation_types = config.allowed_operation_types(cash_desk_id)
     return {
         "cash_desk_id": cash_desk_id,
-        "configured": configured is not None,
+        "configured": effective.source == config.OWN,
+        "source": effective.source,
+        "template_branch_id": effective.template_branch_id,
         "operations": serializers.OperationTypeOptionSerializer(operation_types, many=True).data,
+    }
+
+
+def _operation_template_payload(branch_id):
+    """Return an operation template payload; ``defined`` is false when none exists."""
+    template = (
+        OperationTemplate.objects.prefetch_related("operation_types")
+        .filter(branch_id=branch_id)
+        .first()
+    )
+    if template is None:
+        return {"branch_id": branch_id, "defined": False, "operations": []}
+    return {
+        "branch_id": branch_id,
+        "defined": True,
+        "operations": serializers.OperationTypeOptionSerializer(
+            template.operation_types.order_by("name"), many=True
+        ).data,
     }
 
 
@@ -158,13 +205,12 @@ class OperationViewSet(
         )
 
         allowed_currencies = _reference_directory().cash_desk_currency_codes(shift.cash_desk_id)
-        if allowed_currencies is not None:
-            for line in lines:
-                if line.currency not in allowed_currencies:
-                    raise ValidationError(
-                        _("The currency %(currency)s is not available at this cash desk.")
-                        % {"currency": line.currency}
-                    )
+        for line in lines:
+            if line.currency not in allowed_currencies:
+                raise ValidationError(
+                    _("The currency %(currency)s is not available at this cash desk.")
+                    % {"currency": line.currency}
+                )
 
         operation = post_operation(
             operation_type=operation_type,
@@ -227,13 +273,18 @@ class OperationsSettingsView(APIView):
 
 
 class CashDeskOperationsView(APIView):
-    """Read and update which operation types are available at a cash desk."""
+    """Read and update which operation types are effective at a cash desk.
+
+    A ``PUT`` with an empty list removes the cash desk's override, so it falls back
+    to the effective template (deny by default when no template applies).
+    """
 
     @extend_schema(responses={200: OpenApiTypes.OBJECT})
     def get(self, request, cash_desk_id):
         if not request.user.has_permission(PermissionCode.VIEW):
             raise PermissionDenied(_("You do not have permission to perform this action."))
-        _ensure_cash_desk_access(request.user, cash_desk_id)
+        if not _can_view_cash_desk_config(request.user, cash_desk_id):
+            raise PermissionDenied(_("The cash desk is not available to you."))
         return Response(_cash_desk_operations_payload(cash_desk_id))
 
     @extend_schema(
@@ -241,13 +292,95 @@ class CashDeskOperationsView(APIView):
         responses={200: OpenApiTypes.OBJECT},
     )
     def put(self, request, cash_desk_id):
-        if not request.user.has_permission(PermissionCode.CONFIG_MANAGE):
+        cash_desk = _org_directory().get_cash_desk(cash_desk_id)
+        if cash_desk is None:
+            raise NotFound(_("No cash desk matches the given query."))
+        if not _can_configure_operations(request.user, cash_desk.branch_id):
             raise PermissionDenied(_("You do not have permission to perform this action."))
-        _ensure_cash_desk_access(request.user, cash_desk_id)
         serializer = serializers.CashDeskOperationsSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         config.set_operation_types(cash_desk_id, serializer.validated_data["operations"])
         return Response(_cash_desk_operations_payload(cash_desk_id))
+
+
+class OperationTemplateListView(APIView):
+    """List the operation templates visible to the caller (bank and branches)."""
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    def get(self, request):
+        if not request.user.has_permission(PermissionCode.VIEW):
+            raise PermissionDenied(_("You do not have permission to perform this action."))
+        queryset = OperationTemplate.objects.prefetch_related("operation_types")
+        branch_ids = _org_directory().accessible_branch_ids(request.user.id)
+        if branch_ids is not None:
+            queryset = queryset.filter(Q(branch_id__isnull=True) | Q(branch_id__in=branch_ids))
+        return Response(
+            {
+                "results": [
+                    serializers.OperationTemplateSerializer(template).data
+                    for template in queryset.order_by("branch_id")
+                ]
+            }
+        )
+
+
+class BankOperationTemplateView(APIView):
+    """Read, set or remove the bank-wide operation template."""
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    def get(self, request):
+        if not request.user.has_permission(PermissionCode.VIEW):
+            raise PermissionDenied(_("You do not have permission to perform this action."))
+        return Response(_operation_template_payload(None))
+
+    @extend_schema(
+        request=serializers.CashDeskOperationsSerializer,
+        responses={200: OpenApiTypes.OBJECT},
+    )
+    def put(self, request):
+        if not _can_configure_operations(request.user, None):
+            raise PermissionDenied(_("You do not have permission to perform this action."))
+        serializer = serializers.CashDeskOperationsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        config.set_template_operation_types(None, serializer.validated_data["operations"])
+        return Response(_operation_template_payload(None))
+
+    @extend_schema(responses={204: None})
+    def delete(self, request):
+        if not _can_configure_operations(request.user, None):
+            raise PermissionDenied(_("You do not have permission to perform this action."))
+        config.delete_template(None)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class BranchOperationTemplateView(APIView):
+    """Read, set or remove the operation template of a single branch."""
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    def get(self, request, branch_id):
+        if not request.user.has_permission(PermissionCode.VIEW):
+            raise PermissionDenied(_("You do not have permission to perform this action."))
+        _ensure_branch_readable(request.user, branch_id)
+        return Response(_operation_template_payload(branch_id))
+
+    @extend_schema(
+        request=serializers.CashDeskOperationsSerializer,
+        responses={200: OpenApiTypes.OBJECT},
+    )
+    def put(self, request, branch_id):
+        if not _can_configure_operations(request.user, branch_id):
+            raise PermissionDenied(_("You do not have permission to perform this action."))
+        serializer = serializers.CashDeskOperationsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        config.set_template_operation_types(branch_id, serializer.validated_data["operations"])
+        return Response(_operation_template_payload(branch_id))
+
+    @extend_schema(responses={204: None})
+    def delete(self, request, branch_id):
+        if not _can_configure_operations(request.user, branch_id):
+            raise PermissionDenied(_("You do not have permission to perform this action."))
+        config.delete_template(branch_id)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class WorkplaceView(APIView):
@@ -274,11 +407,7 @@ class WorkplaceView(APIView):
         cash_desk_id = shift.cash_desk_id
         references = _reference_directory()
         allowed = references.cash_desk_currency_codes(cash_desk_id)
-        currencies = [
-            currency
-            for currency in references.currencies()
-            if allowed is None or currency.code in allowed
-        ]
+        currencies = [currency for currency in references.currencies() if currency.code in allowed]
         rates = references.cash_desk_rates(cash_desk_id)
         balances = CashBalance.objects.filter(cash_desk_id=cash_desk_id).order_by("currency")
         return Response(

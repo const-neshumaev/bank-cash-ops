@@ -8,6 +8,7 @@ from modules.operations.backend.models import (
     OperationLine,
     OperationNumberSequence,
     OperationsSettings,
+    OperationTemplate,
     OperationType,
     SlotDef,
 )
@@ -122,6 +123,15 @@ class CashDeskOperationAdmin(admin.ModelAdmin):
     search_fields = ("cash_desk_id", "operation_type__code", "operation_type__name")
     autocomplete_fields = ("operation_type",)
     readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(OperationTemplate)
+class OperationTemplateAdmin(admin.ModelAdmin):
+    """Administration of the bank-wide and per-branch operation templates."""
+
+    list_display = ("__str__", "branch_id")
+    list_filter = ("branch_id",)
+    filter_horizontal = ("operation_types",)
 
 
 @admin.register(OperationsSettings)

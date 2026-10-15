@@ -39,6 +39,14 @@ class OrgDirectory(Protocol):
         """Cash desks the user may see; ``None`` means every cash desk."""
         ...
 
+    def accessible_branch_ids(self, user_id: int) -> set[int] | None:
+        """Branches the user may see; ``None`` means every branch."""
+        ...
+
+    def branch_ancestor_ids(self, branch_id: int) -> tuple[int, ...]:
+        """Return ``branch_id`` and its ancestors, nearest first (up to the root)."""
+        ...
+
     def user_can_access_cash_desk(self, user_id: int, cash_desk_id: int) -> bool: ...
 
 
@@ -49,8 +57,12 @@ class ReferenceDirectory(Protocol):
 
     def get_currency(self, code: str) -> CurrencyDTO | None: ...
 
-    def cash_desk_currency_codes(self, cash_desk_id: int) -> set[str] | None:
-        """Currencies enabled on a cash desk; ``None`` means it is unrestricted."""
+    def cash_desk_currency_codes(self, cash_desk_id: int) -> set[str]:
+        """Effective currencies enabled at a cash desk.
+
+        An empty set means no currency is allowed: the cash desk has neither its
+        own currencies nor an applicable template (deny by default).
+        """
         ...
 
     def rate(

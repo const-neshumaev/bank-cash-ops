@@ -333,10 +333,11 @@ class OperationsSettings(TimeStampedModel):
 
 
 class CashDeskOperation(TimeStampedModel):
-    """An operation type enabled on a specific cash desk.
+    """An operation type enabled on a specific cash desk (an explicit override).
 
-    An empty set means the cash desk is not restricted (any active operation type
-    is allowed); configuring operations narrows the desk to that list.
+    When a cash desk has its own operations, they replace the effective template;
+    a cash desk without its own operations inherits the nearest operation template
+    (see :class:`OperationTemplate`). With neither, no operation is allowed.
     """
 
     cash_desk_id = models.PositiveBigIntegerField(_("cash desk"))
@@ -363,6 +364,40 @@ class CashDeskOperation(TimeStampedModel):
         return f"{self.cash_desk_id} — {self.operation_type}"
 
 
+class OperationTemplate(TimeStampedModel):
+    """A default set of cash desk operations, for the bank or a branch.
+
+    ``branch_id`` is a stable identifier of a ``core`` branch (a plain integer,
+    never an ORM relation — see ``docs/modules.md``). ``None`` is the bank-wide
+    default; a template with a branch applies to that branch and its descendants,
+    and a closer template overrides a farther one. A template that exists but
+    lists no operation types means "no operation is allowed".
+    """
+
+    branch_id = models.PositiveBigIntegerField(_("branch"), null=True, blank=True)
+    operation_types = models.ManyToManyField(
+        OperationType,
+        related_name="templates",
+        blank=True,
+        verbose_name=_("operation types"),
+    )
+
+    class Meta:
+        verbose_name = _("operation template")
+        verbose_name_plural = _("operation templates")
+        db_table = qualified_table("operations", "operations_operationtemplate")
+        constraints = (
+            models.UniqueConstraint(
+                fields=["branch_id"],
+                name="operations_unique_operation_template_scope",
+                nulls_distinct=False,
+            ),
+        )
+
+    def __str__(self):
+        return _("Bank template") if self.branch_id is None else f"Branch {self.branch_id}"
+
+
 # Re-exported for convenience of callers that build movements.
 __all__ = [
     "CashBalance",
@@ -371,6 +406,7 @@ __all__ = [
     "Operation",
     "OperationLine",
     "OperationNumberSequence",
+    "OperationTemplate",
     "OperationsSettings",
     "OperationType",
     "RegisterCode",
