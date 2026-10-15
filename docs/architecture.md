@@ -18,7 +18,9 @@ graph TD
 - **Уровень логики** — Django + Django REST Framework. Отдаёт API, содержит
   бизнес-логику и обеспечивает аутентификацию/авторизацию.
 - **Уровень данных** — реляционная СУБД PostgreSQL, единая для разработки и
-  эксплуатации. Подключение задаётся переменной окружения `DATABASE_URL`.
+  эксплуатации. Каждый модуль владеет своей схемой PostgreSQL, поэтому данные
+  модулей изолированы внутри общей СУБД. Подключение задаётся переменной
+  окружения `DATABASE_URL`.
 
 ## Модульная архитектура
 
@@ -32,17 +34,17 @@ graph TD
         Comp[Профиль заказчика<br/>какие модули включены]
     end
     subgraph Core["core"]
-        C_BE[backend] --> C_DB[(данные core)]
+        C_BE[backend] --> C_DB[(схема core)]
         C_FE[frontend]
         C_CT[contracts]
     end
     subgraph Ops["operations"]
-        O_BE[backend] --> O_DB[(данные operations)]
+        O_BE[backend] --> O_DB[(схема operations)]
         O_FE[frontend]
         O_CT[contracts]
     end
     subgraph Rep["reports"]
-        R_BE[backend] --> R_DB[(данные reports)]
+        R_BE[backend] --> R_DB[(схема reports)]
         R_CT[contracts]
     end
     O_CT -. "только через contracts" .-> C_CT
@@ -68,6 +70,9 @@ graph TD
   события), единственная разрешённая точка зависимости между модулями.
 - **Профиль заказчика** — файл композиции: какие модули включены и как они
   находят друг друга (`profiles/`).
+- **Схема БД** — каждый модуль владеет отдельной схемой PostgreSQL (`core`,
+  `operations`); ядро Django остаётся в `public`. Подробности и оговорки — в
+  `docs/adr/0013-postgresql-schemas-per-module.md`.
 
 Полные правила, формат манифеста и контрактов описаны в `docs/modules.md`.
 

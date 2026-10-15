@@ -6,6 +6,7 @@ from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
 
 from modules.common.backend.models import TimeStampedModel
+from modules.common.backend.schemas import qualified_table
 from modules.core.backend.managers import UserManager
 from modules.core.backend.permission_codes import PermissionCode
 
@@ -37,6 +38,7 @@ class Role(TimeStampedModel):
     class Meta:
         verbose_name = _("role")
         verbose_name_plural = _("roles")
+        db_table = qualified_table("core", "core_role")
         ordering = ("name",)
 
     def __str__(self):
@@ -72,6 +74,7 @@ class User(AbstractUser):
     class Meta:
         verbose_name = _("user")
         verbose_name_plural = _("users")
+        db_table = qualified_table("core", "core_user")
         ordering = ("last_name", "first_name", "email")
 
     def __str__(self):
@@ -122,6 +125,7 @@ class Branch(TimeStampedModel):
     class Meta:
         verbose_name = _("branch")
         verbose_name_plural = _("branches")
+        db_table = qualified_table("core", "core_branch")
         ordering = ("name",)
         constraints = (
             models.UniqueConstraint(
@@ -194,6 +198,7 @@ class BranchAccess(TimeStampedModel):
     class Meta:
         verbose_name = _("branch access")
         verbose_name_plural = _("branch access")
+        db_table = qualified_table("core", "core_branchaccess")
         ordering = ("branch__name",)
         constraints = (
             models.UniqueConstraint(
@@ -232,6 +237,7 @@ class CashDesk(TimeStampedModel):
     class Meta:
         verbose_name = _("cash desk")
         verbose_name_plural = _("cash desks")
+        db_table = qualified_table("core", "core_cashdesk")
         ordering = ("branch__name", "name")
 
     def __str__(self):
@@ -295,6 +301,7 @@ class Shift(TimeStampedModel):
     class Meta:
         verbose_name = _("shift")
         verbose_name_plural = _("shifts")
+        db_table = qualified_table("core", "core_shift")
         ordering = ("-opened_at",)
         constraints = (
             models.UniqueConstraint(
@@ -329,6 +336,7 @@ class Currency(TimeStampedModel):
     class Meta:
         verbose_name = _("currency")
         verbose_name_plural = _("currencies")
+        db_table = qualified_table("core", "core_currency")
         ordering = ("code",)
 
     def __str__(self):
@@ -362,6 +370,7 @@ class CashDeskCurrency(TimeStampedModel):
     class Meta:
         verbose_name = _("cash desk currency")
         verbose_name_plural = _("cash desk currencies")
+        db_table = qualified_table("core", "core_cashdeskcurrency")
         ordering = ("currency__code",)
         constraints = (
             models.UniqueConstraint(
@@ -419,6 +428,7 @@ class CurrencyRate(TimeStampedModel):
     class Meta:
         verbose_name = _("currency rate")
         verbose_name_plural = _("currency rates")
+        db_table = qualified_table("core", "core_currencyrate")
         ordering = ("currency__code", "rate_type", "-effective_from")
         constraints = (
             models.UniqueConstraint(

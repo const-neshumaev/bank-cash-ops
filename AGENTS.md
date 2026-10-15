@@ -126,7 +126,10 @@ docker compose exec frontend npm run build             # типы + сборка
 2. Зарегистрируйте приложение в `INSTALLED_APPS` (`config/settings.py`).
 3. Подключите маршруты в `config/urls.py` внутри `api_patterns`.
 4. Переиспользуйте общие блоки из `modules.common.backend` (`TimeStampedModel`,
-   `StandardResultsSetPagination`, `IsAdminRole`).
+   `StandardResultsSetPagination`, `IsAdminRole`). Каждой модели задайте
+   `db_table` через `modules.common.backend.schemas.qualified_table("<метка>",
+   "<таблица>")`: модуль владеет отдельной схемой PostgreSQL
+   (`docs/adr/0013-postgresql-schemas-per-module.md`).
 5. Опишите публичный контракт в `modules/<name>/contracts/` и зарегистрируйте его
    реализацию в реестре (`modules.common.contracts.registry`) в `AppConfig.ready`.
 6. Создайте миграции: `docker compose exec backend python manage.py makemigrations`.
@@ -157,6 +160,8 @@ Frontend собран из хоста (`frontend/src/`) и фронтендов 
 - Архитектурные решения: `docs/adr/`
 - Правила модулей и контрактов: `docs/modules.md`
 - Настройки: `backend/config/settings.py`
+- Схемы PostgreSQL по модулям: `modules/common/backend/schemas.py`
+- Проверки границ модулей (Django system checks): `modules/common/backend/checks.py`
 - Корневые URL: `backend/config/urls.py`
 - Модель пользователя: `modules/core/backend/models.py`
 - Каталог прав: `modules/core/backend/permission_codes.py`

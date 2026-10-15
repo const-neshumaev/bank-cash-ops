@@ -102,22 +102,13 @@ ASGI_APPLICATION = "config.asgi.application"
 # --------------------------------------------------------------------------- #
 # Database
 # --------------------------------------------------------------------------- #
-# PostgreSQL is the database for both development and production and is selected
-# through DATABASE_URL. Without it the project falls back to a throwaway SQLite
-# file, kept only as a transitional bootstrap for tooling that does not run a
-# database service yet (the CI backend job); the development stack always sets
-# DATABASE_URL. See docs/adr/0002-postgresql-in-development.md.
-DATABASE_URL = env("DATABASE_URL", default="")
-if DATABASE_URL:
-    DATABASES = {"default": env.db_url("DATABASE_URL")}
-    DATABASES["default"].setdefault("CONN_MAX_AGE", 60)
-else:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": env("SQLITE_PATH", default=str(BASE_DIR / "db.sqlite3")),
-        }
-    }
+# PostgreSQL is the only database, used by development, tests and production
+# alike. The connection is configured exclusively through DATABASE_URL; there is
+# no fallback engine, so a misconfigured environment fails loudly instead of
+# silently running on an incompatible database. Each module owns its own schema
+# (see docs/adr/0013-postgresql-schemas-per-module.md).
+DATABASES = {"default": env.db_url("DATABASE_URL")}
+DATABASES["default"].setdefault("CONN_MAX_AGE", 60)
 
 
 # --------------------------------------------------------------------------- #

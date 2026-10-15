@@ -19,6 +19,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from modules.common.backend.models import TimeStampedModel
+from modules.common.backend.schemas import qualified_table
 from modules.operations.backend.registers import RegisterCode
 from modules.operations.contracts.dto import OperationKind
 
@@ -75,6 +76,7 @@ class OperationType(TimeStampedModel):
     class Meta:
         verbose_name = _("operation type")
         verbose_name_plural = _("operation types")
+        db_table = qualified_table("operations", "operations_operationtype")
         ordering = ("name",)
 
     def __str__(self):
@@ -104,6 +106,7 @@ class SlotDef(TimeStampedModel):
     class Meta:
         verbose_name = _("slot")
         verbose_name_plural = _("slots")
+        db_table = qualified_table("operations", "operations_slotdef")
         ordering = ("order", "id")
         constraints = (
             models.UniqueConstraint(
@@ -163,6 +166,7 @@ class Operation(TimeStampedModel):
     class Meta:
         verbose_name = _("operation")
         verbose_name_plural = _("operations")
+        db_table = qualified_table("operations", "operations_operation")
         ordering = ("-posted_at", "-id")
         indexes = (
             models.Index(fields=["cash_desk_id", "posted_at"]),
@@ -202,6 +206,7 @@ class OperationLine(TimeStampedModel):
     class Meta:
         verbose_name = _("operation line")
         verbose_name_plural = _("operation lines")
+        db_table = qualified_table("operations", "operations_operationline")
         ordering = ("id",)
 
     def __str__(self):
@@ -226,6 +231,7 @@ class Movement(TimeStampedModel):
     class Meta:
         verbose_name = _("movement")
         verbose_name_plural = _("movements")
+        db_table = qualified_table("operations", "operations_movement")
         ordering = ("id",)
         indexes = (models.Index(fields=["register", "cash_desk_id", "currency"]),)
 
@@ -249,6 +255,7 @@ class CashBalance(TimeStampedModel):
     class Meta:
         verbose_name = _("cash balance")
         verbose_name_plural = _("cash balances")
+        db_table = qualified_table("operations", "operations_cashbalance")
         ordering = ("cash_desk_id", "currency")
         constraints = (
             models.UniqueConstraint(
@@ -274,6 +281,7 @@ class OperationNumberSequence(models.Model):
     class Meta:
         verbose_name = _("operation number sequence")
         verbose_name_plural = _("operation number sequences")
+        db_table = qualified_table("operations", "operations_operationnumbersequence")
 
     def __str__(self):
         return f"{self.cash_desk_id}: {self.last_number}"
@@ -299,6 +307,7 @@ class OperationsSettings(TimeStampedModel):
     class Meta:
         verbose_name = _("operations settings")
         verbose_name_plural = _("operations settings")
+        db_table = qualified_table("operations", "operations_operationssettings")
 
     def save(self, *args, **kwargs):
         self.pk = 1
@@ -341,6 +350,7 @@ class CashDeskOperation(TimeStampedModel):
     class Meta:
         verbose_name = _("cash desk operation")
         verbose_name_plural = _("cash desk operations")
+        db_table = qualified_table("operations", "operations_cashdeskoperation")
         ordering = ("operation_type__name",)
         constraints = (
             models.UniqueConstraint(

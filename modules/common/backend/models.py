@@ -5,6 +5,8 @@ import uuid
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from modules.common.backend.schemas import qualified_table
+
 
 class TimeStampedModel(models.Model):
     """Abstract base that records creation and modification timestamps."""
@@ -36,6 +38,7 @@ class OutboxEvent(models.Model):
     class Meta:
         verbose_name = _("outbox event")
         verbose_name_plural = _("outbox events")
+        db_table = qualified_table("common", "common_outboxevent")
         ordering = ("id",)
         indexes = (models.Index(fields=["delivered_at", "id"]),)
 

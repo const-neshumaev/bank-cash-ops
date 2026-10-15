@@ -17,6 +17,31 @@ jobs:
   backend:
     name: Backend (ruff, pytest)
     runs-on: ubuntu-latest
+
+    # PostgreSQL is the project's only database (docs/adr/0002-postgresql-in-development.md),
+    # so both the migration check and the test suite run against it.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: bankcashops
+          POSTGRES_USER: bankcashops
+          POSTGRES_PASSWORD: bankcashops
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bankcashops"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Replicate the container layout, where the Django host project and the
+      # `modules` package sit side by side: the host project provides settings
+      # (PYTHONPATH) and the modules provide the tests.
+      PYTHONPATH: ${{ github.workspace }}/backend:${{ github.workspace }}
+      DATABASE_URL: postgres://bankcashops:bankcashops@localhost:5432/bankcashops
+
     steps:
       - uses: actions/checkout@v7
 
@@ -35,19 +60,10 @@ jobs:
         run: ruff check --config backend/pyproject.toml backend modules
 
       - name: Check for missing migrations
-        # Fail when models changed without a matching migration. The throwaway
-        # SQLite file keeps the check off the workspace and its output quiet.
-        env:
-          PYTHONPATH: ${{ github.workspace }}/backend:${{ github.workspace }}
-          SQLITE_PATH: ${{ runner.temp }}/ci.sqlite3
+        # Fail when models changed without a matching migration.
         run: python backend/manage.py makemigrations --check --dry-run
 
       - name: Tests (pytest)
-        # Replicate the container layout, where the Django host project and the
-        # `modules` package sit side by side: the host project provides settings
-        # (PYTHONPATH) and the modules provide the tests.
-        env:
-          PYTHONPATH: ${{ github.workspace }}/backend:${{ github.workspace }}
         run: pytest -c backend/pyproject.toml modules
 
   frontend:
