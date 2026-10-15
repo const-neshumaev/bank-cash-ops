@@ -38,13 +38,14 @@
 другие модули используют только их, а не модели `core`:
 
 - `core.users` (`UserDirectory`) — чтение пользователя, проверка прав и админа;
-- `core.org` (`OrgDirectory`) — открытая смена кассира, доступные кассы и проверка
-  доступа к кассе;
-- `core.references` (`ReferenceDirectory`) — справочник валют, валюты, включённые
-  на кассе, и действующие курсы (в том числе кассовые).
+- `core.org` (`OrgDirectory`) — открытая смена кассира, доступные кассы и
+  отделения, проверка доступа к кассе, путь по дереву отделений (`branch_ancestor_ids`);
+- `core.references` (`ReferenceDirectory`) — справочник валют, **действующие**
+  валюты кассы и действующие курсы (в том числе кассовые).
 
 `core.users` и `core.org` нужны модулю `operations`; `core.references` — для
-проверки доступных кассе валют при проведении.
+проверки доступных кассе валют при проведении (возвращает эффективный набор,
+пустой = ничего не разрешено).
 
 ## Схема данных
 
@@ -135,8 +136,12 @@ erDiagram
 
 ### Валюты
 
-Справочник валют банка и валюты, включённые на конкретной кассе. Набор валют
-кассы — **opt-in**: пусто означает «без ограничений».
+Справочник валют банка, валюты, включённые на конкретной кассе, и **шаблоны
+комплектации** (банк и отделение). Действующий набор валют кассы вычисляется
+динамически: своя настройка кассы → ближайший определённый шаблон по пути
+«отделение → … → банк» → при отсутствии шаблонов **валюты не разрешены**
+(deny-by-default). Пустой шаблон также запрещает все валюты. Правило и обоснование
+— в `docs/adr/0014-cash-desk-configuration-templates.md`.
 
 ```mermaid
 erDiagram
@@ -152,6 +157,10 @@ erDiagram
         bigint cash_desk_id FK
         bigint currency_id FK
     }
+    CURRENCY_TEMPLATE {
+        bigint id PK
+        bigint branch_id FK
+    }
     CURRENCY_RATE {
         bigint id PK
         bigint currency_id FK
@@ -163,6 +172,8 @@ erDiagram
     }
     CASH_DESK ||--o{ CASH_DESK_CURRENCY : allows
     CURRENCY ||--o{ CASH_DESK_CURRENCY : "enabled on"
+    BRANCH ||--o| CURRENCY_TEMPLATE : "default for"
+    CURRENCY_TEMPLATE }o--o{ CURRENCY : defaults
     CURRENCY ||--o{ CURRENCY_RATE : quotes
     CASH_DESK ||--o{ CURRENCY_RATE : "scoped to"
 ```

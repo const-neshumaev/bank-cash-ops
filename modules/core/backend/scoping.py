@@ -75,3 +75,19 @@ def can_access_branch(user: User, branch: Branch) -> bool:
     """Return whether ``user`` is allowed to work with ``branch``."""
     branch_ids = accessible_branch_ids(user)
     return branch_ids is None or branch.pk in branch_ids
+
+
+def branch_ancestor_ids(branch_id: int) -> tuple[int, ...]:
+    """Return ``branch_id`` and its ancestors, nearest first (up to the root).
+
+    Used to resolve the inherited configuration templates: a closer branch in the
+    chain overrides a farther one, and the bank-wide template is the base.
+    """
+    ids: list[int] = []
+    current: int | None = branch_id
+    seen: set[int] = set()
+    while current is not None and current not in seen:
+        seen.add(current)
+        ids.append(current)
+        current = Branch.objects.filter(pk=current).values_list("parent_id", flat=True).first()
+    return tuple(ids)

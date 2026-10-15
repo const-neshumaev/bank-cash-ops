@@ -11,6 +11,7 @@ from modules.core.backend.models import (
     CashDesk,
     Currency,
     CurrencyRate,
+    CurrencyTemplate,
     Role,
     Shift,
 )
@@ -312,9 +313,7 @@ class BranchSerializer(serializers.ModelSerializer):
                 )
 
         parent = attrs.get("parent", getattr(instance, "parent", None))
-        is_head_office = attrs.get(
-            "is_head_office", getattr(instance, "is_head_office", False)
-        )
+        is_head_office = attrs.get("is_head_office", getattr(instance, "is_head_office", False))
 
         if is_head_office and parent is not None:
             raise serializers.ValidationError(
@@ -449,18 +448,25 @@ class CurrencySerializer(serializers.ModelSerializer):
 class CashDeskCurrenciesSerializer(serializers.Serializer):
     """Input for replacing the currencies enabled on a cash desk."""
 
-    currencies = serializers.ListField(
-        child=serializers.CharField(max_length=8), allow_empty=True
-    )
+    currencies = serializers.ListField(child=serializers.CharField(max_length=8), allow_empty=True)
+
+
+class CurrencyTemplateSerializer(serializers.ModelSerializer):
+    """Read representation of a currency template (bank or branch)."""
+
+    branch_id = serializers.IntegerField(read_only=True)
+    currencies = CurrencySerializer(many=True, read_only=True)
+
+    class Meta:
+        model = CurrencyTemplate
+        fields = ("id", "branch_id", "currencies")
 
 
 class CurrencyRateSerializer(serializers.ModelSerializer):
     """Read and write representation of a currency rate."""
 
     currency = serializers.SlugRelatedField(slug_field="code", queryset=Currency.objects.all())
-    base_currency = serializers.SlugRelatedField(
-        slug_field="code", queryset=Currency.objects.all()
-    )
+    base_currency = serializers.SlugRelatedField(slug_field="code", queryset=Currency.objects.all())
     cash_desk = serializers.PrimaryKeyRelatedField(
         queryset=CashDesk.objects.all(), required=False, allow_null=True, default=None
     )
@@ -482,9 +488,7 @@ class CurrencyRateSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         currency = attrs.get("currency", getattr(self.instance, "currency", None))
-        base_currency = attrs.get(
-            "base_currency", getattr(self.instance, "base_currency", None)
-        )
+        base_currency = attrs.get("base_currency", getattr(self.instance, "base_currency", None))
         if currency is not None and currency == base_currency:
             raise serializers.ValidationError(
                 {"base_currency": _("The base currency must differ from the currency.")}

@@ -24,6 +24,9 @@ class PermissionCode:
     STRUCTURE_VIEW = "core.structure.view"
     STRUCTURE_MANAGE = "core.structure.manage"
 
+    CURRENCIES_CONFIG_MANAGE = "core.currencies.config.manage"
+    CURRENCIES_CONFIG_MANAGE_BRANCH = "core.currencies.config.manage.branch"
+
     SHIFTS_VIEW = "core.shifts.view"
     SHIFTS_OPEN = "core.shifts.open"
     SHIFTS_CLOSE = "core.shifts.close"
@@ -45,6 +48,11 @@ CATALOG: tuple[Permission, ...] = (
     Permission(PermissionCode.ROLES_MANAGE, "Управление ролями"),
     Permission(PermissionCode.STRUCTURE_VIEW, "Просмотр структуры банка"),
     Permission(PermissionCode.STRUCTURE_MANAGE, "Управление структурой банка"),
+    Permission(PermissionCode.CURRENCIES_CONFIG_MANAGE, "Настройка валют касс"),
+    Permission(
+        PermissionCode.CURRENCIES_CONFIG_MANAGE_BRANCH,
+        "Настройка валют касс своего отделения",
+    ),
     Permission(PermissionCode.SHIFTS_VIEW, "Просмотр кассовых смен"),
     Permission(PermissionCode.SHIFTS_OPEN, "Открытие кассовой смены"),
     Permission(PermissionCode.SHIFTS_CLOSE, "Закрытие своей смены"),

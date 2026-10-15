@@ -7,7 +7,7 @@ import { moduleNav } from '../registry'
 import type { ModuleNavItem } from '../registry/contract'
 
 export function AppLayout() {
-  const { user, hasPermission, signOut } = useAuth()
+  const { user, hasAnyPermission, signOut } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -17,7 +17,7 @@ export function AppLayout() {
   }
 
   const visibleItems = moduleNav.filter(
-    (item) => !item.permission || hasPermission(item.permission),
+    (item) => !item.permission || hasAnyPermission(item.permission),
   )
   const plainItems = visibleItems.filter((item) => !item.section)
   const sections = visibleItems.reduce<Record<string, ModuleNavItem[]>>((acc, item) => {

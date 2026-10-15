@@ -223,11 +223,15 @@ Content-Type: application/json
 
 | Метод | Путь | Право | Описание |
 | --- | --- | --- | --- |
-| GET | `/api/cash-desks/{id}/currencies/` | `core.structure.view` | Доступные валюты кассы |
-| PUT | `/api/cash-desks/{id}/currencies/` | `core.structure.manage` | Задать доступные валюты |
+| GET | `/api/cash-desks/{id}/currencies/` | `core.structure.view` | Действующие валюты кассы |
+| PUT | `/api/cash-desks/{id}/currencies/` | `core.currencies.config.manage[.branch]` | Задать свою настройку кассы |
 
-Набор валют кассы — **opt-in**: пока он не задан, кассе доступны все активные
-валюты (`configured: false`); после настройки — только перечисленные.
+Действующие валюты кассы вычисляются **динамически** (см.
+`docs/adr/0014-cash-desk-configuration-templates.md`): если у кассы есть своя
+настройка — берётся она; иначе ближайший определённый шаблон по пути «отделение
+→ … → банк» (правило перекрытия); если шаблонов нет — **не разрешена ни одна
+валюта** (deny-by-default). Поле `source` сообщает источник (`own`, `branch`,
+`bank`, `none`), `template_branch_id` — отделение применённого шаблона.
 
 ```http
 PUT /api/cash-desks/7/currencies/
@@ -240,6 +244,8 @@ Content-Type: application/json
 {
   "cash_desk": 7,
   "configured": true,
+  "source": "own",
+  "template_branch_id": null,
   "currencies": [
     { "code": "BYN", "name": "Белорусский рубль", "symbol": "Br", "minor_units": 2 },
     { "code": "USD", "name": "Доллар США", "symbol": "$", "minor_units": 2 }
@@ -247,9 +253,28 @@ Content-Type: application/json
 }
 ```
 
-Неизвестный код валюты отклоняется (`400`). Пустой список снимает настройку
-(касса снова без ограничений). Наличие валюты на кассе проверяется при
-проведении операции (см. «Кассовые операции»).
+Неизвестный код валюты отклоняется (`400`). Пустой список **снимает** свою
+настройку (касса возвращается к шаблону). Наличие валюты на кассе проверяется при
+проведении операции (см. «Кассовые операции»). Право
+`core.currencies.config.manage.branch` ограничивает настройку доступными
+отделениями и не даёт менять шаблон банка; `core.currencies.config.manage`
+снимает все ограничения.
+
+### Шаблоны валют (`/api/currency-templates/`)
+
+| Метод | Путь | Право | Описание |
+| --- | --- | --- | --- |
+| GET | `/api/currency-templates/` | `core.structure.view` | Определённые шаблоны (банк и доступные отделения) |
+| GET | `/api/currency-templates/bank/` | `core.structure.view` | Шаблон банка |
+| PUT | `/api/currency-templates/bank/` | `core.currencies.config.manage` | Задать шаблон банка |
+| DELETE | `/api/currency-templates/bank/` | `core.currencies.config.manage` | Удалить шаблон банка |
+| GET | `/api/currency-templates/branches/{id}/` | `core.structure.view` | Шаблон отделения |
+| PUT | `/api/currency-templates/branches/{id}/` | `core.currencies.config.manage[.branch]` | Задать шаблон отделения |
+| DELETE | `/api/currency-templates/branches/{id}/` | `core.currencies.config.manage[.branch]` | Удалить шаблон отделения |
+
+Тело PUT — `{ "currencies": [...] }`. Пустой список — определённый **пустой
+шаблон**, запрещающий все валюты. Отдельный GET возвращает `defined: false`,
+когда шаблон не задан, и `defined: true` с содержимым, когда задан.
 
 ## Валюты (`/api/currencies/`)
 
@@ -456,31 +481,54 @@ Content-Type: application/json
 
 | Метод | Путь | Право | Описание |
 | --- | --- | --- | --- |
-| GET | `/api/operations/cash-desks/{cash_desk}/operations/` | `operations.view` | Операции, доступные на кассе |
-| PUT | `/api/operations/cash-desks/{cash_desk}/operations/` | `operations.config.manage` | Задать доступные операции |
+| GET | `/api/operations/cash-desks/{cash_desk}/operations/` | `operations.view` | Действующие операции кассы |
+| PUT | `/api/operations/cash-desks/{cash_desk}/operations/` | `operations.config.manage[.branch]` | Задать свою настройку кассы |
 
-Набор операций кассы — **opt-in**: пока он не задан, кассе доступны все активные
-операции (`configured: false`); после настройки — только перечисленные.
+Действующие операции кассы вычисляются **динамически** (см.
+`docs/adr/0014-cash-desk-configuration-templates.md`): своя настройка кассы →
+ближайший определённый шаблон по пути «отделение → … → банк» → при отсутствии
+шаблонов **операции запрещены** (deny-by-default). Поле `source` — источник
+(`own`, `branch`, `bank`, `none`), `template_branch_id` — отделение шаблона.
 
 ```http
 PUT /api/operations/cash-desks/7/operations/
 Content-Type: application/json
 
-{ "operations": ["cash_receipt", "cash_disbursement"] }
+{ "operations": ["cash_receipt", "cash_handover"] }
 ```
 
 ```json
 {
   "cash_desk_id": 7,
-  "configured": true,
+  "configured": false,
+  "source": "bank",
+  "template_branch_id": null,
   "operations": [
-    { "code": "cash_receipt", "name": "Приход наличных", "kind": "income" }
+    { "code": "cash_receipt", "name": "Приход наличных от клиента", "kind": "income" }
   ]
 }
 ```
 
-Неизвестный код операции отклоняется (`400`). Пустой список снимает настройку
-(касса снова без ограничений).
+Неизвестный код операции отклоняется (`400`). Пустой список **снимает** свою
+настройку (касса возвращается к шаблону). Право
+`operations.config.manage.branch` ограничивает настройку доступными отделениями и
+не даёт менять шаблон банка; `operations.config.manage` снимает ограничения.
+
+### Шаблоны операций (`/api/operations/operation-templates/`)
+
+| Метод | Путь | Право | Описание |
+| --- | --- | --- | --- |
+| GET | `/api/operations/operation-templates/` | `operations.view` | Определённые шаблоны (банк и доступные отделения) |
+| GET | `/api/operations/operation-templates/bank/` | `operations.view` | Шаблон банка |
+| PUT | `/api/operations/operation-templates/bank/` | `operations.config.manage` | Задать шаблон банка |
+| DELETE | `/api/operations/operation-templates/bank/` | `operations.config.manage` | Удалить шаблон банка |
+| GET | `/api/operations/operation-templates/branches/{id}/` | `operations.view` | Шаблон отделения |
+| PUT | `/api/operations/operation-templates/branches/{id}/` | `operations.config.manage[.branch]` | Задать шаблон отделения |
+| DELETE | `/api/operations/operation-templates/branches/{id}/` | `operations.config.manage[.branch]` | Удалить шаблон отделения |
+
+Тело PUT — `{ "operations": [...] }`. Пустой список — определённый **пустой
+шаблон**, запрещающий все операции. Отдельный GET возвращает `defined: false`,
+когда шаблон не задан.
 
 ### Настройки (`/api/operations/settings/`)
 

@@ -5,10 +5,9 @@ from __future__ import annotations
 from django.db.models import Q
 from django.utils import timezone
 
-from modules.core.backend import scoping
+from modules.core.backend import currency_config, scoping
 from modules.core.backend.models import (
     CashDesk,
-    CashDeskCurrency,
     Currency,
     CurrencyRate,
     Shift,
@@ -66,9 +65,16 @@ class OrgDirectoryService:
         branch_ids = scoping.accessible_branch_ids(user)
         if branch_ids is None:
             return None
-        return set(
-            CashDesk.objects.filter(branch_id__in=branch_ids).values_list("id", flat=True)
-        )
+        return set(CashDesk.objects.filter(branch_id__in=branch_ids).values_list("id", flat=True))
+
+    def accessible_branch_ids(self, user_id: int) -> set[int] | None:
+        user = User.objects.filter(pk=user_id).first()
+        if user is None:
+            return set()
+        return scoping.accessible_branch_ids(user)
+
+    def branch_ancestor_ids(self, branch_id: int) -> tuple[int, ...]:
+        return scoping.branch_ancestor_ids(branch_id)
 
     def user_can_access_cash_desk(self, user_id: int, cash_desk_id: int) -> bool:
         user = User.objects.filter(pk=user_id).first()
@@ -100,13 +106,8 @@ class ReferenceDirectoryService:
         currency = Currency.objects.filter(code=(code or "").upper()).first()
         return self._currency_to_dto(currency) if currency is not None else None
 
-    def cash_desk_currency_codes(self, cash_desk_id: int) -> set[str] | None:
-        codes = set(
-            CashDeskCurrency.objects.filter(cash_desk_id=cash_desk_id).values_list(
-                "currency__code", flat=True
-            )
-        )
-        return codes or None
+    def cash_desk_currency_codes(self, cash_desk_id: int) -> set[str]:
+        return currency_config.effective_currency_codes(cash_desk_id)
 
     def rate(
         self,
