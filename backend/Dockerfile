@@ -10,6 +10,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# ``gettext`` provides ``msgfmt``/``xgettext`` for ``compilemessages``/
+# ``makemessages`` (see the internationalisation section of docs/development.md).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gettext \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY backend/requirements.txt backend/requirements-dev.txt ./
 RUN pip install -r requirements-dev.txt
 

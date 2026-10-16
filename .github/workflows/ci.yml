@@ -54,6 +54,14 @@ jobs:
       - name: Install dependencies
         run: pip install -r backend/requirements-dev.txt
 
+      - name: Install gettext (translation tooling)
+        # ``compilemessages``/``makemessages`` need msgfmt/xgettext.
+        run: sudo apt-get update && sudo apt-get install -y gettext
+
+      - name: Compile translation catalogs
+        # Fails on malformed .po files and verifies the catalogs build.
+        run: python backend/manage.py compilemessages
+
       - name: Lint (ruff)
         # Run from the repository root so ruff resolves the project root to the
         # VCS root and treats both `config` and `modules` as first-party.

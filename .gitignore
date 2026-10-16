@@ -23,6 +23,10 @@ npm-debug.log*
 .env.*.local
 
 # --- Generated ------------------------------------------------------------- #
+# Compiled translation catalogs are produced by ``compilemessages`` (entrypoint
+# and CI); only the ``.po`` sources are committed.
+*.mo
+
 # Module frontends are assembled here at build time (bind mount in development,
 # copy in the production image); the directory is never committed.
 frontend/modules/

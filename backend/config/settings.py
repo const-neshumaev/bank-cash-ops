@@ -10,6 +10,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import environ
+from django.utils.translation import gettext_lazy as _
 
 # Directory that contains ``manage.py``.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -70,6 +71,10 @@ if not DEBUG and not TESTING:
 
 MIDDLEWARE += [
     "django.contrib.sessions.middleware.SessionMiddleware",
+    # Activates the request language from ``Accept-Language`` (see the
+    # internationalisation block below and ADR 0015). It must sit after the
+    # session middleware and before ``CommonMiddleware``.
+    "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -127,7 +132,21 @@ AUTH_PASSWORD_VALIDATORS = [
 # --------------------------------------------------------------------------- #
 # Internationalisation
 # --------------------------------------------------------------------------- #
-LANGUAGE_CODE = "ru-ru"
+# The application is multilingual (docs/adr/0015-application-language-layers.md):
+# every response is rendered in the language of the request (``Accept-Language``,
+# activated by ``LocaleMiddleware``), the per-user choice lives in ``core.User``
+# and the bank-wide default below is the fallback when neither is present.
+LANGUAGE_CODE = env("BCO_DEFAULT_LANGUAGE", default="ru")
+# Languages the application offers. Adding one means adding an entry here and the
+# matching translation catalogs (``locale/<lang>/LC_MESSAGES``).
+LANGUAGES = [
+    ("ru", _("Russian")),
+    ("en", _("English")),
+]
+# Translation catalogs live inside each module (``modules/<name>/backend/locale``)
+# and Django discovers them automatically as app-level locale directories. There is
+# deliberately no ``LOCALE_PATHS``: ``makemessages`` then writes into the catalog of
+# the module it is run in, instead of a shared host directory.
 TIME_ZONE = env("DJANGO_TIME_ZONE")
 USE_I18N = True
 USE_TZ = True
