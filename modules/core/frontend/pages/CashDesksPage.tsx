@@ -17,6 +17,7 @@ import { useDebouncedValue } from '@mantine/hooks'
 import { notifications } from '@mantine/notifications'
 import { IconEdit, IconPlus, IconSearch, IconTrash } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { extractErrorMessage } from '@app/api/errors'
 import type { Branch, CashDesk } from '@app/api/types'
@@ -26,6 +27,7 @@ import * as cashDesksApi from '../api/cashDesks'
 import { CashDeskFormModal } from '../components/CashDeskFormModal'
 
 export function CashDesksPage() {
+  const { t } = useTranslation('core')
   const [cashDesks, setCashDesks] = useState<CashDesk[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(false)
@@ -53,7 +55,7 @@ export function CashDesksPage() {
       })
       setCashDesks(data.results)
     } catch (error) {
-      notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
+      notifications.show({ color: 'red', title: t('common.error'), message: extractErrorMessage(error) })
     } finally {
       setLoading(false)
     }
@@ -76,32 +78,32 @@ export function CashDesksPage() {
   const handleDelete = async (cashDesk: CashDesk) => {
     try {
       await cashDesksApi.deleteCashDesk(cashDesk.id)
-      notifications.show({ color: 'green', message: 'Касса удалена' })
+      notifications.show({ color: 'green', message: t('cashDesks.deleted') })
       void load()
     } catch (error) {
-      notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
+      notifications.show({ color: 'red', title: t('common.error'), message: extractErrorMessage(error) })
     }
   }
 
   return (
     <Stack>
       <Group justify="space-between">
-        <Title order={3}>Кассы</Title>
+        <Title order={3}>{t('cashDesks.title')}</Title>
         <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
-          Добавить
+          {t('common.add')}
         </Button>
       </Group>
 
       <Group>
         <TextInput
-          placeholder="Поиск по названию, коду, MAC-адресу"
+          placeholder={t('cashDesks.searchPlaceholder')}
           leftSection={<IconSearch size={16} />}
           value={search}
           onChange={(event) => setSearch(event.currentTarget.value)}
           w={320}
         />
         <Select
-          placeholder="Отделение"
+          placeholder={t('cashDesks.branchFilter')}
           data={branches.map((branch) => ({ value: String(branch.id), label: branch.name }))}
           value={branchFilter}
           onChange={setBranchFilter}
@@ -113,11 +115,11 @@ export function CashDesksPage() {
       <Table striped highlightOnHover withTableBorder>
         <Table.Thead>
           <Table.Tr>
-            <Table.Th>Название</Table.Th>
-            <Table.Th>Код</Table.Th>
-            <Table.Th>Отделение</Table.Th>
-            <Table.Th>MAC-адрес</Table.Th>
-            <Table.Th>Статус</Table.Th>
+            <Table.Th>{t('cashDesks.columns.name')}</Table.Th>
+            <Table.Th>{t('cashDesks.columns.code')}</Table.Th>
+            <Table.Th>{t('cashDesks.columns.branch')}</Table.Th>
+            <Table.Th>{t('cashDesks.columns.mac')}</Table.Th>
+            <Table.Th>{t('cashDesks.columns.status')}</Table.Th>
             <Table.Th />
           </Table.Tr>
         </Table.Thead>
@@ -134,7 +136,7 @@ export function CashDesksPage() {
             <Table.Tr>
               <Table.Td colSpan={6}>
                 <Center py="md">
-                  <Text c="dimmed">Кассы не найдены</Text>
+                  <Text c="dimmed">{t('cashDesks.empty')}</Text>
                 </Center>
               </Table.Td>
             </Table.Tr>
@@ -147,17 +149,17 @@ export function CashDesksPage() {
                 <Table.Td>{cashDesk.mac_address || '—'}</Table.Td>
                 <Table.Td>
                   <Badge color={cashDesk.is_active ? 'green' : 'gray'} variant="light">
-                    {cashDesk.is_active ? 'Активна' : 'Отключена'}
+                    {cashDesk.is_active ? t('cashDesks.active') : t('cashDesks.inactive')}
                   </Badge>
                 </Table.Td>
                 <Table.Td>
                   <Group gap={4} justify="flex-end">
-                    <Tooltip label="Редактировать">
+                    <Tooltip label={t('common.edit')}>
                       <ActionIcon variant="subtle" onClick={() => openEdit(cashDesk)}>
                         <IconEdit size={16} />
                       </ActionIcon>
                     </Tooltip>
-                    <Tooltip label="Удалить">
+                    <Tooltip label={t('common.delete')}>
                       <ActionIcon
                         variant="subtle"
                         color="red"

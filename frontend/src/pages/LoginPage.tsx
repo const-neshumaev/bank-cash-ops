@@ -3,6 +3,7 @@ import {
   Button,
   Card,
   Center,
+  Group,
   PasswordInput,
   Stack,
   Text,
@@ -12,9 +13,11 @@ import {
 import { useForm } from '@mantine/form'
 import { IconAlertCircle } from '@tabler/icons-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../auth/AuthContext'
+import { LanguageSelect } from '../components/LanguageSelect'
 
 interface LocationState {
   from?: { pathname?: string }
@@ -22,6 +25,7 @@ interface LocationState {
 
 export function LoginPage() {
   const { user, loading, signIn } = useAuth()
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
   const [error, setError] = useState<string | null>(null)
@@ -30,8 +34,9 @@ export function LoginPage() {
   const form = useForm({
     initialValues: { email: '', password: '' },
     validate: {
-      email: (value) => (/^\S+@\S+\.\S+$/.test(value.trim()) ? null : 'Укажите корректный email'),
-      password: (value) => (value.length > 0 ? null : 'Укажите пароль'),
+      email: (value) =>
+        /^\S+@\S+\.\S+$/.test(value.trim()) ? null : t('login.validation.email'),
+      password: (value) => (value.length > 0 ? null : t('login.validation.password')),
     },
   })
 
@@ -47,7 +52,7 @@ export function LoginPage() {
       const state = location.state as LocationState | null
       navigate(state?.from?.pathname ?? '/', { replace: true })
     } catch {
-      setError('Не удалось войти. Проверьте email и пароль.')
+      setError(t('login.failed'))
     } finally {
       setSubmitting(false)
     }
@@ -58,9 +63,12 @@ export function LoginPage() {
       <Card w={380} padding="lg" radius="md" withBorder>
         <Stack>
           <Stack gap={0}>
-            <Title order={3}>BankCashOps</Title>
+            <Group justify="space-between">
+              <Title order={3}>BankCashOps</Title>
+              <LanguageSelect />
+            </Group>
             <Text size="sm" c="dimmed">
-              Вход в систему
+              {t('login.subtitle')}
             </Text>
           </Stack>
 
@@ -73,7 +81,7 @@ export function LoginPage() {
           <form onSubmit={handleSubmit} autoComplete="on" noValidate>
             <Stack>
               <TextInput
-                label="Email"
+                label={t('login.email')}
                 name="email"
                 id="login-email"
                 type="email"
@@ -82,14 +90,14 @@ export function LoginPage() {
                 {...form.getInputProps('email')}
               />
               <PasswordInput
-                label="Пароль"
+                label={t('login.password')}
                 name="password"
                 id="login-password"
                 autoComplete="current-password"
                 {...form.getInputProps('password')}
               />
               <Button type="submit" loading={submitting} fullWidth>
-                Войти
+                {t('login.submit')}
               </Button>
             </Stack>
           </form>

@@ -1,5 +1,7 @@
 import { isAxiosError } from 'axios'
 
+import i18n from '../i18n'
+
 type ApiErrorData = Record<string, unknown>
 
 /** Convert a DRF validation error payload into a single human readable line. */
@@ -13,5 +15,5 @@ export function extractErrorMessage(error: unknown): string {
       }
     }
   }
-  return 'Произошла ошибка. Попробуйте ещё раз.'
+  return i18n.t('errors.generic')
 }

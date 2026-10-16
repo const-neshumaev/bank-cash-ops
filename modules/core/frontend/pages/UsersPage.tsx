@@ -26,6 +26,7 @@ import {
   IconUserOff,
 } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 
 import { extractErrorMessage } from '@app/api/errors'
 import type { Role, User } from '@app/api/types'
@@ -39,11 +40,12 @@ import { UserFormModal } from '../components/UserFormModal'
 const PAGE_SIZE = 10
 
 const STATUS_OPTIONS = [
-  { value: 'true', label: 'Активные' },
-  { value: 'false', label: 'Заблокированные' },
+  { value: 'true', labelKey: 'users.statusActive' },
+  { value: 'false', labelKey: 'users.statusBlocked' },
 ]
 
 export function UsersPage() {
+  const { t } = useTranslation('core')
   const { user: currentUser } = useAuth()
 
   const [users, setUsers] = useState<User[]>([])
@@ -82,7 +84,7 @@ export function UsersPage() {
       setUsers(data.results)
       setTotal(data.count)
     } catch (error) {
-      notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
+      notifications.show({ color: 'red', title: t('common.error'), message: extractErrorMessage(error) })
     } finally {
       setLoading(false)
     }
@@ -115,7 +117,7 @@ export function UsersPage() {
       }
       void load()
     } catch (error) {
-      notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
+      notifications.show({ color: 'red', title: t('common.error'), message: extractErrorMessage(error) })
     }
   }
 
@@ -126,12 +128,12 @@ export function UsersPage() {
       await usersApi.deleteUser(deleteTarget.id, permanent)
       notifications.show({
         color: 'green',
-        message: permanent ? 'Пользователь удалён' : 'Пользователь деактивирован',
+        message: permanent ? t('users.deleted') : t('users.deactivated'),
       })
       setDeleteTarget(null)
       void load()
     } catch (error) {
-      notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
+      notifications.show({ color: 'red', title: t('common.error'), message: extractErrorMessage(error) })
     } finally {
       setDeleting(false)
     }
@@ -142,22 +144,22 @@ export function UsersPage() {
   return (
     <Stack>
       <Group justify="space-between">
-        <Title order={3}>Пользователи</Title>
+        <Title order={3}>{t('users.title')}</Title>
         <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
-          Добавить
+          {t('common.add')}
         </Button>
       </Group>
 
       <Group>
         <TextInput
-          placeholder="Поиск по имени, email, телефону"
+          placeholder={t('users.searchPlaceholder')}
           leftSection={<IconSearch size={16} />}
           value={search}
           onChange={(event) => setSearch(event.currentTarget.value)}
           w={320}
         />
         <Select
-          placeholder="Роль"
+          placeholder={t('users.roleFilter')}
           data={roles.map((role) => ({ value: String(role.id), label: role.name }))}
           value={roleFilter}
           onChange={setRoleFilter}
@@ -165,8 +167,8 @@ export function UsersPage() {
           w={220}
         />
         <Select
-          placeholder="Статус"
-          data={STATUS_OPTIONS}
+          placeholder={t('users.statusFilter')}
+          data={STATUS_OPTIONS.map((option) => ({ value: option.value, label: t(option.labelKey) }))}
           value={statusFilter}
           onChange={setStatusFilter}
           clearable
@@ -177,11 +179,11 @@ export function UsersPage() {
       <Table striped highlightOnHover withTableBorder>
         <Table.Thead>
           <Table.Tr>
-            <Table.Th>ФИО</Table.Th>
-            <Table.Th>Email</Table.Th>
-            <Table.Th>Роли</Table.Th>
-            <Table.Th>Телефон</Table.Th>
-            <Table.Th>Статус</Table.Th>
+            <Table.Th>{t('users.columns.name')}</Table.Th>
+            <Table.Th>{t('users.columns.email')}</Table.Th>
+            <Table.Th>{t('users.columns.roles')}</Table.Th>
+            <Table.Th>{t('users.columns.phone')}</Table.Th>
+            <Table.Th>{t('users.columns.status')}</Table.Th>
             <Table.Th />
           </Table.Tr>
         </Table.Thead>
@@ -198,7 +200,7 @@ export function UsersPage() {
             <Table.Tr>
               <Table.Td colSpan={6}>
                 <Center py="md">
-                  <Text c="dimmed">Пользователи не найдены</Text>
+                  <Text c="dimmed">{t('users.empty')}</Text>
                 </Center>
               </Table.Td>
             </Table.Tr>
@@ -227,17 +229,17 @@ export function UsersPage() {
                   <Table.Td>{user.phone || '—'}</Table.Td>
                   <Table.Td>
                     <Badge color={user.is_active ? 'green' : 'gray'} variant="light">
-                      {user.is_active ? 'Активен' : 'Заблокирован'}
+                      {user.is_active ? t('users.active') : t('users.blocked')}
                     </Badge>
                   </Table.Td>
                   <Table.Td>
                     <Group gap={4} justify="flex-end">
-                      <Tooltip label="Редактировать">
+                      <Tooltip label={t('common.edit')}>
                         <ActionIcon variant="subtle" onClick={() => openEdit(user)}>
                           <IconEdit size={16} />
                         </ActionIcon>
                       </Tooltip>
-                      <Tooltip label={user.is_active ? 'Заблокировать' : 'Разблокировать'}>
+                      <Tooltip label={user.is_active ? t('users.block') : t('users.unblock')}>
                         <ActionIcon
                           variant="subtle"
                           color={user.is_active ? 'orange' : 'green'}
@@ -247,7 +249,7 @@ export function UsersPage() {
                           {user.is_active ? <IconUserOff size={16} /> : <IconUserCheck size={16} />}
                         </ActionIcon>
                       </Tooltip>
-                      <Tooltip label="Удалить">
+                      <Tooltip label={t('common.delete')}>
                         <ActionIcon
                           variant="subtle"
                           color="red"
@@ -282,12 +284,16 @@ export function UsersPage() {
       <Modal
         opened={deleteTarget !== null}
         onClose={() => setDeleteTarget(null)}
-        title="Удаление пользователя"
+        title={t('users.deleteTitle')}
       >
         <Stack>
           <Text>
-            Пользователь <b>{deleteTarget?.full_name || deleteTarget?.email}</b> будет деактивирован.
-            Запись сохраняется для аудита.
+            <Trans
+              ns="core"
+              i18nKey="users.deleteConfirm"
+              values={{ name: deleteTarget?.full_name || deleteTarget?.email }}
+              components={{ b: <b /> }}
+            />
           </Text>
           <Group justify="space-between">
             <Button
@@ -296,14 +302,14 @@ export function UsersPage() {
               loading={deleting}
               onClick={() => void handleDelete(true)}
             >
-              Удалить навсегда
+              {t('users.deletePermanent')}
             </Button>
             <Group>
               <Button variant="default" onClick={() => setDeleteTarget(null)}>
-                Отмена
+                {t('common.cancel')}
               </Button>
               <Button color="orange" loading={deleting} onClick={() => void handleDelete(false)}>
-                Деактивировать
+                {t('users.deactivate')}
               </Button>
             </Group>
           </Group>

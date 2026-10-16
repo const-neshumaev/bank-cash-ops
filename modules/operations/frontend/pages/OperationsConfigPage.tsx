@@ -23,6 +23,7 @@ import {
   IconTrash,
 } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { extractErrorMessage } from '@app/api/errors'
 import type { Branch, CashDesk } from '@app/api/types'
@@ -39,28 +40,12 @@ import type {
 
 const BANK_PERMISSION = 'operations.config.manage'
 
-const KIND_LABELS: Record<string, string> = {
-  income: 'Приход',
-  expense: 'Расход',
-  exchange: 'Обмен',
-  internal: 'Внутренняя',
-}
-
-function sourceLabel(
-  source: ConfigSource,
-  templateBranchId: number | null,
-  branchName: (id: number) => string,
-): string {
-  switch (source) {
-    case 'own':
-      return 'Своя настройка кассы'
-    case 'branch':
-      return `Шаблон отделения «${templateBranchId ? branchName(templateBranchId) : ''}»`
-    case 'bank':
-      return 'Шаблон банка'
-    default:
-      return 'Не задано — операции запрещены'
-  }
+/** i18n keys of the operation-kind labels (under `config.kind.*`). */
+const KIND_LABEL_KEYS: Record<string, string> = {
+  income: 'config.kind.income',
+  expense: 'config.kind.expense',
+  exchange: 'config.kind.exchange',
+  internal: 'config.kind.internal',
 }
 
 function sourceColor(source: ConfigSource): string {
@@ -89,6 +74,7 @@ function OperationsChecklist({
   onChange,
   disabled,
 }: OperationsChecklistProps) {
+  const { t } = useTranslation('operations')
   return (
     <Checkbox.Group value={value} onChange={onChange}>
       <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} mt="xs">
@@ -96,7 +82,7 @@ function OperationsChecklist({
           <Checkbox
             key={operation.code}
             value={operation.code}
-            label={`${operation.name} (${KIND_LABELS[operation.kind] ?? operation.kind})`}
+            label={`${operation.name} (${t(KIND_LABEL_KEYS[operation.kind] ?? operation.kind)})`}
             disabled={disabled}
           />
         ))}
@@ -106,10 +92,11 @@ function OperationsChecklist({
 }
 
 function OperationBadges({ operations }: { operations: OperationOption[] }) {
+  const { t } = useTranslation('operations')
   if (operations.length === 0) {
     return (
       <Text c="dimmed" size="sm">
-        Операции запрещены
+        {t('config.disabled')}
       </Text>
     )
   }
@@ -125,6 +112,7 @@ function OperationBadges({ operations }: { operations: OperationOption[] }) {
 }
 
 export function OperationsConfigPage() {
+  const { t } = useTranslation('operations')
   const { hasPermission } = useAuth()
   const canManageBank = hasPermission(BANK_PERMISSION)
 
@@ -153,6 +141,21 @@ export function OperationsConfigPage() {
     [branches],
   )
 
+  const sourceLabel = (source: ConfigSource, templateBranchId: number | null) => {
+    switch (source) {
+      case 'own':
+        return t('config.source.own')
+      case 'branch':
+        return t('config.source.branch', {
+          branch: templateBranchId ? branchName(templateBranchId) : '',
+        })
+      case 'bank':
+        return t('config.source.bank')
+      default:
+        return t('config.source.none')
+    }
+  }
+
   const branchesWithTemplate = useMemo(
     () =>
       new Set(
@@ -162,7 +165,7 @@ export function OperationsConfigPage() {
   )
 
   const notifyError = (error: unknown) =>
-    notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
+    notifications.show({ color: 'red', title: t('common.error'), message: extractErrorMessage(error) })
 
   const reloadTemplates = useCallback(async () => {
     try {
@@ -230,7 +233,7 @@ export function OperationsConfigPage() {
       const config = await configApi.setCashDeskOperations(Number(deskId), deskDraft)
       setDeskConfig(config)
       setDeskEditing(false)
-      notifications.show({ color: 'green', message: 'Настройка кассы сохранена' })
+      notifications.show({ color: 'green', message: t('config.saved.desk') })
     } catch (error) {
       notifyError(error)
     } finally {
@@ -246,7 +249,7 @@ export function OperationsConfigPage() {
       setDeskConfig(config)
       setDeskDraft(config.operations.map((operation) => operation.code))
       setDeskEditing(false)
-      notifications.show({ color: 'green', message: 'Своя настройка снята' })
+      notifications.show({ color: 'green', message: t('config.saved.deskReset') })
     } catch (error) {
       notifyError(error)
     } finally {
@@ -260,7 +263,7 @@ export function OperationsConfigPage() {
       const template = await configApi.setBankOperationTemplate(bankDraft)
       setBankTemplate(template)
       await reloadTemplates()
-      notifications.show({ color: 'green', message: 'Шаблон банка сохранён' })
+      notifications.show({ color: 'green', message: t('config.saved.bank') })
     } catch (error) {
       notifyError(error)
     } finally {
@@ -274,7 +277,7 @@ export function OperationsConfigPage() {
       await configApi.deleteBankOperationTemplate()
       await reloadBankTemplate()
       await reloadTemplates()
-      notifications.show({ color: 'green', message: 'Шаблон банка удалён' })
+      notifications.show({ color: 'green', message: t('config.saved.bankDeleted') })
     } catch (error) {
       notifyError(error)
     } finally {
@@ -289,7 +292,7 @@ export function OperationsConfigPage() {
       const template = await configApi.setBranchOperationTemplate(Number(branchId), branchDraft)
       setBranchTemplate(template)
       await reloadTemplates()
-      notifications.show({ color: 'green', message: 'Шаблон отделения сохранён' })
+      notifications.show({ color: 'green', message: t('config.saved.branch') })
     } catch (error) {
       notifyError(error)
     } finally {
@@ -305,7 +308,7 @@ export function OperationsConfigPage() {
       await reloadTemplates()
       setBranchTemplate({ branch_id: Number(branchId), defined: false, operations: [] })
       setBranchDraft([])
-      notifications.show({ color: 'green', message: 'Шаблон отделения удалён' })
+      notifications.show({ color: 'green', message: t('config.saved.branchDeleted') })
     } catch (error) {
       notifyError(error)
     } finally {
@@ -315,23 +318,23 @@ export function OperationsConfigPage() {
 
   return (
     <Stack>
-      <Title order={3}>Операции касс</Title>
+      <Title order={3}>{t('config.title')}</Title>
 
       <Tabs defaultValue="desks">
         <Tabs.List>
           <Tabs.Tab value="desks" leftSection={<IconKeyboard size={16} />}>
-            Кассы
+            {t('config.tabs.desks')}
           </Tabs.Tab>
           <Tabs.Tab value="templates" leftSection={<IconTemplate size={16} />}>
-            Шаблоны
+            {t('config.tabs.templates')}
           </Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="desks" pt="md">
           <Stack>
             <Select
-              label="Касса"
-              placeholder="Выберите кассу"
+              label={t('config.cashDesk')}
+              placeholder={t('config.cashDeskPlaceholder')}
               searchable
               data={cashDesks.map((cashDesk) => ({
                 value: String(cashDesk.id),
@@ -343,16 +346,16 @@ export function OperationsConfigPage() {
             />
 
             {!deskId ? (
-              <Text c="dimmed">Выберите кассу, чтобы увидеть и настроить её операции.</Text>
+              <Text c="dimmed">{t('config.cashDeskPrompt')}</Text>
             ) : !deskConfig ? (
               <Loader size="sm" />
             ) : (
               <Card withBorder padding="md">
                 <Stack>
                   <Group>
-                    <Text fw={500}>Действующие операции</Text>
+                    <Text fw={500}>{t('config.effective')}</Text>
                     <Badge color={sourceColor(deskConfig.source)} variant="light">
-                      {sourceLabel(deskConfig.source, deskConfig.template_branch_id, branchName)}
+                      {sourceLabel(deskConfig.source, deskConfig.template_branch_id)}
                     </Badge>
                   </Group>
 
@@ -369,10 +372,10 @@ export function OperationsConfigPage() {
                           loading={deskSaving}
                           onClick={() => void saveDesk()}
                         >
-                          Сохранить
+                          {t('common.save')}
                         </Button>
                         <Button variant="default" onClick={() => setDeskEditing(false)}>
-                          Отмена
+                          {t('common.cancel')}
                         </Button>
                       </Group>
                     </>
@@ -388,7 +391,7 @@ export function OperationsConfigPage() {
                             setDeskEditing(true)
                           }}
                         >
-                          Настроить индивидуально
+                          {t('config.configureIndividually')}
                         </Button>
                         {deskConfig.source === 'own' && (
                           <Button
@@ -397,7 +400,7 @@ export function OperationsConfigPage() {
                             loading={deskSaving}
                             onClick={() => void resetDesk()}
                           >
-                            Снять свою настройку
+                            {t('config.removeOwn')}
                           </Button>
                         )}
                       </Group>
@@ -413,24 +416,22 @@ export function OperationsConfigPage() {
           <Stack>
             {!canManageBank && (
               <Alert color="blue" icon={<IconAlertTriangle size={16} />}>
-                Шаблон банка настраивает администратор банка. Вам доступны шаблоны ваших
-                отделений.
+                {t('config.bank.readonly')}
               </Alert>
             )}
 
             <Card withBorder padding="md">
               <Stack>
                 <Group justify="space-between">
-                  <Text fw={500}>Шаблон банка</Text>
+                  <Text fw={500}>{t('config.bank.title')}</Text>
                   {bankTemplate && (
                     <Badge color={bankTemplate.defined ? 'teal' : 'red'} variant="light">
-                      {bankTemplate.defined ? 'задан' : 'не задан'}
+                      {bankTemplate.defined ? t('config.bank.defined') : t('config.bank.undefined')}
                     </Badge>
                   )}
                 </Group>
                 <Text size="sm" c="dimmed">
-                  Действует на все кассы, для которых нет шаблона отделения и своей настройки.
-                  Пустой шаблон запрещает все операции.
+                  {t('config.bank.description')}
                 </Text>
                 <OperationsChecklist
                   operations={operations}
@@ -445,7 +446,7 @@ export function OperationsConfigPage() {
                     disabled={!canManageBank}
                     onClick={() => void saveBank()}
                   >
-                    Сохранить
+                    {t('common.save')}
                   </Button>
                   <Button
                     variant="default"
@@ -455,7 +456,7 @@ export function OperationsConfigPage() {
                     disabled={!canManageBank || !bankTemplate?.defined}
                     onClick={() => void deleteBank()}
                   >
-                    Удалить шаблон
+                    {t('config.deleteTemplate')}
                   </Button>
                 </Group>
               </Stack>
@@ -463,15 +464,15 @@ export function OperationsConfigPage() {
 
             <Card withBorder padding="md">
               <Stack>
-                <Text fw={500}>Шаблон отделения</Text>
+                <Text fw={500}>{t('config.branch.title')}</Text>
                 <Select
-                  label="Отделение"
-                  placeholder="Выберите отделение"
+                  label={t('config.branch.label')}
+                  placeholder={t('config.branch.placeholder')}
                   searchable
                   data={branches.map((branch) => ({
                     value: String(branch.id),
                     label: branchesWithTemplate.has(branch.id)
-                      ? `${branch.name} (шаблон задан)`
+                      ? t('config.branch.definedSuffix', { name: branch.name })
                       : branch.name,
                   }))}
                   value={branchId}
@@ -481,8 +482,7 @@ export function OperationsConfigPage() {
                 {branchId && branchTemplate && (
                   <>
                     <Text size="sm" c="dimmed">
-                      Действует на кассы этого отделения и его подчинённых, перекрывая шаблон
-                      банка. Пустой шаблон запрещает все операции.
+                      {t('config.branch.description')}
                     </Text>
                     <OperationsChecklist
                       operations={operations}
@@ -495,7 +495,7 @@ export function OperationsConfigPage() {
                         loading={branchSaving}
                         onClick={() => void saveBranch()}
                       >
-                        Сохранить
+                        {t('common.save')}
                       </Button>
                       <Button
                         variant="default"
@@ -505,7 +505,7 @@ export function OperationsConfigPage() {
                         disabled={!branchTemplate.defined}
                         onClick={() => void deleteBranch()}
                       >
-                        Удалить шаблон
+                        {t('config.deleteTemplate')}
                       </Button>
                     </Group>
                   </>

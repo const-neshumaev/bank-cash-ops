@@ -16,6 +16,7 @@ import { useDebouncedValue } from '@mantine/hooks'
 import { notifications } from '@mantine/notifications'
 import { IconEdit, IconPlus, IconSearch, IconTrash } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { extractErrorMessage } from '@app/api/errors'
 import type { Permission, Role } from '@app/api/types'
@@ -24,6 +25,7 @@ import * as rolesApi from '../api/roles'
 import { RoleFormModal } from '../components/RoleFormModal'
 
 export function RolesPage() {
+  const { t } = useTranslation('core')
   const [roles, setRoles] = useState<Role[]>([])
   const [permissions, setPermissions] = useState<Permission[]>([])
   const [loading, setLoading] = useState(false)
@@ -46,7 +48,7 @@ export function RolesPage() {
       const data = await rolesApi.listRoles({ search: debouncedSearch, pageSize: 100 })
       setRoles(data.results)
     } catch (error) {
-      notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
+      notifications.show({ color: 'red', title: t('common.error'), message: extractErrorMessage(error) })
     } finally {
       setLoading(false)
     }
@@ -72,24 +74,24 @@ export function RolesPage() {
   const handleDelete = async (role: Role) => {
     try {
       await rolesApi.deleteRole(role.id)
-      notifications.show({ color: 'green', message: 'Роль удалена' })
+      notifications.show({ color: 'green', message: t('roles.deleted') })
       void load()
     } catch (error) {
-      notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
+      notifications.show({ color: 'red', title: t('common.error'), message: extractErrorMessage(error) })
     }
   }
 
   return (
     <Stack>
       <Group justify="space-between">
-        <Title order={3}>Роли</Title>
+        <Title order={3}>{t('roles.title')}</Title>
         <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
-          Добавить
+          {t('common.add')}
         </Button>
       </Group>
 
       <TextInput
-        placeholder="Поиск по названию"
+        placeholder={t('roles.searchPlaceholder')}
         leftSection={<IconSearch size={16} />}
         value={search}
         onChange={(event) => setSearch(event.currentTarget.value)}
@@ -99,9 +101,9 @@ export function RolesPage() {
       <Table striped highlightOnHover withTableBorder>
         <Table.Thead>
           <Table.Tr>
-            <Table.Th>Название</Table.Th>
-            <Table.Th>Права</Table.Th>
-            <Table.Th>Пользователей</Table.Th>
+            <Table.Th>{t('roles.columns.name')}</Table.Th>
+            <Table.Th>{t('roles.columns.permissions')}</Table.Th>
+            <Table.Th>{t('roles.columns.users')}</Table.Th>
             <Table.Th />
           </Table.Tr>
         </Table.Thead>
@@ -118,7 +120,7 @@ export function RolesPage() {
             <Table.Tr>
               <Table.Td colSpan={4}>
                 <Center py="md">
-                  <Text c="dimmed">Роли не найдены</Text>
+                  <Text c="dimmed">{t('roles.empty')}</Text>
                 </Center>
               </Table.Td>
             </Table.Tr>
@@ -130,7 +132,7 @@ export function RolesPage() {
                     <Text fw={500}>{role.name}</Text>
                     {role.is_system && (
                       <Badge color="gray" variant="light">
-                        системная
+                        {t('roles.system')}
                       </Badge>
                     )}
                   </Group>
@@ -158,12 +160,12 @@ export function RolesPage() {
                 <Table.Td>{role.users_count}</Table.Td>
                 <Table.Td>
                   <Group gap={4} justify="flex-end">
-                    <Tooltip label="Редактировать">
+                    <Tooltip label={t('common.edit')}>
                       <ActionIcon variant="subtle" onClick={() => openEdit(role)}>
                         <IconEdit size={16} />
                       </ActionIcon>
                     </Tooltip>
-                    <Tooltip label={role.is_system ? 'Системную роль нельзя удалить' : 'Удалить'}>
+                    <Tooltip label={role.is_system ? t('roles.systemDeleteHint') : t('common.delete')}>
                       <ActionIcon
                         variant="subtle"
                         color="red"

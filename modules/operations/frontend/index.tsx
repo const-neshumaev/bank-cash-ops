@@ -2,10 +2,11 @@ import { IconCashRegister, IconSettings } from '@tabler/icons-react'
 
 import type { FrontendModule } from '@app/registry/contract'
 
+import en from './locales/en.json'
+import ru from './locales/ru.json'
 import { OperationsConfigPage } from './pages/OperationsConfigPage'
 import { OperationsWorkplacePage } from './pages/OperationsWorkplacePage'
 
-const ADMIN_SECTION = 'Администрирование'
 const CONFIG_PERMISSIONS = ['operations.config.manage', 'operations.config.manage.branch']
 
 /**
@@ -18,7 +19,7 @@ const CONFIG_PERMISSIONS = ['operations.config.manage', 'operations.config.manag
  */
 export const operationsFrontend: FrontendModule = {
   id: 'operations',
-  title: 'Кассовые операции',
+  titleKey: 'title',
   routes: [
     {
       path: 'operations',
@@ -33,17 +34,18 @@ export const operationsFrontend: FrontendModule = {
   ],
   nav: [
     {
-      label: 'Касса',
+      labelKey: 'nav.workplace',
       to: '/operations',
       icon: <IconCashRegister size={18} />,
       permission: 'operations.view',
     },
     {
-      label: 'Операции касс',
+      labelKey: 'nav.config',
       to: '/operations-config',
       icon: <IconSettings size={18} />,
       permission: CONFIG_PERMISSIONS,
-      section: ADMIN_SECTION,
+      section: 'admin',
     },
   ],
+  resources: { ru, en },
 }

@@ -1,19 +1,21 @@
 import { Badge, Card, Group, List, Stack, Text, Title } from '@mantine/core'
+import { useTranslation } from 'react-i18next'
 
 import { useAuth } from '../auth/AuthContext'
 import { roleColor } from '../roles'
 
 export function DashboardPage() {
   const { user, hasPermission } = useAuth()
+  const { t } = useTranslation()
 
   return (
     <Stack>
-      <Title order={3}>Панель управления</Title>
+      <Title order={3}>{t('dashboard.title')}</Title>
 
       <Card withBorder padding="lg" radius="md">
         <Stack gap="xs">
           <Group>
-            <Text fw={500}>Вы вошли как</Text>
+            <Text fw={500}>{t('dashboard.signedInAs')}</Text>
             <Text>{user?.full_name || user?.email}</Text>
             {user?.roles.map((code, index) => (
               <Badge key={code} color={roleColor(code)} variant="light">
@@ -22,23 +24,26 @@ export function DashboardPage() {
             ))}
           </Group>
           <Text size="sm" c="dimmed">
-            Система учёта кассовых операций банка. Доступные разделы меню зависят от
-            ролей и прав вашей учётной записи.
+            {t('dashboard.description')}
           </Text>
         </Stack>
       </Card>
 
       <Card withBorder padding="lg" radius="md">
         <Stack gap="xs">
-          <Title order={5}>Доступные разделы</Title>
+          <Title order={5}>{t('dashboard.sections')}</Title>
           <List spacing="xs" size="sm">
             <List.Item>
-              <b>Администрирование</b> — пользователи, роли, отделения банка и кассы.
-              {hasPermission('core.structure.view') ? ' Доступно.' : ' Доступно администраторам.'}
+              <b>{t('dashboard.admin.name')}</b> {t('dashboard.admin.text')}{' '}
+              {hasPermission('core.structure.view')
+                ? t('dashboard.available')
+                : t('dashboard.admin.restricted')}
             </List.Item>
             <List.Item>
-              <b>Кассовые смены</b> — открытие и закрытие смен, привязка к кассе.
-              {hasPermission('core.shifts.view') ? ' Доступно.' : ' Доступно кассирам и руководителям.'}
+              <b>{t('dashboard.shifts.name')}</b> {t('dashboard.shifts.text')}{' '}
+              {hasPermission('core.shifts.view')
+                ? t('dashboard.available')
+                : t('dashboard.shifts.restricted')}
             </List.Item>
           </List>
         </Stack>

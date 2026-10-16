@@ -13,6 +13,7 @@ import {
 import { useForm } from '@mantine/form'
 import { notifications } from '@mantine/notifications'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import * as authApi from '../api/auth'
 import { extractErrorMessage } from '../api/errors'
@@ -21,6 +22,7 @@ import { roleColor } from '../roles'
 
 export function ProfilePage() {
   const { user, refreshUser } = useAuth()
+  const { t } = useTranslation()
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingPassword, setSavingPassword] = useState(false)
 
@@ -32,19 +34,19 @@ export function ProfilePage() {
       phone: user?.phone ?? '',
     },
     validate: {
-      last_name: (value) => (value.trim() ? null : 'Укажите фамилию'),
-      first_name: (value) => (value.trim() ? null : 'Укажите имя'),
+      last_name: (value) => (value.trim() ? null : t('profile.validation.lastName')),
+      first_name: (value) => (value.trim() ? null : t('profile.validation.firstName')),
     },
   })
 
   const passwordForm = useForm({
     initialValues: { old_password: '', new_password: '', new_password_confirm: '' },
     validate: {
-      old_password: (value) => (value ? null : 'Укажите текущий пароль'),
+      old_password: (value) => (value ? null : t('profile.validation.currentPassword')),
       new_password: (value) =>
-        value.length >= 8 ? null : 'Пароль должен содержать не менее 8 символов',
+        value.length >= 8 ? null : t('profile.validation.newPassword'),
       new_password_confirm: (value, values) =>
-        value === values.new_password ? null : 'Пароли не совпадают',
+        value === values.new_password ? null : t('profile.validation.confirmPassword'),
     },
   })
 
@@ -70,9 +72,13 @@ export function ProfilePage() {
         phone: values.phone.trim(),
       })
       await refreshUser()
-      notifications.show({ color: 'green', message: 'Профиль сохранён' })
+      notifications.show({ color: 'green', message: t('profile.saved') })
     } catch (error) {
-      notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
+      notifications.show({
+        color: 'red',
+        title: t('common.error'),
+        message: extractErrorMessage(error),
+      })
     } finally {
       setSavingProfile(false)
     }
@@ -87,9 +93,13 @@ export function ProfilePage() {
         new_password_confirm: values.new_password_confirm,
       })
       passwordForm.reset()
-      notifications.show({ color: 'green', message: 'Пароль изменён' })
+      notifications.show({ color: 'green', message: t('profile.passwordChanged') })
     } catch (error) {
-      notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
+      notifications.show({
+        color: 'red',
+        title: t('common.error'),
+        message: extractErrorMessage(error),
+      })
     } finally {
       setSavingPassword(false)
     }
@@ -97,27 +107,27 @@ export function ProfilePage() {
 
   return (
     <Stack maw={640}>
-      <Title order={3}>Профиль</Title>
+      <Title order={3}>{t('profile.title')}</Title>
 
       <Card withBorder padding="lg" radius="md">
         <Stack gap="xs">
           <Group justify="space-between">
-            <Text fw={500}>Учётная запись</Text>
+            <Text fw={500}>{t('profile.account')}</Text>
             {user && (
               <Badge color={user.is_active ? 'green' : 'gray'} variant="light">
-                {user.is_active ? 'Активна' : 'Заблокирована'}
+                {user.is_active ? t('profile.active') : t('profile.blocked')}
               </Badge>
             )}
           </Group>
           <Group>
             <Text size="sm" c="dimmed">
-              Email:
+              {t('profile.email')}
             </Text>
             <Text size="sm">{user?.email}</Text>
           </Group>
           <Group>
             <Text size="sm" c="dimmed">
-              Роли:
+              {t('profile.roles')}
             </Text>
             <Group gap={6}>
               {user?.roles.length ? (
@@ -137,22 +147,33 @@ export function ProfilePage() {
       <Card withBorder padding="lg" radius="md">
         <form onSubmit={handleProfileSubmit}>
           <Stack>
-            <Text fw={500}>Личные данные</Text>
+            <Text fw={500}>{t('profile.personal')}</Text>
             <Group grow align="flex-start">
-              <TextInput label="Фамилия" required {...profileForm.getInputProps('last_name')} />
-              <TextInput label="Имя" required {...profileForm.getInputProps('first_name')} />
+              <TextInput
+                label={t('profile.lastName')}
+                required
+                {...profileForm.getInputProps('last_name')}
+              />
+              <TextInput
+                label={t('profile.firstName')}
+                required
+                {...profileForm.getInputProps('first_name')}
+              />
             </Group>
             <Group grow align="flex-start">
-              <TextInput label="Отчество" {...profileForm.getInputProps('middle_name')} />
               <TextInput
-                label="Телефон"
+                label={t('profile.middleName')}
+                {...profileForm.getInputProps('middle_name')}
+              />
+              <TextInput
+                label={t('profile.phone')}
                 placeholder="+7-900-000-00-00"
                 {...profileForm.getInputProps('phone')}
               />
             </Group>
             <Group justify="flex-end">
               <Button type="submit" loading={savingProfile}>
-                Сохранить
+                {t('common.save')}
               </Button>
             </Group>
           </Stack>
@@ -162,28 +183,28 @@ export function ProfilePage() {
       <Card withBorder padding="lg" radius="md">
         <form onSubmit={handlePasswordSubmit}>
           <Stack>
-            <Text fw={500}>Смена пароля</Text>
+            <Text fw={500}>{t('profile.passwordSection')}</Text>
             <Divider />
             <PasswordInput
-              label="Текущий пароль"
+              label={t('profile.currentPassword')}
               autoComplete="current-password"
               {...passwordForm.getInputProps('old_password')}
             />
             <Group grow align="flex-start">
               <PasswordInput
-                label="Новый пароль"
+                label={t('profile.newPassword')}
                 autoComplete="new-password"
                 {...passwordForm.getInputProps('new_password')}
               />
               <PasswordInput
-                label="Подтверждение"
+                label={t('profile.confirmPassword')}
                 autoComplete="new-password"
                 {...passwordForm.getInputProps('new_password_confirm')}
               />
             </Group>
             <Group justify="flex-end">
               <Button type="submit" loading={savingPassword}>
-                Изменить пароль
+                {t('profile.changePassword')}
               </Button>
             </Group>
           </Stack>

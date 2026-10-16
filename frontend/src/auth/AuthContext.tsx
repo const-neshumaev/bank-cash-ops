@@ -11,6 +11,7 @@ import {
 import * as authApi from '../api/auth'
 import { tokenStorage } from '../api/client'
 import type { User } from '../api/types'
+import { setLanguage } from '../i18n'
 
 interface AuthContextValue {
   user: User | null
@@ -35,7 +36,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
     try {
-      setUser(await authApi.fetchMe())
+      const me = await authApi.fetchMe()
+      setUser(me)
+      if (me.language) {
+        setLanguage(me.language)
+      }
     } catch {
       tokenStorage.clear()
       setUser(null)
@@ -55,6 +60,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(async (email: string, password: string) => {
     const response = await authApi.login({ email, password })
     setUser(response.user)
+    if (response.user.language) {
+      setLanguage(response.user.language)
+    }
   }, [])
 
   const signOut = useCallback(async () => {

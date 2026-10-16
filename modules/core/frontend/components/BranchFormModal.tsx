@@ -2,6 +2,7 @@ import { Button, Group, Modal, Select, Stack, Switch, TextInput } from '@mantine
 import { useForm } from '@mantine/form'
 import { notifications } from '@mantine/notifications'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { extractErrorMessage } from '@app/api/errors'
 import type { Branch } from '@app/api/types'
@@ -36,6 +37,7 @@ const EMPTY_VALUES: FormValues = {
 }
 
 export function BranchFormModal({ opened, branch, onClose, onSaved }: BranchFormModalProps) {
+  const { t } = useTranslation('core')
   const isEdit = Boolean(branch)
   const [submitting, setSubmitting] = useState(false)
   const [branches, setBranches] = useState<Branch[]>([])
@@ -43,9 +45,9 @@ export function BranchFormModal({ opened, branch, onClose, onSaved }: BranchForm
   const form = useForm<FormValues>({
     initialValues: EMPTY_VALUES,
     validate: {
-      name: (value) => (value.trim() ? null : 'Укажите название'),
+      name: (value) => (value.trim() ? null : t('validation.name')),
       parent: (value, values) =>
-        values.is_head_office || value ? null : 'Выберите вышестоящее отделение',
+        values.is_head_office || value ? null : t('validation.parentBranch'),
     },
   })
 
@@ -98,15 +100,15 @@ export function BranchFormModal({ opened, branch, onClose, onSaved }: BranchForm
       }
       if (branch) {
         await branchesApi.updateBranch(branch.id, payload)
-        notifications.show({ color: 'green', message: 'Отделение обновлено' })
+        notifications.show({ color: 'green', message: t('branches.updated') })
       } else {
         await branchesApi.createBranch(payload)
-        notifications.show({ color: 'green', message: 'Отделение создано' })
+        notifications.show({ color: 'green', message: t('branches.created') })
       }
       onSaved()
       onClose()
     } catch (error) {
-      notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
+      notifications.show({ color: 'red', title: t('common.error'), message: extractErrorMessage(error) })
     } finally {
       setSubmitting(false)
     }
@@ -116,25 +118,25 @@ export function BranchFormModal({ opened, branch, onClose, onSaved }: BranchForm
     <Modal
       opened={opened}
       onClose={onClose}
-      title={isEdit ? 'Редактирование отделения' : 'Новое отделение'}
+      title={isEdit ? t('branches.editTitle') : t('branches.createTitle')}
       size="lg"
     >
       <form onSubmit={handleSubmit}>
         <Stack>
           <Group grow align="flex-start">
-            <TextInput label="Название" required {...form.getInputProps('name')} />
+            <TextInput label={t('branches.form.name')} required {...form.getInputProps('name')} />
             <TextInput
-              label="Код"
-              description="Необязательно: внутренний идентификатор банка"
+              label={t('branches.form.code')}
+              description={t('branches.form.codeHint')}
               {...form.getInputProps('code')}
             />
           </Group>
           <Switch
-            label="Головной офис"
+            label={t('branches.form.headOffice')}
             {...form.getInputProps('is_head_office', { type: 'checkbox' })}
           />
           <Select
-            label="Вышестоящее отделение"
+            label={t('branches.form.parent')}
             data={parentOptions}
             searchable
             clearable
@@ -143,16 +145,16 @@ export function BranchFormModal({ opened, branch, onClose, onSaved }: BranchForm
             {...form.getInputProps('parent')}
           />
           <Group grow align="flex-start">
-            <TextInput label="Адрес" {...form.getInputProps('address')} />
-            <TextInput label="Телефон" {...form.getInputProps('phone')} />
+            <TextInput label={t('branches.form.address')} {...form.getInputProps('address')} />
+            <TextInput label={t('branches.form.phone')} {...form.getInputProps('phone')} />
           </Group>
-          <Switch label="Активно" {...form.getInputProps('is_active', { type: 'checkbox' })} />
+          <Switch label={t('branches.form.active')} {...form.getInputProps('is_active', { type: 'checkbox' })} />
           <Group justify="flex-end">
             <Button variant="default" onClick={onClose}>
-              Отмена
+              {t('common.cancel')}
             </Button>
             <Button type="submit" loading={submitting}>
-              Сохранить
+              {t('common.save')}
             </Button>
           </Group>
         </Stack>

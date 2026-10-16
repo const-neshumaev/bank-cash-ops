@@ -39,6 +39,7 @@ export interface UpdateMePayload {
   last_name?: string
   middle_name?: string
   phone?: string
+  language?: string
 }
 
 export async function updateMe(payload: UpdateMePayload): Promise<User> {

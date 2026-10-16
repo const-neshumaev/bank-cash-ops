@@ -1,0 +1,106 @@
+{
+  "title": "Cash operations",
+  "nav": {
+    "workplace": "Cash desk",
+    "config": "Cash desk operations"
+  },
+  "common": {
+    "error": "Error",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "validation": {
+    "amounts": "Enter the amounts and currencies"
+  },
+  "workplace": {
+    "title": "Cash desk",
+    "shiftBadge": "Shift #{{id}}",
+    "noShift": {
+      "title": "No open shift",
+      "message": "Open a cash shift to perform operations.",
+      "open": "Open shift"
+    },
+    "balances": {
+      "title": "Cash balances",
+      "empty": "No balances yet."
+    },
+    "rates": {
+      "title": "Exchange rates"
+    },
+    "rateType": {
+      "buy": "buy",
+      "sell": "sell",
+      "central": "central"
+    },
+    "newOperation": "New operation",
+    "operation": "Operation",
+    "operationPlaceholder": "Select an operation",
+    "operationNotFound": "No operations found",
+    "currency": "Currency",
+    "client": "Client",
+    "document": "Document",
+    "comment": "Comment",
+    "post": "Post",
+    "reverse": "Reverse",
+    "posted": "Operation posted",
+    "reversed": "Operation reversed",
+    "recent": {
+      "title": "Recent operations",
+      "empty": "No operations at this cash desk yet.",
+      "number": "No.",
+      "operation": "Operation",
+      "amounts": "Amounts",
+      "time": "Time",
+      "status": "Status"
+    }
+  },
+  "config": {
+    "title": "Cash desk operations",
+    "tabs": {
+      "desks": "Cash desks",
+      "templates": "Templates"
+    },
+    "cashDesk": "Cash desk",
+    "cashDeskPlaceholder": "Select a cash desk",
+    "cashDeskPrompt": "Select a cash desk to view and configure its operations.",
+    "effective": "Effective operations",
+    "disabled": "Operations disabled",
+    "configureIndividually": "Configure individually",
+    "removeOwn": "Remove own configuration",
+    "deleteTemplate": "Delete template",
+    "kind": {
+      "income": "Income",
+      "expense": "Expense",
+      "exchange": "Exchange",
+      "internal": "Internal"
+    },
+    "source": {
+      "own": "Own cash desk configuration",
+      "branch": "Branch template “{{branch}}”",
+      "bank": "Bank template",
+      "none": "Not configured — operations disabled"
+    },
+    "bank": {
+      "title": "Bank template",
+      "defined": "set",
+      "undefined": "not set",
+      "description": "Applies to every cash desk that has no branch template or own configuration. An empty template disables all operations.",
+      "readonly": "The bank template is managed by the bank administrator. You can manage the templates of your branches."
+    },
+    "branch": {
+      "title": "Branch template",
+      "label": "Branch",
+      "placeholder": "Select a branch",
+      "definedSuffix": "{{name}} (template set)",
+      "description": "Applies to the cash desks of this branch and its children, overriding the bank template. An empty template disables all operations."
+    },
+    "saved": {
+      "desk": "Cash desk configuration saved",
+      "deskReset": "Own configuration removed",
+      "bank": "Bank template saved",
+      "bankDeleted": "Bank template deleted",
+      "branch": "Branch template saved",
+      "branchDeleted": "Branch template deleted"
+    }
+  }
+}

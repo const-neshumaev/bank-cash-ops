@@ -28,7 +28,8 @@
 ```text
 modules/<name>/
 ├── backend/            # Django-приложение (модели, миграции, views, services)
-├── frontend/           # страницы, API-клиенты и типы SPA
+│   └── locale/         # каталоги переводов модуля (*.po / *.mo)
+├── frontend/           # страницы, API-клиенты, i18n-ресурсы и типы SPA
 ├── contracts/          # публичный интерфейс: DTO, сервисные интерфейсы, события
 └── module.yaml         # манифест модуля
 ```
@@ -186,24 +187,37 @@ Frontend собран из **хоста** (`frontend/src/`) и **фронтен�
 Контракт фронтенд-модуля:
 
 ```ts
+export type ModuleResources = Record<string, Record<string, unknown>>
+
 export interface FrontendModule {
   id: string
-  title: string
-  routes: ModuleRoute[] // { path, element, access?: 'protected' | 'admin' }
-  nav?: ModuleNavItem[] // { label, to, icon?, adminOnly? }
+  titleKey: string              // i18n-ключ в собственном пространстве имён модуля
+  routes: ModuleRoute[]         // { path, element, permission? }
+  nav?: ModuleNavItem[]         // { labelKey, to, icon?, permission?, section? }
+  resources: ModuleResources    // { ru: {…}, en: {…} } — строки модуля
 }
 ```
 
 Пример манифеста:
 
 ```tsx
+import en from './locales/en.json'
+import ru from './locales/ru.json'
+
 export const coreFrontend: FrontendModule = {
   id: 'core',
-  title: 'Ядро',
-  routes: [{ path: 'users', element: <UsersPage />, access: 'admin' }],
+  titleKey: 'title',
+  routes: [{ path: 'users', element: <UsersPage />, permission: 'core.users.view' }],
   nav: [
-    { label: 'Пользователи', to: '/users', icon: <IconUsers size={18} />, adminOnly: true },
+    {
+      labelKey: 'nav.users',
+      to: '/users',
+      icon: <IconUsers size={18} />,
+      permission: 'core.users.view',
+      section: 'admin',
+    },
   ],
+  resources: { ru, en },
 }
 ```
 
@@ -211,6 +225,21 @@ export const coreFrontend: FrontendModule = {
 (аналог `INSTALLED_APPS` на backend). Сборка экспонирует фронтенды модулей внутри
 корня фронтенда как `./modules` (bind mount в разработке, копирование в
 эксплуатации), чтобы разрешение модулей находило общий `node_modules`.
+
+### Локализация модуля
+
+Приложение мультиязычно (ru/en, расширяемо; см.
+`docs/adr/0015-application-language-layers.md`). Локализация — часть модуля:
+
+1. **Backend.** Строки, видимые пользователю, оборачиваются в `gettext_lazy`;
+   каталоги переводов лежат в `modules/<name>/backend/locale/<lang>/LC_MESSAGES/` и
+   подхватываются Django автоматически.
+2. **Frontend.** Модуль поставляет свои i18n-ресурсы (значения для каждого языка) и
+   регистрирует их в манифесте; хост предоставляет рантайм и переключатель языка.
+   Ключи ресурсов — английские, с префиксом модуля, чтобы не пересекаться.
+3. **Данные.** Названия справочных данных переводятся таблицами переводов в
+   модуле-владельце (`docs/adr/0016-translatable-reference-data.md`); строк
+   интерфейса в коде не остаётся.
 
 ## Манифест модуля
 

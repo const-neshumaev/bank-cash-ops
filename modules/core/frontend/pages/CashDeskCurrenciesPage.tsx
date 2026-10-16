@@ -23,6 +23,7 @@ import {
   IconTrash,
 } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { extractErrorMessage } from '@app/api/errors'
 import type { Branch, CashDesk } from '@app/api/types'
@@ -34,23 +35,6 @@ import * as currencyApi from '../api/currencyConfig'
 import type { CashDeskCurrencies, ConfigSource, CurrencyOption, CurrencyTemplate } from '../api/currencyConfig'
 
 const BANK_PERMISSION = 'core.currencies.config.manage'
-
-function sourceLabel(
-  source: ConfigSource,
-  templateBranchId: number | null,
-  branchName: (id: number) => string,
-): string {
-  switch (source) {
-    case 'own':
-      return 'Своя настройка кассы'
-    case 'branch':
-      return `Шаблон отделения «${templateBranchId ? branchName(templateBranchId) : ''}»`
-    case 'bank':
-      return 'Шаблон банка'
-    default:
-      return 'Не задано — валюта не разрешена'
-  }
-}
 
 function sourceColor(source: ConfigSource): string {
   switch (source) {
@@ -90,10 +74,11 @@ function CurrencyChecklist({ currencies, value, onChange, disabled }: CurrencyCh
 }
 
 function CurrencyBadges({ currencies }: { currencies: CurrencyOption[] }) {
+  const { t } = useTranslation('core')
   if (currencies.length === 0) {
     return (
       <Text c="dimmed" size="sm">
-        Валюта не разрешена
+        {t('cashDeskCurrencies.currencyNotAllowed')}
       </Text>
     )
   }
@@ -109,6 +94,7 @@ function CurrencyBadges({ currencies }: { currencies: CurrencyOption[] }) {
 }
 
 export function CashDeskCurrenciesPage() {
+  const { t } = useTranslation('core')
   const { hasPermission } = useAuth()
   const canManageBank = hasPermission(BANK_PERMISSION)
 
@@ -137,13 +123,28 @@ export function CashDeskCurrenciesPage() {
     [branches],
   )
 
+  const sourceLabel = (source: ConfigSource, templateBranchId: number | null): string => {
+    switch (source) {
+      case 'own':
+        return t('cashDeskCurrencies.source.own')
+      case 'branch':
+        return t('cashDeskCurrencies.source.branch', {
+          branch: templateBranchId ? branchName(templateBranchId) : '',
+        })
+      case 'bank':
+        return t('cashDeskCurrencies.source.bank')
+      default:
+        return t('cashDeskCurrencies.source.none')
+    }
+  }
+
   const branchesWithTemplate = useMemo(
     () => new Set(templates.map((template) => template.branch_id).filter((id): id is number => id !== null)),
     [templates],
   )
 
   const notifyError = (error: unknown) =>
-    notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
+    notifications.show({ color: 'red', title: t('common.error'), message: extractErrorMessage(error) })
 
   const reloadTemplates = useCallback(async () => {
     try {
@@ -215,7 +216,7 @@ export function CashDeskCurrenciesPage() {
       const config = await currencyApi.setCashDeskCurrencies(Number(deskId), deskDraft)
       setDeskConfig(config)
       setDeskEditing(false)
-      notifications.show({ color: 'green', message: 'Настройка кассы сохранена' })
+      notifications.show({ color: 'green', message: t('cashDeskCurrencies.deskSaved') })
     } catch (error) {
       notifyError(error)
     } finally {
@@ -231,7 +232,7 @@ export function CashDeskCurrenciesPage() {
       setDeskConfig(config)
       setDeskDraft(config.currencies.map((currency) => currency.code))
       setDeskEditing(false)
-      notifications.show({ color: 'green', message: 'Своя настройка снята' })
+      notifications.show({ color: 'green', message: t('cashDeskCurrencies.deskReset') })
     } catch (error) {
       notifyError(error)
     } finally {
@@ -245,7 +246,7 @@ export function CashDeskCurrenciesPage() {
       const template = await currencyApi.setBankCurrencyTemplate(bankDraft)
       setBankTemplate(template)
       await reloadTemplates()
-      notifications.show({ color: 'green', message: 'Шаблон банка сохранён' })
+      notifications.show({ color: 'green', message: t('cashDeskCurrencies.bankSaved') })
     } catch (error) {
       notifyError(error)
     } finally {
@@ -259,7 +260,7 @@ export function CashDeskCurrenciesPage() {
       await currencyApi.deleteBankCurrencyTemplate()
       await reloadBankTemplate()
       await reloadTemplates()
-      notifications.show({ color: 'green', message: 'Шаблон банка удалён' })
+      notifications.show({ color: 'green', message: t('cashDeskCurrencies.bankDeleted') })
     } catch (error) {
       notifyError(error)
     } finally {
@@ -274,7 +275,7 @@ export function CashDeskCurrenciesPage() {
       const template = await currencyApi.setBranchCurrencyTemplate(Number(branchId), branchDraft)
       setBranchTemplate(template)
       await reloadTemplates()
-      notifications.show({ color: 'green', message: 'Шаблон отделения сохранён' })
+      notifications.show({ color: 'green', message: t('cashDeskCurrencies.branchSaved') })
     } catch (error) {
       notifyError(error)
     } finally {
@@ -290,7 +291,7 @@ export function CashDeskCurrenciesPage() {
       await reloadTemplates()
       setBranchTemplate({ branch_id: Number(branchId), defined: false, currencies: [] })
       setBranchDraft([])
-      notifications.show({ color: 'green', message: 'Шаблон отделения удалён' })
+      notifications.show({ color: 'green', message: t('cashDeskCurrencies.branchDeleted') })
     } catch (error) {
       notifyError(error)
     } finally {
@@ -300,23 +301,23 @@ export function CashDeskCurrenciesPage() {
 
   return (
     <Stack>
-      <Title order={3}>Валюты касс</Title>
+      <Title order={3}>{t('cashDeskCurrencies.title')}</Title>
 
       <Tabs defaultValue="desks">
         <Tabs.List>
           <Tabs.Tab value="desks" leftSection={<IconKeyboard size={16} />}>
-            Кассы
+            {t('cashDeskCurrencies.tabDesks')}
           </Tabs.Tab>
           <Tabs.Tab value="templates" leftSection={<IconTemplate size={16} />}>
-            Шаблоны
+            {t('cashDeskCurrencies.tabTemplates')}
           </Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="desks" pt="md">
           <Stack>
             <Select
-              label="Касса"
-              placeholder="Выберите кассу"
+              label={t('cashDeskCurrencies.cashDesk')}
+              placeholder={t('cashDeskCurrencies.selectCashDesk')}
               searchable
               data={cashDesks.map((cashDesk) => ({
                 value: String(cashDesk.id),
@@ -328,16 +329,16 @@ export function CashDeskCurrenciesPage() {
             />
 
             {!deskId ? (
-              <Text c="dimmed">Выберите кассу, чтобы увидеть и настроить её валюты.</Text>
+              <Text c="dimmed">{t('cashDeskCurrencies.selectCashDeskHint')}</Text>
             ) : !deskConfig ? (
               <Loader size="sm" />
             ) : (
               <Card withBorder padding="md">
                 <Stack>
                   <Group>
-                    <Text fw={500}>Действующие валюты</Text>
+                    <Text fw={500}>{t('cashDeskCurrencies.effectiveCurrencies')}</Text>
                     <Badge color={sourceColor(deskConfig.source)} variant="light">
-                      {sourceLabel(deskConfig.source, deskConfig.template_branch_id, branchName)}
+                      {sourceLabel(deskConfig.source, deskConfig.template_branch_id)}
                     </Badge>
                   </Group>
 
@@ -354,10 +355,10 @@ export function CashDeskCurrenciesPage() {
                           loading={deskSaving}
                           onClick={() => void saveDesk()}
                         >
-                          Сохранить
+                          {t('common.save')}
                         </Button>
                         <Button variant="default" onClick={() => setDeskEditing(false)}>
-                          Отмена
+                          {t('common.cancel')}
                         </Button>
                       </Group>
                     </>
@@ -373,7 +374,7 @@ export function CashDeskCurrenciesPage() {
                             setDeskEditing(true)
                           }}
                         >
-                          Настроить индивидуально
+                          {t('cashDeskCurrencies.configureIndividually')}
                         </Button>
                         {deskConfig.source === 'own' && (
                           <Button
@@ -382,7 +383,7 @@ export function CashDeskCurrenciesPage() {
                             loading={deskSaving}
                             onClick={() => void resetDesk()}
                           >
-                            Снять свою настройку
+                            {t('cashDeskCurrencies.resetOwn')}
                           </Button>
                         )}
                       </Group>
@@ -398,24 +399,24 @@ export function CashDeskCurrenciesPage() {
           <Stack>
             {!canManageBank && (
               <Alert color="blue" icon={<IconAlertTriangle size={16} />}>
-                Шаблон банка настраивает администратор банка. Вам доступны шаблоны ваших
-                отделений.
+                {t('cashDeskCurrencies.bankTemplateAlert')}
               </Alert>
             )}
 
             <Card withBorder padding="md">
               <Stack>
                 <Group justify="space-between">
-                  <Text fw={500}>Шаблон банка</Text>
+                  <Text fw={500}>{t('cashDeskCurrencies.bankTemplate')}</Text>
                   {bankTemplate && (
                     <Badge color={bankTemplate.defined ? 'teal' : 'red'} variant="light">
-                      {bankTemplate.defined ? 'задан' : 'не задан'}
+                      {bankTemplate.defined
+                        ? t('cashDeskCurrencies.defined')
+                        : t('cashDeskCurrencies.notDefined')}
                     </Badge>
                   )}
                 </Group>
                 <Text size="sm" c="dimmed">
-                  Действует на все кассы, для которых нет шаблона отделения и своей настройки.
-                  Пустой шаблон запрещает все валюты.
+                  {t('cashDeskCurrencies.bankTemplateHint')}
                 </Text>
                 <CurrencyChecklist
                   currencies={currencies}
@@ -430,7 +431,7 @@ export function CashDeskCurrenciesPage() {
                     disabled={!canManageBank}
                     onClick={() => void saveBank()}
                   >
-                    Сохранить
+                    {t('common.save')}
                   </Button>
                   <Button
                     variant="default"
@@ -440,7 +441,7 @@ export function CashDeskCurrenciesPage() {
                     disabled={!canManageBank || !bankTemplate?.defined}
                     onClick={() => void deleteBank()}
                   >
-                    Удалить шаблон
+                    {t('cashDeskCurrencies.deleteTemplate')}
                   </Button>
                 </Group>
               </Stack>
@@ -448,15 +449,15 @@ export function CashDeskCurrenciesPage() {
 
             <Card withBorder padding="md">
               <Stack>
-                <Text fw={500}>Шаблон отделения</Text>
+                <Text fw={500}>{t('cashDeskCurrencies.branchTemplate')}</Text>
                 <Select
-                  label="Отделение"
-                  placeholder="Выберите отделение"
+                  label={t('cashDeskCurrencies.branch')}
+                  placeholder={t('cashDeskCurrencies.selectBranch')}
                   searchable
                   data={branches.map((branch) => ({
                     value: String(branch.id),
                     label: branchesWithTemplate.has(branch.id)
-                      ? `${branch.name} (шаблон задан)`
+                      ? t('cashDeskCurrencies.branchWithTemplate', { name: branch.name })
                       : branch.name,
                   }))}
                   value={branchId}
@@ -466,8 +467,7 @@ export function CashDeskCurrenciesPage() {
                 {branchId && branchTemplate && (
                   <>
                     <Text size="sm" c="dimmed">
-                      Действует на кассы этого отделения и его подчинённых, перекрывая шаблон
-                      банка. Пустой шаблон запрещает все валюты.
+                      {t('cashDeskCurrencies.branchTemplateHint')}
                     </Text>
                     <CurrencyChecklist
                       currencies={currencies}
@@ -480,7 +480,7 @@ export function CashDeskCurrenciesPage() {
                         loading={branchSaving}
                         onClick={() => void saveBranch()}
                       >
-                        Сохранить
+                        {t('common.save')}
                       </Button>
                       <Button
                         variant="default"
@@ -490,7 +490,7 @@ export function CashDeskCurrenciesPage() {
                         disabled={!branchTemplate.defined}
                         onClick={() => void deleteBranch()}
                       >
-                        Удалить шаблон
+                        {t('cashDeskCurrencies.deleteTemplate')}
                       </Button>
                     </Group>
                   </>

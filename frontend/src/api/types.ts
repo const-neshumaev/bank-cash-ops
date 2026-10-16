@@ -27,6 +27,7 @@ export interface User {
   permissions: string[]
   branch_access: BranchAccessEntry[]
   phone: string
+  language: string
   is_active: boolean
   is_staff: boolean
   is_superuser: boolean

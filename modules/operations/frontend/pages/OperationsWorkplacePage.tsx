@@ -17,6 +17,7 @@ import { notifications } from '@mantine/notifications'
 import { IconAlertCircle } from '@tabler/icons-react'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { NavLink as RouterNavLink } from 'react-router-dom'
 
 import { extractErrorMessage } from '@app/api/errors'
@@ -30,14 +31,11 @@ function currencyLabel(code: string, currencies: Currency[]): string {
   return currency ? `${currency.code} — ${currency.name}` : code
 }
 
-const RATE_TYPE_LABELS: Record<string, string> = {
-  buy: 'покупка',
-  sell: 'продажа',
-  central: 'учётный',
-}
-
-function rateTypeLabel(rateType: string): string {
-  return RATE_TYPE_LABELS[rateType] ?? rateType
+/** i18n keys of the rate-type labels (under `workplace.rateType.*`). */
+const RATE_TYPE_LABEL_KEYS: Record<string, string> = {
+  buy: 'workplace.rateType.buy',
+  sell: 'workplace.rateType.sell',
+  central: 'workplace.rateType.central',
 }
 
 function amountsText(operation: Operation): string {
@@ -45,6 +43,7 @@ function amountsText(operation: Operation): string {
 }
 
 export function OperationsWorkplacePage() {
+  const { t } = useTranslation('operations')
   const { hasPermission } = useAuth()
   const [context, setContext] = useState<WorkplaceContext | null>(null)
   const [journal, setJournal] = useState<Operation[]>([])
@@ -63,6 +62,8 @@ export function OperationsWorkplacePage() {
     [context, operationCode],
   )
 
+  const rateTypeLabel = (rateType: string) => t(RATE_TYPE_LABEL_KEYS[rateType] ?? rateType)
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -70,7 +71,7 @@ export function OperationsWorkplacePage() {
       setContext(data)
       setJournal(data.cash_desk_id === null ? [] : await operationsApi.listOperations(data.cash_desk_id))
     } catch (error) {
-      notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
+      notifications.show({ color: 'red', title: t('common.error'), message: extractErrorMessage(error) })
     } finally {
       setLoading(false)
     }
@@ -98,7 +99,7 @@ export function OperationsWorkplacePage() {
       rate: null,
     }))
     if (lines.some((line) => !line.currency || Number(line.amount) <= 0)) {
-      notifications.show({ color: 'red', title: 'Ошибка', message: 'Заполните суммы и валюты' })
+      notifications.show({ color: 'red', title: t('common.error'), message: t('validation.amounts') })
       return
     }
     setSubmitting(true)
@@ -111,11 +112,11 @@ export function OperationsWorkplacePage() {
         comment,
         idempotency_key: crypto.randomUUID(),
       })
-      notifications.show({ color: 'green', message: 'Операция проведена' })
+      notifications.show({ color: 'green', message: t('workplace.posted') })
       setOperationCode(null)
       await load()
     } catch (error) {
-      notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
+      notifications.show({ color: 'red', title: t('common.error'), message: extractErrorMessage(error) })
     } finally {
       setSubmitting(false)
     }
@@ -125,10 +126,10 @@ export function OperationsWorkplacePage() {
     setSubmitting(true)
     try {
       await operationsApi.reverseOperation(id)
-      notifications.show({ color: 'green', message: 'Операция сторнирована' })
+      notifications.show({ color: 'green', message: t('workplace.reversed') })
       await load()
     } catch (error) {
-      notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
+      notifications.show({ color: 'red', title: t('common.error'), message: extractErrorMessage(error) })
     } finally {
       setSubmitting(false)
     }
@@ -145,12 +146,16 @@ export function OperationsWorkplacePage() {
   if (!context || context.shift_id === null) {
     return (
       <Stack maw={640}>
-        <Title order={3}>Касса</Title>
-        <Alert color="yellow" icon={<IconAlertCircle size={16} />} title="Смена не открыта">
+        <Title order={3}>{t('workplace.title')}</Title>
+        <Alert
+          color="yellow"
+          icon={<IconAlertCircle size={16} />}
+          title={t('workplace.noShift.title')}
+        >
           <Stack gap="sm" align="flex-start">
-            <Text size="sm">Чтобы выполнять операции, откройте кассовую смену.</Text>
+            <Text size="sm">{t('workplace.noShift.message')}</Text>
             <Button component={RouterNavLink} to="/workplace" variant="light">
-              Открыть смену
+              {t('workplace.noShift.open')}
             </Button>
           </Stack>
         </Alert>
@@ -161,16 +166,16 @@ export function OperationsWorkplacePage() {
   return (
     <Stack>
       <Group justify="space-between">
-        <Title order={3}>Касса</Title>
-        <Badge variant="light">Смена #{context.shift_id}</Badge>
+        <Title order={3}>{t('workplace.title')}</Title>
+        <Badge variant="light">{t('workplace.shiftBadge', { id: context.shift_id })}</Badge>
       </Group>
 
       <Card withBorder padding="lg" radius="md">
         <Stack gap="xs">
-          <Text fw={500}>Остатки наличных</Text>
+          <Text fw={500}>{t('workplace.balances.title')}</Text>
           {context.balances.length === 0 ? (
             <Text size="sm" c="dimmed">
-              Остатков пока нет.
+              {t('workplace.balances.empty')}
             </Text>
           ) : (
             <Group gap="xl">
@@ -187,7 +192,7 @@ export function OperationsWorkplacePage() {
       {context.rates.length > 0 && (
         <Card withBorder padding="lg" radius="md">
           <Stack gap="xs">
-            <Text fw={500}>Курсы валют</Text>
+            <Text fw={500}>{t('workplace.rates.title')}</Text>
             <Group gap="xl">
               {context.rates.map((rate) => (
                 <Text key={`${rate.currency}-${rate.base_currency}-${rate.rate_type}`} size="sm">
@@ -202,15 +207,15 @@ export function OperationsWorkplacePage() {
 
       <Card withBorder padding="lg" radius="md">
         <Stack>
-          <Text fw={500}>Новая операция</Text>
+          <Text fw={500}>{t('workplace.newOperation')}</Text>
           <Select
-            label="Операция"
-            placeholder="Выберите операцию"
+            label={t('workplace.operation')}
+            placeholder={t('workplace.operationPlaceholder')}
             data={context.operations.map((item) => ({ value: item.code, label: item.name }))}
             value={operationCode}
             onChange={setOperationCode}
             searchable
-            nothingFoundMessage="Операции не найдены"
+            nothingFoundMessage={t('workplace.operationNotFound')}
           />
 
           {selectedOperation && (
@@ -227,7 +232,7 @@ export function OperationsWorkplacePage() {
                     }
                   />
                   <Select
-                    label="Валюта"
+                    label={t('workplace.currency')}
                     data={context.currencies.map((currency) => ({
                       value: currency.code,
                       label: currencyLabel(currency.code, context.currencies),
@@ -245,12 +250,12 @@ export function OperationsWorkplacePage() {
               {selectedOperation.requires_client && (
                 <Group grow>
                   <TextInput
-                    label="Клиент"
+                    label={t('workplace.client')}
                     value={clientName}
                     onChange={(event) => setClientName(event.currentTarget.value)}
                   />
                   <TextInput
-                    label="Документ"
+                    label={t('workplace.document')}
                     value={clientDocument}
                     onChange={(event) => setClientDocument(event.currentTarget.value)}
                   />
@@ -258,14 +263,14 @@ export function OperationsWorkplacePage() {
               )}
 
               <TextInput
-                label="Комментарий"
+                label={t('workplace.comment')}
                 value={comment}
                 onChange={(event) => setComment(event.currentTarget.value)}
               />
 
               <Group justify="flex-end">
                 <Button loading={submitting} onClick={() => void handleSubmit()}>
-                  Провести
+                  {t('workplace.post')}
                 </Button>
               </Group>
             </>
@@ -275,20 +280,20 @@ export function OperationsWorkplacePage() {
 
       <Card withBorder padding="lg" radius="md">
         <Stack>
-          <Text fw={500}>Последние операции</Text>
+          <Text fw={500}>{t('workplace.recent.title')}</Text>
           {journal.length === 0 ? (
             <Text size="sm" c="dimmed">
-              Операций по кассе пока нет.
+              {t('workplace.recent.empty')}
             </Text>
           ) : (
             <Table striped>
               <Table.Thead>
                 <Table.Tr>
-                  <Table.Th>№</Table.Th>
-                  <Table.Th>Операция</Table.Th>
-                  <Table.Th>Суммы</Table.Th>
-                  <Table.Th>Время</Table.Th>
-                  <Table.Th>Статус</Table.Th>
+                  <Table.Th>{t('workplace.recent.number')}</Table.Th>
+                  <Table.Th>{t('workplace.recent.operation')}</Table.Th>
+                  <Table.Th>{t('workplace.recent.amounts')}</Table.Th>
+                  <Table.Th>{t('workplace.recent.time')}</Table.Th>
+                  <Table.Th>{t('workplace.recent.status')}</Table.Th>
                   <Table.Th />
                 </Table.Tr>
               </Table.Thead>
@@ -316,7 +321,7 @@ export function OperationsWorkplacePage() {
                           loading={submitting}
                           onClick={() => void handleReverse(operation.id)}
                         >
-                          Сторно
+                          {t('workplace.reverse')}
                         </Button>
                       )}
                     </Table.Td>
