@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
@@ -5,6 +6,7 @@ from django.db import models
 from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
 
+from modules.common.backend.i18n import pick_translation
 from modules.common.backend.models import TimeStampedModel
 from modules.common.backend.schemas import qualified_table
 from modules.core.backend.managers import UserManager
@@ -59,6 +61,12 @@ class User(AbstractUser):
     last_name = models.CharField(_("last name"), max_length=150)
     middle_name = models.CharField(_("middle name"), max_length=150, blank=True)
     phone = models.CharField(_("phone number"), max_length=32, blank=True)
+    language = models.CharField(
+        _("language"),
+        max_length=8,
+        blank=True,
+        help_text=_("Empty means the bank-wide default language."),
+    )
     roles = models.ManyToManyField(
         "core.Role",
         related_name="users",
@@ -346,6 +354,45 @@ class Currency(TimeStampedModel):
         self.code = (self.code or "").strip().upper()
         return super().save(*args, **kwargs)
 
+    def localized_name(self, language: str | None = None) -> str:
+        """Return the currency name for ``language`` (the active one when omitted)."""
+        return pick_translation(
+            self.name,
+            ((t.language, t.name) for t in self.translations.all()),
+            language,
+        )
+
+
+class CurrencyTranslation(TimeStampedModel):
+    """A localized name of a currency for a single language.
+
+    The base value lives in :attr:`Currency.name`; a row here overrides it for the
+    given language. See ``docs/adr/0016-translatable-reference-data.md``.
+    """
+
+    currency = models.ForeignKey(
+        Currency,
+        on_delete=models.CASCADE,
+        related_name="translations",
+        verbose_name=_("currency"),
+    )
+    language = models.CharField(_("language"), max_length=8)
+    name = models.CharField(_("name"), max_length=100)
+
+    class Meta:
+        verbose_name = _("currency translation")
+        verbose_name_plural = _("currency translations")
+        db_table = qualified_table("core", "core_currencytranslation")
+        constraints = (
+            models.UniqueConstraint(
+                fields=["currency", "language"],
+                name="core_unique_currency_translation",
+            ),
+        )
+
+    def __str__(self):
+        return f"{self.currency} ({self.language})"
+
 
 class CashDeskCurrency(TimeStampedModel):
     """A currency enabled on a specific cash desk (an explicit override).
@@ -489,3 +536,61 @@ class CurrencyRate(TimeStampedModel):
             raise ValidationError(
                 {"base_currency": _("The base currency must differ from the currency.")}
             )
+
+
+class BankSettings(TimeStampedModel):
+    """Bank-wide settings (a singleton row).
+
+    Holds the languages the application offers and the bank-wide default, which is
+    the fallback when neither the request nor the user picks a language. The row is
+    created on first access from the ``settings`` defaults (``LANGUAGES`` and
+    ``LANGUAGE_CODE``); see ``docs/adr/0015-application-language-layers.md``.
+    """
+
+    default_language = models.CharField(_("default language"), max_length=8, default="ru")
+    enabled_languages = models.JSONField(_("enabled languages"), default=list, blank=True)
+
+    class Meta:
+        verbose_name = _("bank settings")
+        verbose_name_plural = _("bank settings")
+        db_table = qualified_table("core", "core_banksettings")
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        return super().save(*args, **kwargs)
+
+    def clean(self):
+        super().clean()
+        supported = {code for code, _name in settings.LANGUAGES}
+        enabled = list(self.enabled_languages or [])
+        unknown = sorted(set(enabled) - supported)
+        if unknown:
+            raise ValidationError(
+                {
+                    "enabled_languages": _("Unsupported languages: %(codes)s.")
+                    % {"codes": ", ".join(unknown)}
+                }
+            )
+        if self.default_language and self.default_language not in enabled:
+            raise ValidationError(
+                {
+                    "default_language": _(
+                        "The default language must be one of the enabled languages."
+                    )
+                }
+            )
+
+    @classmethod
+    def load(cls) -> "BankSettings":
+        """Return the singleton, creating it from the settings defaults if needed."""
+        obj, _created = cls.objects.get_or_create(
+            pk=1,
+            defaults={
+                "default_language": settings.LANGUAGE_CODE.split("-")[0],
+                "enabled_languages": [code for code, _name in settings.LANGUAGES],
+            },
+        )
+        return obj
+
+    def __str__(self):
+        return _("Bank settings")

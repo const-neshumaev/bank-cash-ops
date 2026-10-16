@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from django.utils.translation import gettext_lazy as _
+
 
 class PermissionCode:
     """Stable identifiers of the permissions the application understands."""
@@ -42,21 +44,21 @@ class Permission:
 
 
 CATALOG: tuple[Permission, ...] = (
-    Permission(PermissionCode.USERS_VIEW, "Просмотр пользователей"),
-    Permission(PermissionCode.USERS_MANAGE, "Управление пользователями"),
-    Permission(PermissionCode.ROLES_VIEW, "Просмотр ролей"),
-    Permission(PermissionCode.ROLES_MANAGE, "Управление ролями"),
-    Permission(PermissionCode.STRUCTURE_VIEW, "Просмотр структуры банка"),
-    Permission(PermissionCode.STRUCTURE_MANAGE, "Управление структурой банка"),
-    Permission(PermissionCode.CURRENCIES_CONFIG_MANAGE, "Настройка валют касс"),
+    Permission(PermissionCode.USERS_VIEW, _("View users")),
+    Permission(PermissionCode.USERS_MANAGE, _("Manage users")),
+    Permission(PermissionCode.ROLES_VIEW, _("View roles")),
+    Permission(PermissionCode.ROLES_MANAGE, _("Manage roles")),
+    Permission(PermissionCode.STRUCTURE_VIEW, _("View bank structure")),
+    Permission(PermissionCode.STRUCTURE_MANAGE, _("Manage bank structure")),
+    Permission(PermissionCode.CURRENCIES_CONFIG_MANAGE, _("Configure cash desk currencies")),
     Permission(
         PermissionCode.CURRENCIES_CONFIG_MANAGE_BRANCH,
-        "Настройка валют касс своего отделения",
+        _("Configure cash desk currencies of own branch"),
     ),
-    Permission(PermissionCode.SHIFTS_VIEW, "Просмотр кассовых смен"),
-    Permission(PermissionCode.SHIFTS_OPEN, "Открытие кассовой смены"),
-    Permission(PermissionCode.SHIFTS_CLOSE, "Закрытие своей смены"),
-    Permission(PermissionCode.SHIFTS_MANAGE, "Управление кассовыми сменами"),
+    Permission(PermissionCode.SHIFTS_VIEW, _("View cash shifts")),
+    Permission(PermissionCode.SHIFTS_OPEN, _("Open a cash shift")),
+    Permission(PermissionCode.SHIFTS_CLOSE, _("Close own shift")),
+    Permission(PermissionCode.SHIFTS_MANAGE, _("Manage cash shifts")),
 )
 
 ALL_CODES: tuple[str, ...] = tuple(permission.code for permission in CATALOG)

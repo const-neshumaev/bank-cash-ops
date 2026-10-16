@@ -18,6 +18,7 @@ from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from modules.common.backend.i18n import pick_translation
 from modules.common.backend.models import TimeStampedModel
 from modules.common.backend.schemas import qualified_table
 from modules.operations.backend.registers import RegisterCode
@@ -82,6 +83,51 @@ class OperationType(TimeStampedModel):
     def __str__(self):
         return self.name
 
+    def localized_name(self, language: str | None = None) -> str:
+        """Return the name in ``language`` (the active one when omitted).
+
+        Falls back to the base ``name`` when the language has no translation
+        (see ``docs/adr/0016-translatable-reference-data.md``).
+        """
+        return pick_translation(
+            self.name,
+            ((row.language, row.name) for row in self.translations.all()),
+            language,
+        )
+
+
+class OperationTypeTranslation(TimeStampedModel):
+    """The name of an operation type in one language.
+
+    The base value stays on :attr:`OperationType.name`; this table holds the
+    translations owned by the module (see
+    ``docs/adr/0016-translatable-reference-data.md``).
+    """
+
+    operation_type = models.ForeignKey(
+        OperationType,
+        on_delete=models.CASCADE,
+        related_name="translations",
+        verbose_name=_("operation type"),
+    )
+    language = models.CharField(_("language"), max_length=8)
+    name = models.CharField(_("name"), max_length=150)
+
+    class Meta:
+        verbose_name = _("operation type translation")
+        verbose_name_plural = _("operation type translations")
+        db_table = qualified_table("operations", "operations_operationtypetranslation")
+        ordering = ("language",)
+        constraints = (
+            models.UniqueConstraint(
+                fields=["operation_type", "language"],
+                name="operations_unique_operation_type_translation",
+            ),
+        )
+
+    def __str__(self):
+        return f"{self.operation_type.code} [{self.language}]"
+
 
 class SlotDef(TimeStampedModel):
     """An amount slot an operation type expects (its input shape)."""
@@ -117,6 +163,51 @@ class SlotDef(TimeStampedModel):
 
     def __str__(self):
         return f"{self.operation_type.code}.{self.code}"
+
+    def localized_name(self, language: str | None = None) -> str:
+        """Return the name in ``language`` (the active one when omitted).
+
+        Falls back to the base ``name`` when the language has no translation
+        (see ``docs/adr/0016-translatable-reference-data.md``).
+        """
+        return pick_translation(
+            self.name,
+            ((row.language, row.name) for row in self.translations.all()),
+            language,
+        )
+
+
+class SlotDefTranslation(TimeStampedModel):
+    """The name of an operation type's amount slot in one language.
+
+    The base value stays on :attr:`SlotDef.name`; this table holds the
+    translations owned by the module (see
+    ``docs/adr/0016-translatable-reference-data.md``).
+    """
+
+    slot = models.ForeignKey(
+        SlotDef,
+        on_delete=models.CASCADE,
+        related_name="translations",
+        verbose_name=_("slot"),
+    )
+    language = models.CharField(_("language"), max_length=8)
+    name = models.CharField(_("name"), max_length=150)
+
+    class Meta:
+        verbose_name = _("slot translation")
+        verbose_name_plural = _("slot translations")
+        db_table = qualified_table("operations", "operations_slotdeftranslation")
+        ordering = ("language",)
+        constraints = (
+            models.UniqueConstraint(
+                fields=["slot", "language"],
+                name="operations_unique_slot_translation",
+            ),
+        )
+
+    def __str__(self):
+        return f"{self.slot} [{self.language}]"
 
 
 class Operation(TimeStampedModel):
@@ -409,6 +500,8 @@ __all__ = [
     "OperationTemplate",
     "OperationsSettings",
     "OperationType",
+    "OperationTypeTranslation",
     "RegisterCode",
     "SlotDef",
+    "SlotDefTranslation",
 ]

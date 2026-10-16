@@ -1,0 +1,477 @@
+# Russian translation of the core module.
+# The source strings are English (see docs/adr/0015-application-language-layers.md).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: BankCashOps core\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-16 09:53+0300\n"
+"PO-Revision-Date: 2026-10-16 09:51+0300\n"
+"Last-Translator: BankCashOps\n"
+"Language-Team: Russian\n"
+"Language: ru\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=4; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
+"n%10<=4 && (n%100<12 || n%100>14) ? 1 : n%10==0 || (n%10>=5 && n%10<=9) || "
+"(n%100>=11 && n%100<=14)? 2 : 3);\n"
+
+#: admin.py:29 models.py:83
+msgid "users"
+msgstr "пользователи"
+
+#: admin.py:56
+msgid "Personal information"
+msgstr "Личная информация"
+
+#: admin.py:59
+msgid "Roles"
+msgstr "Роли"
+
+#: admin.py:61
+msgid "Permissions"
+msgstr "Права"
+
+#: admin.py:64
+msgid "Important dates"
+msgstr "Важные даты"
+
+#: admin.py:83
+msgid "full name"
+msgstr "полное имя"
+
+#: apps.py:11
+msgid "Core"
+msgstr "Ядро"
+
+#: currency_config.py:97
+#, python-format
+msgid "Unknown currencies: %(codes)s."
+msgstr "Неизвестные валюты: %(codes)s."
+
+#: models.py:16
+msgid "Enter a MAC address in the form AA:BB:CC:DD:EE:FF."
+msgstr "Введите MAC-адрес в формате AA:BB:CC:DD:EE:FF."
+
+#: models.py:29 models.py:125 models.py:230 models.py:337
+msgid "code"
+msgstr "код"
+
+#: models.py:30 models.py:126 models.py:231 models.py:338
+msgid "name"
+msgstr "название"
+
+#: models.py:31
+msgid "description"
+msgstr "описание"
+
+#: models.py:32
+msgid "permissions"
+msgstr "права"
+
+#: models.py:34
+msgid "system role"
+msgstr "системная роль"
+
+#: models.py:36
+msgid "System roles are shipped with the product and cannot be deleted."
+msgstr "Системные роли поставляются с продуктом и не могут быть удалены."
+
+#: models.py:40
+msgid "role"
+msgstr "роль"
+
+#: models.py:41 models.py:73
+msgid "roles"
+msgstr "роли"
+
+#: models.py:58
+msgid "email address"
+msgstr "адрес электронной почты"
+
+#: models.py:59
+msgid "first name"
+msgstr "имя"
+
+#: models.py:60
+msgid "last name"
+msgstr "фамилия"
+
+#: models.py:61
+msgid "middle name"
+msgstr "отчество"
+
+#: models.py:62 models.py:128
+msgid "phone number"
+msgstr "номер телефона"
+
+#: models.py:64
+msgid "language"
+msgstr "язык"
+
+#: models.py:67
+msgid "Empty means the bank-wide default language."
+msgstr "Пусто — язык по умолчанию для всего банка."
+
+#: models.py:82 models.py:191
+msgid "user"
+msgstr "пользователь"
+
+#: models.py:123
+msgid "parent branch"
+msgstr "родительское отделение"
+
+#: models.py:127
+msgid "address"
+msgstr "адрес"
+
+#: models.py:129
+msgid "head office"
+msgstr "головной офис"
+
+#: models.py:130 models.py:242 models.py:341
+msgid "active"
+msgstr "активно"
+
+#: models.py:133 models.py:197 models.py:228 models.py:409
+msgid "branch"
+msgstr "отделение"
+
+#: models.py:134
+msgid "branches"
+msgstr "отделения"
+
+#: models.py:166 serializers.py:343
+msgid "The head office cannot have a parent."
+msgstr "У головного офиса не может быть родительского отделения."
+
+#: models.py:168 serializers.py:347
+msgid "Only the head office can have no parent."
+msgstr "Только головной офис может не иметь родительского отделения."
+
+#: models.py:171 serializers.py:354
+msgid "A branch cannot be its own ancestor."
+msgstr "Отделение не может быть своим предком."
+
+#: models.py:200
+msgid "include child branches"
+msgstr "включая дочерние отделения"
+
+#: models.py:202
+msgid "Also grant access to every child branch of this branch."
+msgstr "Также предоставить доступ ко всем дочерним отделениям этого отделения."
+
+#: models.py:206 models.py:207
+msgid "branch access"
+msgstr "доступ к отделениям"
+
+#: models.py:233
+msgid "MAC address"
+msgstr "MAC-адрес"
+
+#: models.py:239
+msgid "Network address of the workstation, e.g. AA:BB:CC:DD:EE:FF."
+msgstr "Сетевой адрес рабочего места, например AA:BB:CC:DD:EE:FF."
+
+#: models.py:241
+msgid "hostname"
+msgstr "имя хоста"
+
+#: models.py:245 models.py:283 models.py:369 models.py:466
+msgid "cash desk"
+msgstr "касса"
+
+#: models.py:246
+msgid "cash desks"
+msgstr "кассы"
+
+#: models.py:276
+msgid "Open"
+msgstr "Открыта"
+
+#: models.py:277
+msgid "Closed"
+msgstr "Закрыта"
+
+#: models.py:289
+msgid "cashier"
+msgstr "кассир"
+
+#: models.py:292
+msgid "status"
+msgstr "статус"
+
+#: models.py:297
+msgid "opened at"
+msgstr "время открытия"
+
+#: models.py:298
+msgid "closed at"
+msgstr "время закрытия"
+
+#: models.py:305
+msgid "closed by"
+msgstr "закрыл"
+
+#: models.py:309
+msgid "shift"
+msgstr "смена"
+
+#: models.py:310
+msgid "shifts"
+msgstr "смены"
+
+#: models.py:339
+msgid "symbol"
+msgstr "символ"
+
+#: models.py:340
+msgid "minor units"
+msgstr "число дробных разрядов"
+
+#: models.py:344 models.py:375 models.py:452
+msgid "currency"
+msgstr "валюта"
+
+#: models.py:345 models.py:416
+msgid "currencies"
+msgstr "валюты"
+
+#: models.py:379
+msgid "cash desk currency"
+msgstr "валюта кассы"
+
+#: models.py:380
+msgid "cash desk currencies"
+msgstr "валюты касс"
+
+#: models.py:410
+msgid "Empty for the bank-wide template."
+msgstr "Пусто для банковского шаблона."
+
+#: models.py:420
+msgid "currency template"
+msgstr "шаблон валют"
+
+#: models.py:421
+msgid "currency templates"
+msgstr "шаблоны валют"
+
+#: models.py:432
+msgid "Bank template"
+msgstr "Банковский шаблон"
+
+#: models.py:444
+msgid "Buy"
+msgstr "Покупка"
+
+#: models.py:445
+msgid "Sell"
+msgstr "Продажа"
+
+#: models.py:446
+msgid "Central"
+msgstr "Учётный"
+
+#: models.py:458
+msgid "base currency"
+msgstr "базовая валюта"
+
+#: models.py:469
+msgid "rate type"
+msgstr "тип курса"
+
+#: models.py:474
+msgid "value"
+msgstr "значение"
+
+#: models.py:475
+msgid "effective from"
+msgstr "действует с"
+
+#: models.py:478
+msgid "currency rate"
+msgstr "курс валюты"
+
+#: models.py:479
+msgid "currency rates"
+msgstr "курсы валют"
+
+#: models.py:497 serializers.py:517
+msgid "The base currency must differ from the currency."
+msgstr "Базовая валюта должна отличаться от валюты."
+
+#: models.py:510
+msgid "default language"
+msgstr "язык по умолчанию"
+
+#: models.py:511
+msgid "enabled languages"
+msgstr "доступные языки"
+
+#: models.py:514 models.py:515
+msgid "bank settings"
+msgstr "настройки банка"
+
+#: models.py:530
+#, python-format
+msgid "Unsupported languages: %(codes)s."
+msgstr "Неподдерживаемые языки: %(codes)s."
+
+#: models.py:538
+msgid "The default language must be one of the enabled languages."
+msgstr "Язык по умолчанию должен входить в число доступных языков."
+
+#: models.py:556
+msgid "Bank settings"
+msgstr "Настройки банка"
+
+#: permission_codes.py:47
+msgid "View users"
+msgstr "Просмотр пользователей"
+
+#: permission_codes.py:48
+msgid "Manage users"
+msgstr "Управление пользователями"
+
+#: permission_codes.py:49
+msgid "View roles"
+msgstr "Просмотр ролей"
+
+#: permission_codes.py:50
+msgid "Manage roles"
+msgstr "Управление ролями"
+
+#: permission_codes.py:51
+msgid "View bank structure"
+msgstr "Просмотр структуры банка"
+
+#: permission_codes.py:52
+msgid "Manage bank structure"
+msgstr "Управление структурой банка"
+
+#: permission_codes.py:53
+msgid "Configure cash desk currencies"
+msgstr "Настройка валют касс"
+
+#: permission_codes.py:56
+msgid "Configure cash desk currencies of own branch"
+msgstr "Настройка валют касс своего отделения"
+
+#: permission_codes.py:58
+msgid "View cash shifts"
+msgstr "Просмотр кассовых смен"
+
+#: permission_codes.py:59
+msgid "Open a cash shift"
+msgstr "Открытие кассовой смены"
+
+#: permission_codes.py:60
+msgid "Close own shift"
+msgstr "Закрытие своей смены"
+
+#: permission_codes.py:61
+msgid "Manage cash shifts"
+msgstr "Управление кассовыми сменами"
+
+#: serializers.py:85
+#, python-format
+msgid "Unknown permission codes: %(codes)s."
+msgstr "Неизвестные коды прав: %(codes)s."
+
+#: serializers.py:97
+msgid "Unsupported language."
+msgstr "Неподдерживаемый язык."
+
+#: serializers.py:181 serializers.py:259
+msgid "Passwords do not match."
+msgstr "Пароли не совпадают."
+
+#: serializers.py:253
+msgid "The current password is incorrect."
+msgstr "Текущий пароль неверен."
+
+#: serializers.py:335
+msgid "A branch with this code already exists."
+msgstr "Отделение с таким кодом уже существует."
+
+#: serializers.py:407
+msgid "A cash desk with this code already exists."
+msgstr "Касса с таким кодом уже существует."
+
+#: shifts.py:43
+msgid "The cash desk is not active."
+msgstr "Касса неактивна."
+
+#: shifts.py:45
+msgid "The branch is not active."
+msgstr "Отделение неактивно."
+
+#: shifts.py:47
+msgid "The cash desk is not available to you."
+msgstr "Касса недоступна для вас."
+
+#: shifts.py:49
+msgid "You already have an open shift."
+msgstr "У вас уже есть открытая смена."
+
+#: shifts.py:51
+msgid "The cash desk already has an open shift."
+msgstr "На кассе уже есть открытая смена."
+
+#: shifts.py:68
+msgid "The shift is already closed."
+msgstr "Смена уже закрыта."
+
+#: views.py:79
+msgid "This field is required."
+msgstr "Это поле обязательно."
+
+#: views.py:116
+msgid "Password has been changed."
+msgstr "Пароль изменён."
+
+#: views.py:195
+msgid "You cannot delete your own account."
+msgstr "Нельзя удалить собственную учётную запись."
+
+#: views.py:217
+msgid "You cannot deactivate your own account."
+msgstr "Нельзя деактивировать собственную учётную запись."
+
+#: views.py:246
+msgid "A system role cannot be deleted."
+msgstr "Системную роль нельзя удалить."
+
+#: views.py:250
+msgid "The role is assigned to users."
+msgstr "Роль назначена пользователям."
+
+#: views.py:327
+msgid "The branch has nested branches or cash desks."
+msgstr "У отделения есть вложенные отделения или кассы."
+
+#: views.py:375
+msgid "A valid integer is required."
+msgstr "Требуется корректное целое число."
+
+#: views.py:394 views.py:608 views.py:618 views.py:640 views.py:651
+msgid "You do not have permission to perform this action."
+msgstr "У вас нет прав на выполнение этого действия."
+
+#: views.py:407
+msgid "The cash desk has shifts."
+msgstr "У кассы есть смены."
+
+#: views.py:436
+msgid "The currency is used by a cash desk."
+msgstr "Валюта используется кассой."
+
+#: views.py:524
+msgid "You can only close your own shift."
+msgstr "Вы можете закрыть только свою смену."
+
+#: views.py:557 views.py:562
+msgid "No branch matches the given query."
+msgstr "Нет отделения, соответствующего запросу."

@@ -9,6 +9,25 @@
 Authorization: Bearer <access_token>
 ```
 
+Язык ответа определяется заголовком `Accept-Language` (`ru` или `en`); при его
+отсутствии используется язык по умолчанию банка (см.
+`docs/adr/0015-application-language-layers.md`). Выбор языка конкретного
+пользователя хранится в поле `language` его профиля.
+
+Названия справочных данных (валюты, типы операций и их слоты) также отдаются на
+языке запроса; базовые значения хранятся на русском, переводы — в отдельных
+таблицах модуля-владельца, при отсутствии перевода отдаётся базовое значение (см.
+`docs/adr/0016-translatable-reference-data.md`).
+
+## Настройки банка (`/api/settings/`)
+
+| Метод | Путь | Доступ | Описание |
+| --- | --- | --- | --- |
+| GET | `/api/settings/` | публичный | Языки банка: `{ "default_language", "enabled_languages" }` |
+
+Публичный эндпоинт: SPA читает его до входа, чтобы показать экран входа на языке
+по умолчанию банка. `language` в профиле валидируется по `enabled_languages`.
+
 ## Служебные методы
 
 | Метод | Путь | Доступ | Описание |
@@ -23,7 +42,7 @@ Authorization: Bearer <access_token>
 | POST | `/api/auth/refresh/` | публичный | Обновление: `refresh` → `access` (и новый `refresh`) |
 | POST | `/api/auth/logout/` | авторизованный | Выход: `refresh` заносится в чёрный список |
 | GET | `/api/auth/me/` | авторизованный | Текущий пользователь |
-| PATCH | `/api/auth/me/` | авторизованный | Изменение своего профиля (`first_name`, `last_name`, `middle_name`, `phone`) |
+| PATCH | `/api/auth/me/` | авторизованный | Изменение своего профиля (`first_name`, `last_name`, `middle_name`, `phone`, `language`) |
 | POST | `/api/auth/change-password/` | авторизованный | Смена пароля: `old_password`, `new_password`, `new_password_confirm` |
 
 ### Пример входа
@@ -45,6 +64,7 @@ Content-Type: application/json
     "full_name": "Administrator System",
     "role": "admin",
     "role_display": "Administrator",
+    "language": "",
     "is_active": true,
     "is_superuser": true
   }
@@ -94,6 +114,7 @@ Content-Type: application/json
     { "branch": 3, "include_descendants": true }
   ],
   "phone": "+7-900-000-00-00",
+  "language": "",
   "is_active": true
 }
 ```

@@ -10,7 +10,9 @@ from modules.operations.backend.models import (
     OperationsSettings,
     OperationTemplate,
     OperationType,
+    OperationTypeTranslation,
     SlotDef,
+    SlotDefTranslation,
 )
 
 
@@ -18,6 +20,20 @@ class SlotDefInline(admin.TabularInline):
     """Edit an operation type's amount slots from its page."""
 
     model = SlotDef
+    extra = 1
+
+
+class OperationTypeTranslationInline(admin.TabularInline):
+    """Edit an operation type's translations from its page."""
+
+    model = OperationTypeTranslation
+    extra = 1
+
+
+class SlotDefTranslationInline(admin.TabularInline):
+    """Edit a slot's translations from its page."""
+
+    model = SlotDefTranslation
     extra = 1
 
 
@@ -29,7 +45,18 @@ class OperationTypeAdmin(admin.ModelAdmin):
     list_filter = ("kind", "is_external", "requires_client", "is_active")
     search_fields = ("name", "code")
     readonly_fields = ("created_at", "updated_at")
-    inlines = (SlotDefInline,)
+    inlines = (SlotDefInline, OperationTypeTranslationInline)
+
+
+@admin.register(SlotDef)
+class SlotDefAdmin(admin.ModelAdmin):
+    """Administration of the amount slot catalogue and its translations."""
+
+    list_display = ("__str__", "name", "required", "fixed_currency", "order")
+    list_filter = ("required", "fixed_currency")
+    search_fields = ("name", "code", "operation_type__code", "operation_type__name")
+    readonly_fields = ("created_at", "updated_at")
+    inlines = (SlotDefTranslationInline,)
 
 
 class OperationLineInline(admin.TabularInline):

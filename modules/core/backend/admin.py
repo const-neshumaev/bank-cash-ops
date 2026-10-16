@@ -3,6 +3,7 @@ from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.utils.translation import gettext_lazy as _
 
 from modules.core.backend.models import (
+    BankSettings,
     Branch,
     BranchAccess,
     CashDesk,
@@ -10,6 +11,7 @@ from modules.core.backend.models import (
     Currency,
     CurrencyRate,
     CurrencyTemplate,
+    CurrencyTranslation,
     Role,
     Shift,
     User,
@@ -53,7 +55,7 @@ class UserAdmin(DjangoUserAdmin):
         (None, {"fields": ("email", "password")}),
         (
             _("Personal information"),
-            {"fields": ("last_name", "first_name", "middle_name", "phone")},
+            {"fields": ("last_name", "first_name", "middle_name", "phone", "language")},
         ),
         (_("Roles"), {"fields": ("roles",)}),
         (
@@ -123,6 +125,13 @@ class CashDeskAdmin(admin.ModelAdmin):
     inlines = (CashDeskCurrencyInline,)
 
 
+class CurrencyTranslationInline(admin.TabularInline):
+    """Edit a currency's localized names from its page."""
+
+    model = CurrencyTranslation
+    extra = 1
+
+
 @admin.register(Currency)
 class CurrencyAdmin(admin.ModelAdmin):
     """Administration of the currency reference data."""
@@ -131,6 +140,7 @@ class CurrencyAdmin(admin.ModelAdmin):
     list_filter = ("is_active",)
     search_fields = ("code", "name")
     readonly_fields = ("created_at", "updated_at")
+    inlines = (CurrencyTranslationInline,)
 
 
 @admin.register(CurrencyTemplate)
@@ -169,3 +179,14 @@ class ShiftAdmin(admin.ModelAdmin):
     list_filter = ("status", "cash_desk")
     search_fields = ("cashier__email", "cashier__last_name", "cash_desk__name", "cash_desk__code")
     readonly_fields = ("opened_at", "created_at", "updated_at")
+
+
+@admin.register(BankSettings)
+class BankSettingsAdmin(admin.ModelAdmin):
+    """Administer the bank-wide settings (offered languages and the default)."""
+
+    def has_add_permission(self, request):
+        return not BankSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False

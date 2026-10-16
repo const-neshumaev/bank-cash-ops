@@ -20,6 +20,11 @@ class SlotDefSerializer(serializers.ModelSerializer):
         model = SlotDef
         fields = ("code", "name", "required", "fixed_currency", "order")
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["name"] = instance.localized_name()
+        return data
+
 
 class OperationTypeSerializer(serializers.ModelSerializer):
     """Read-only representation of an operation type and its slots."""
@@ -42,6 +47,11 @@ class OperationTypeSerializer(serializers.ModelSerializer):
             "slots",
         )
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["name"] = instance.localized_name()
+        return data
+
 
 class OperationTypeOptionSerializer(serializers.ModelSerializer):
     """Compact operation type representation used by pickers."""
@@ -49,6 +59,11 @@ class OperationTypeOptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = OperationType
         fields = ("code", "name", "kind")
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["name"] = instance.localized_name()
+        return data
 
 
 class MovementSerializer(serializers.ModelSerializer):
@@ -71,10 +86,13 @@ class OperationSerializer(serializers.ModelSerializer):
     """Read-only representation of an operation document."""
 
     operation_type = serializers.SlugRelatedField(slug_field="code", read_only=True)
-    operation_type_name = serializers.CharField(source="operation_type.name", read_only=True)
+    operation_type_name = serializers.SerializerMethodField()
     status_display = serializers.CharField(source="get_status_display", read_only=True)
     lines = OperationLineSerializer(many=True, read_only=True)
     movements = MovementSerializer(many=True, read_only=True)
+
+    def get_operation_type_name(self, obj) -> str:
+        return obj.operation_type.localized_name()
 
     class Meta:
         model = Operation
@@ -180,3 +198,8 @@ class WorkplaceOperationSerializer(serializers.ModelSerializer):
     class Meta:
         model = OperationType
         fields = ("code", "name", "kind", "requires_client", "client_id_threshold", "slots")
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["name"] = instance.localized_name()
+        return data
