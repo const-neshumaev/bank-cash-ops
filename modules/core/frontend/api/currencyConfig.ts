@@ -34,10 +34,17 @@ export interface CurrencyTemplateSummary {
 }
 
 export async function listActiveCurrencies(): Promise<CurrencyOption[]> {
-  const { data } = await api.get<Paginated<CurrencyOption>>('/currencies/', {
-    params: { page_size: 100, is_active: true, ordering: 'code' },
-  })
-  return data.results
+  const results: CurrencyOption[] = []
+  let page = 1
+  for (;;) {
+    const { data } = await api.get<Paginated<CurrencyOption>>('/references/currencies/', {
+      params: { page_size: 100, page, is_active: true, ordering: 'code' },
+    })
+    results.push(...data.results)
+    if (!data.next) break
+    page += 1
+  }
+  return results
 }
 
 export async function fetchCashDeskCurrencies(cashDeskId: number): Promise<CashDeskCurrencies> {

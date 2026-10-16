@@ -40,7 +40,7 @@ def test_workplace_returns_the_desk_context(auth_client, income_type):
 
 
 def test_workplace_currencies_respect_the_cash_desk_configuration(auth_client, contracts):
-    contracts.references.allowed = {"USD"}
+    contracts.cash_desk_config.allowed = {"USD"}
 
     response = auth_client.get(WORKPLACE_URL)
 
@@ -48,7 +48,7 @@ def test_workplace_currencies_respect_the_cash_desk_configuration(auth_client, c
 
 
 def test_workplace_exposes_the_effective_rates(auth_client, contracts):
-    contracts.references.rates = (
+    contracts.cash_desk_config.rates = (
         CurrencyRateDTO(
             currency_code="USD",
             base_currency_code="BYN",

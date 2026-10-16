@@ -34,10 +34,14 @@
 frontend, backend и данных и публикует контракт. Основание и правила — в
 `docs/adr/0001-modular-monolith.md` и `docs/modules.md`.
 
-Текущее состояние: техническая библиотека `common` и доменный модуль `core`
-уже живут в `modules/`. В `core` реализованы пользователи, аутентификация,
-**управляемые данными роли и права**, оргструктура (отделения и кассы) и
-кассовые смены. Остальные модули добавляются по мере развития.
+Текущее состояние: техническая библиотека `common` и доменные модули
+`references`, `core`, `operations` и `operations_standard` живут в `modules/`.
+`references` владеет общесистемными справочниками — валютами ISO 4217 и типами
+курсов (`docs/adr/0017-references-module.md`). В `core` реализованы пользователи,
+аутентификация, **управляемые данными роли и права**, оргструктура (отделения и
+кассы), валюты касс и шаблоны валют и кассовые смены; `operations` — кассовые
+операции, регистры и остатки; `operations_standard` объявляет базовый набор
+операций. Остальные модули добавляются по мере развития.
 
 ## Языковые правила
 
@@ -178,6 +182,7 @@ Frontend собран из хоста (`frontend/src/`) и фронтендов 
 
 - Общая архитектура: `docs/architecture.md`
 - Архитектура модуля core: `docs/architecture-module-core.md`
+- Архитектура модуля references: `docs/architecture-module-references.md`
 - Архитектурные решения: `docs/adr/`
 - Правила модулей и контрактов: `docs/modules.md`
 - Настройки: `backend/config/settings.py`
@@ -187,7 +192,8 @@ Frontend собран из хоста (`frontend/src/`) и фронтендов 
 - Модель пользователя: `modules/core/backend/models.py`
 - Каталог прав: `modules/core/backend/permission_codes.py`
 - Область видимости по отделениям: `modules/core/backend/scoping.py`
-- API пользователей и справочников: `modules/core/backend/views.py`
+- API пользователей и справочников `core`: `modules/core/backend/views.py`
+- Справочники (валюты, типы курсов): `modules/references/backend/models.py`
 - HTTP-клиент SPA: `frontend/src/api/client.ts`
 - Контекст аутентификации: `frontend/src/auth/AuthContext.tsx`
 - Реестр модулей SPA: `frontend/src/registry/index.ts`

@@ -1,0 +1,11 @@
+name: references
+title: Справочники
+version: 0.1.0
+description: Общесистемные справочные данные: валюты (ISO 4217) и типы курсов.
+
+dependencies: []
+
+provides:
+  contracts: modules.references.contracts
+  api_base: /api/references/
+  frontend_routes: true

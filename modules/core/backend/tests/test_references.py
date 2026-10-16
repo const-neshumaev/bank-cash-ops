@@ -1,4 +1,4 @@
-"""Currency reference data, cash desk currencies and currency templates."""
+"""Cash desk currencies and currency templates (configuration of ``core`` entities)."""
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -10,17 +10,16 @@ from modules.core.backend.models import (
     BranchAccess,
     CashDesk,
     CashDeskCurrency,
-    Currency,
     CurrencyTemplate,
+    CurrencyTemplateItem,
     Role,
 )
-from modules.core.contracts import REFERENCE_DIRECTORY
+from modules.core.contracts import CASH_DESK_CONFIG
 
 User = get_user_model()
 
 pytestmark = pytest.mark.django_db
 
-CURRENCIES_URL = "/api/currencies/"
 BANK_TEMPLATE_URL = "/api/currency-templates/bank/"
 LIST_TEMPLATES_URL = "/api/currency-templates/"
 
@@ -60,17 +59,10 @@ def _codes(payload):
     return {row["code"] for row in payload["currencies"]}
 
 
-def test_common_currencies_are_seeded():
-    codes = set(Currency.objects.values_list("code", flat=True))
-
-    assert {"BYN", "USD", "EUR", "RUB"} <= codes
-
-
-def test_listing_currencies(auth_client):
-    response = auth_client.get(CURRENCIES_URL)
-
-    assert response.status_code == 200
-    assert "USD" in {row["code"] for row in response.data["results"]}
+def _set_template_currencies(template, codes):
+    CurrencyTemplateItem.objects.filter(template=template).delete()
+    for code in codes:
+        CurrencyTemplateItem.objects.create(template=template, currency_code=code)
 
 
 def test_a_cash_desk_without_configuration_denies_every_currency(auth_client, cash_desk):
@@ -84,7 +76,7 @@ def test_a_cash_desk_without_configuration_denies_every_currency(auth_client, ca
 
 def test_the_bank_template_sets_the_default(auth_client, cash_desk):
     template = CurrencyTemplate.objects.create(branch=None)
-    template.currencies.set([Currency.objects.get(code="USD")])
+    _set_template_currencies(template, ["USD"])
 
     response = auth_client.get(_currencies_url(cash_desk))
 
@@ -96,9 +88,9 @@ def test_the_bank_template_sets_the_default(auth_client, cash_desk):
 
 def test_a_branch_template_overrides_the_bank_template(auth_client, cash_desk):
     bank = CurrencyTemplate.objects.create(branch=None)
-    bank.currencies.set([Currency.objects.get(code="USD")])
+    _set_template_currencies(bank, ["USD"])
     branch = CurrencyTemplate.objects.create(branch=cash_desk.branch)
-    branch.currencies.set([Currency.objects.get(code="BYN")])
+    _set_template_currencies(branch, ["BYN"])
 
     response = auth_client.get(_currencies_url(cash_desk))
 
@@ -123,7 +115,7 @@ def test_setting_cash_desk_currencies(auth_client, cash_desk):
 
 def test_an_empty_own_configuration_falls_back_to_the_template(auth_client, cash_desk):
     template = CurrencyTemplate.objects.create(branch=None)
-    template.currencies.set([Currency.objects.get(code="USD")])
+    _set_template_currencies(template, ["USD"])
     auth_client.put(_currencies_url(cash_desk), {"currencies": ["BYN"]}, format="json")
 
     response = auth_client.put(_currencies_url(cash_desk), {"currencies": []}, format="json")
@@ -143,12 +135,12 @@ def test_an_unknown_currency_is_rejected(auth_client, cash_desk):
     assert response.status_code == 400
 
 
-def test_reference_directory_contract_reports_the_effective_currencies(cash_desk):
-    directory = registry.get(REFERENCE_DIRECTORY)
+def test_cash_desk_config_contract_reports_the_effective_currencies(cash_desk):
+    directory = registry.get(CASH_DESK_CONFIG)
 
     assert directory.cash_desk_currency_codes(cash_desk.id) == set()
 
-    CashDeskCurrency.objects.create(cash_desk=cash_desk, currency=Currency.objects.get(code="USD"))
+    CashDeskCurrency.objects.create(cash_desk=cash_desk, currency_code="USD")
 
     assert directory.cash_desk_currency_codes(cash_desk.id) == {"USD"}
 
@@ -185,6 +177,15 @@ def test_the_template_list_contains_the_bank_and_branch_templates(auth_client, c
 
     assert response.status_code == 200
     assert {row["branch_id"] for row in response.data["results"]} == {None, cash_desk.branch_id}
+
+
+def test_the_api_localizes_names_in_a_currency_template(auth_client):
+    auth_client.put(BANK_TEMPLATE_URL, {"currencies": ["USD"]}, format="json")
+
+    response = auth_client.get(BANK_TEMPLATE_URL, HTTP_ACCEPT_LANGUAGE="en")
+
+    assert response.status_code == 200
+    assert response.data["currencies"][0]["name"] == "US dollar"
 
 
 def test_the_branch_permission_is_scoped_to_accessible_branches(client, cash_desk):

@@ -14,37 +14,44 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 
 from modules.common.backend import permissions_catalog
 from modules.common.backend.permissions import PermissionRequired
+from modules.common.contracts import registry
 from modules.core.backend import currency_config, scoping, serializers, shifts
 from modules.core.backend.filters import ShiftFilter
 from modules.core.backend.models import (
     BankSettings,
     Branch,
     CashDesk,
-    Currency,
     CurrencyRate,
     CurrencyTemplate,
     Role,
     Shift,
 )
 from modules.core.backend.permission_codes import PermissionCode
+from modules.references.contracts import REFERENCE_DIRECTORY
 
 User = get_user_model()
+
+
+def _currency_payload(codes):
+    """Serialize currency codes from the ``references`` catalogue.
+
+    Unknown codes (a catalogue entry removed after being configured) are skipped
+    rather than failing the whole response.
+    """
+    directory = registry.get(REFERENCE_DIRECTORY)
+    resolved = [currency for code in codes if (currency := directory.get_currency(code))]
+    return serializers.CurrencyRefSerializer(resolved, many=True).data
 
 
 def _cash_desk_currencies_payload(cash_desk):
     """Return the effective currencies of ``cash_desk`` and where they come from."""
     effective = currency_config.effective_currency_config(cash_desk.id)
-    currencies = (
-        Currency.objects.filter(code__in=effective.codes)
-        .prefetch_related("translations")
-        .order_by("code")
-    )
     return {
         "cash_desk": cash_desk.id,
         "configured": effective.source == currency_config.OWN,
         "source": effective.source,
         "template_branch_id": effective.template_branch_id,
-        "currencies": serializers.CurrencySerializer(currencies, many=True).data,
+        "currencies": _currency_payload(effective.codes),
     }
 
 
@@ -412,39 +419,10 @@ class CashDeskViewSet(viewsets.ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class CurrencyViewSet(viewsets.ModelViewSet):
-    """CRUD administration of the currency reference data."""
-
-    queryset = Currency.objects.prefetch_related("translations")
-    serializer_class = serializers.CurrencySerializer
-    permission_classes = [PermissionRequired]
-    permission_map = {
-        "list": PermissionCode.STRUCTURE_VIEW,
-        "retrieve": PermissionCode.STRUCTURE_VIEW,
-        "create": PermissionCode.STRUCTURE_MANAGE,
-        "update": PermissionCode.STRUCTURE_MANAGE,
-        "partial_update": PermissionCode.STRUCTURE_MANAGE,
-        "destroy": PermissionCode.STRUCTURE_MANAGE,
-    }
-    lookup_field = "code"
-    filterset_fields = ["is_active"]
-    search_fields = ["code", "name"]
-    ordering_fields = ["code", "name"]
-    ordering = ["code"]
-
-    def destroy(self, request, *args, **kwargs):
-        currency = self.get_object()
-        try:
-            currency.delete()
-        except ProtectedError:
-            raise ValidationError({"detail": _("The currency is used by a cash desk.")}) from None
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-
 class CurrencyRateViewSet(viewsets.ModelViewSet):
     """CRUD administration of the currency rates."""
 
-    queryset = CurrencyRate.objects.select_related("currency", "base_currency", "cash_desk").all()
+    queryset = CurrencyRate.objects.select_related("cash_desk").all()
     serializer_class = serializers.CurrencyRateSerializer
     permission_classes = [PermissionRequired]
     permission_map = {
@@ -541,12 +519,11 @@ def _currency_template_payload(template, branch_id):
     """Return a currency template payload; ``defined`` is false when none exists."""
     if template is None:
         return {"branch_id": branch_id, "defined": False, "currencies": []}
+    codes = template.items.order_by("currency_code").values_list("currency_code", flat=True)
     return {
         "branch_id": branch_id,
         "defined": True,
-        "currencies": serializers.CurrencySerializer(
-            template.currencies.order_by("code"), many=True
-        ).data,
+        "currencies": _currency_payload(codes),
     }
 
 
@@ -574,7 +551,7 @@ class CurrencyTemplateListView(APIView):
     required_permission = PermissionCode.STRUCTURE_VIEW
 
     def get(self, request):
-        queryset = CurrencyTemplate.objects.prefetch_related("currencies")
+        queryset = CurrencyTemplate.objects.prefetch_related("items")
         branch_ids = scoping.accessible_branch_ids(request.user)
         if branch_ids is not None:
             queryset = queryset.filter(Q(branch__isnull=True) | Q(branch_id__in=branch_ids))
@@ -583,9 +560,11 @@ class CurrencyTemplateListView(APIView):
                 "results": [
                     {
                         "branch_id": template.branch_id,
-                        "currencies": serializers.CurrencySerializer(
-                            template.currencies.order_by("code"), many=True
-                        ).data,
+                        "currencies": _currency_payload(
+                            template.items.order_by("currency_code").values_list(
+                                "currency_code", flat=True
+                            )
+                        ),
                     }
                     for template in queryset.order_by("branch_id")
                 ]
@@ -601,9 +580,7 @@ class BankCurrencyTemplateView(APIView):
 
     def get(self, request):
         template = (
-            CurrencyTemplate.objects.prefetch_related("currencies")
-            .filter(branch__isnull=True)
-            .first()
+            CurrencyTemplate.objects.prefetch_related("items").filter(branch__isnull=True).first()
         )
         return Response(_currency_template_payload(template, None))
 
@@ -633,9 +610,7 @@ class BranchCurrencyTemplateView(APIView):
     def get(self, request, branch_id):
         _branch_template_or_404(request.user, branch_id)
         template = (
-            CurrencyTemplate.objects.prefetch_related("currencies")
-            .filter(branch_id=branch_id)
-            .first()
+            CurrencyTemplate.objects.prefetch_related("items").filter(branch_id=branch_id).first()
         )
         return Response(_currency_template_payload(template, branch_id))
 

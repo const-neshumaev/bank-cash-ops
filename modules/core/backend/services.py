@@ -8,12 +8,11 @@ from django.utils import timezone
 from modules.core.backend import currency_config, scoping
 from modules.core.backend.models import (
     CashDesk,
-    Currency,
     CurrencyRate,
     Shift,
     User,
 )
-from modules.core.contracts.dto import CashDeskDTO, CurrencyDTO, CurrencyRateDTO, ShiftDTO, UserDTO
+from modules.core.contracts.dto import CashDeskDTO, CurrencyRateDTO, ShiftDTO, UserDTO
 
 
 class UserDirectoryService:
@@ -95,18 +94,8 @@ class OrgDirectoryService:
         )
 
 
-class ReferenceDirectoryService:
-    """In-process implementation of the ``ReferenceDirectory`` contract."""
-
-    def currencies(self) -> tuple[CurrencyDTO, ...]:
-        queryset = (
-            Currency.objects.filter(is_active=True).prefetch_related("translations").order_by("code")
-        )
-        return tuple(self._currency_to_dto(currency) for currency in queryset)
-
-    def get_currency(self, code: str) -> CurrencyDTO | None:
-        currency = Currency.objects.filter(code=(code or "").upper()).first()
-        return self._currency_to_dto(currency) if currency is not None else None
+class CashDeskConfigService:
+    """In-process implementation of the ``CashDeskConfigDirectory`` contract."""
 
     def cash_desk_currency_codes(self, cash_desk_id: int) -> set[str]:
         return currency_config.effective_currency_codes(cash_desk_id)
@@ -121,7 +110,7 @@ class ReferenceDirectoryService:
     ):
         moment = at or timezone.now()
         rows = CurrencyRate.objects.filter(
-            currency__code=(currency_code or "").upper(),
+            currency=(currency_code or "").strip().upper(),
             rate_type=rate_type,
             effective_from__lte=moment,
         )
@@ -134,18 +123,16 @@ class ReferenceDirectoryService:
 
     def cash_desk_rates(self, cash_desk_id: int) -> tuple[CurrencyRateDTO, ...]:
         moment = timezone.now()
-        rows = (
-            CurrencyRate.objects.select_related("currency", "base_currency")
-            .filter(effective_from__lte=moment)
-            .filter(Q(cash_desk_id=cash_desk_id) | Q(cash_desk__isnull=True))
+        rows = CurrencyRate.objects.filter(effective_from__lte=moment).filter(
+            Q(cash_desk_id=cash_desk_id) | Q(cash_desk__isnull=True)
         )
-        keys = sorted({(row.currency_id, row.base_currency_id, row.rate_type) for row in rows})
+        keys = sorted({(row.currency, row.base_currency, row.rate_type) for row in rows})
         resolved: list[CurrencyRateDTO] = []
-        for currency_id, base_id, rate_type in keys:
+        for currency, base, rate_type in keys:
             scoped = (
                 rows.filter(
-                    currency_id=currency_id,
-                    base_currency_id=base_id,
+                    currency=currency,
+                    base_currency=base,
                     rate_type=rate_type,
                     cash_desk_id=cash_desk_id,
                 )
@@ -154,8 +141,8 @@ class ReferenceDirectoryService:
             )
             chosen = scoped or (
                 rows.filter(
-                    currency_id=currency_id,
-                    base_currency_id=base_id,
+                    currency=currency,
+                    base_currency=base,
                     rate_type=rate_type,
                     cash_desk__isnull=True,
                 )
@@ -167,19 +154,10 @@ class ReferenceDirectoryService:
         return tuple(resolved)
 
     @staticmethod
-    def _currency_to_dto(currency: Currency) -> CurrencyDTO:
-        return CurrencyDTO(
-            code=currency.code,
-            name=currency.localized_name(),
-            symbol=currency.symbol,
-            minor_units=currency.minor_units,
-        )
-
-    @staticmethod
     def _rate_to_dto(rate: CurrencyRate) -> CurrencyRateDTO:
         return CurrencyRateDTO(
-            currency_code=rate.currency.code,
-            base_currency_code=rate.base_currency.code,
+            currency_code=rate.currency,
+            base_currency_code=rate.base_currency,
             rate_type=rate.rate_type,
             value=rate.value,
             effective_from=rate.effective_from,

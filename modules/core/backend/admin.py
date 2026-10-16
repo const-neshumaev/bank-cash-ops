@@ -8,10 +8,9 @@ from modules.core.backend.models import (
     BranchAccess,
     CashDesk,
     CashDeskCurrency,
-    Currency,
     CurrencyRate,
     CurrencyTemplate,
-    CurrencyTranslation,
+    CurrencyTemplateItem,
     Role,
     Shift,
     User,
@@ -111,7 +110,6 @@ class CashDeskCurrencyInline(admin.TabularInline):
 
     model = CashDeskCurrency
     extra = 1
-    autocomplete_fields = ("currency",)
 
 
 @admin.register(CashDesk)
@@ -125,22 +123,11 @@ class CashDeskAdmin(admin.ModelAdmin):
     inlines = (CashDeskCurrencyInline,)
 
 
-class CurrencyTranslationInline(admin.TabularInline):
-    """Edit a currency's localized names from its page."""
+class CurrencyTemplateItemInline(admin.TabularInline):
+    """Edit the currencies of a currency template from its page."""
 
-    model = CurrencyTranslation
+    model = CurrencyTemplateItem
     extra = 1
-
-
-@admin.register(Currency)
-class CurrencyAdmin(admin.ModelAdmin):
-    """Administration of the currency reference data."""
-
-    list_display = ("code", "name", "symbol", "minor_units", "is_active")
-    list_filter = ("is_active",)
-    search_fields = ("code", "name")
-    readonly_fields = ("created_at", "updated_at")
-    inlines = (CurrencyTranslationInline,)
 
 
 @admin.register(CurrencyTemplate)
@@ -150,7 +137,7 @@ class CurrencyTemplateAdmin(admin.ModelAdmin):
     list_display = ("__str__", "branch")
     list_filter = ("branch",)
     autocomplete_fields = ("branch",)
-    filter_horizontal = ("currencies",)
+    inlines = (CurrencyTemplateItemInline,)
 
 
 @admin.register(CurrencyRate)
@@ -166,8 +153,8 @@ class CurrencyRateAdmin(admin.ModelAdmin):
         "effective_from",
     )
     list_filter = ("rate_type", "cash_desk", "currency", "base_currency")
-    search_fields = ("currency__code", "base_currency__code")
-    autocomplete_fields = ("currency", "base_currency", "cash_desk")
+    search_fields = ("currency", "base_currency")
+    autocomplete_fields = ("cash_desk",)
     readonly_fields = ("created_at", "updated_at")
 
 

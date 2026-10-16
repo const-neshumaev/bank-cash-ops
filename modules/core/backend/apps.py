@@ -16,17 +16,17 @@ class CoreConfig(AppConfig):
         from modules.common.contracts import registry
         from modules.core.backend.permission_codes import CATALOG
         from modules.core.backend.services import (
+            CashDeskConfigService,
             OrgDirectoryService,
-            ReferenceDirectoryService,
             UserDirectoryService,
         )
         from modules.core.contracts import (
+            CASH_DESK_CONFIG,
             ORG_DIRECTORY,
-            REFERENCE_DIRECTORY,
             USER_DIRECTORY,
         )
 
         permissions_catalog.register(CATALOG)
         registry.register(USER_DIRECTORY, UserDirectoryService())
         registry.register(ORG_DIRECTORY, OrgDirectoryService())
-        registry.register(REFERENCE_DIRECTORY, ReferenceDirectoryService())
+        registry.register(CASH_DESK_CONFIG, CashDeskConfigService())

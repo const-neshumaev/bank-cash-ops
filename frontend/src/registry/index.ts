@@ -1,6 +1,7 @@
 import i18n from '@app/i18n'
 import { coreFrontend } from '@modules/core/frontend'
 import { operationsFrontend } from '@modules/operations/frontend'
+import { referencesFrontend } from '@modules/references/frontend'
 
 import type { FrontendModule, ModuleNavItem } from './contract'
 
@@ -10,7 +11,11 @@ import type { FrontendModule, ModuleNavItem } from './contract'
  * It mirrors the backend composition (`INSTALLED_APPS` / customer profile).
  * Add a module here to plug its routes, navigation and translations into the shell.
  */
-export const enabledModules: FrontendModule[] = [coreFrontend, operationsFrontend]
+export const enabledModules: FrontendModule[] = [
+  referencesFrontend,
+  coreFrontend,
+  operationsFrontend,
+]
 
 // Register each module's translation bundle under its own i18next namespace, so a
 // module owns its strings while the host provides the runtime and the switcher.

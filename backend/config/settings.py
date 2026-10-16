@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     # Local modules
     "modules.common.backend",
+    "modules.references.backend",
     "modules.core.backend",
     "modules.operations.backend",
     "modules.operations_standard.backend",

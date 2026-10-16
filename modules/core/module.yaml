@@ -3,7 +3,10 @@ title: Ядро
 version: 0.2.0
 description: Пользователи, аутентификация, роли и права, оргструктура (отделения, кассы) и кассовые смены.
 
-dependencies: []
+dependencies:
+  - name: references
+    version: "0.1.0"
+    access: inprocess
 
 provides:
   contracts: modules.core.contracts

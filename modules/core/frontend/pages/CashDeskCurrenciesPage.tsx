@@ -1,14 +1,14 @@
 import {
+  ActionIcon,
   Alert,
   Badge,
   Button,
   Card,
-  Checkbox,
   Group,
   Loader,
   Select,
-  SimpleGrid,
   Stack,
+  Table,
   Tabs,
   Text,
   Title,
@@ -21,6 +21,7 @@ import {
   IconReload,
   IconTemplate,
   IconTrash,
+  IconX,
 } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -49,27 +50,74 @@ function sourceColor(source: ConfigSource): string {
   }
 }
 
-interface CurrencyChecklistProps {
+interface CurrencyListEditorProps {
   currencies: CurrencyOption[]
   value: string[]
   onChange: (value: string[]) => void
   disabled?: boolean
 }
 
-function CurrencyChecklist({ currencies, value, onChange, disabled }: CurrencyChecklistProps) {
+/**
+ * A grid of the selected currencies with an "add" picker.
+ *
+ * The catalogue holds the whole ISO 4217 list, so a checkbox per currency is
+ * unwieldy: the editor shows only what is selected and offers a searchable
+ * picker over the currencies that are not selected yet.
+ */
+function CurrencyListEditor({ currencies, value, onChange, disabled }: CurrencyListEditorProps) {
+  const { t } = useTranslation('core')
+  const byCode = new Map(currencies.map((currency) => [currency.code, currency]))
+  const selected = new Set(value)
+  const options = currencies
+    .filter((currency) => !selected.has(currency.code))
+    .map((currency) => ({ value: currency.code, label: `${currency.code} — ${currency.name}` }))
+
+  const remove = (code: string) => onChange(value.filter((item) => item !== code))
+
   return (
-    <Checkbox.Group value={value} onChange={onChange}>
-      <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} mt="xs">
-        {currencies.map((currency) => (
-          <Checkbox
-            key={currency.code}
-            value={currency.code}
-            label={`${currency.code} — ${currency.name}`}
-            disabled={disabled}
-          />
-        ))}
-      </SimpleGrid>
-    </Checkbox.Group>
+    <Stack gap="xs">
+      {value.length === 0 ? (
+        <Text c="dimmed" size="sm">
+          {t('cashDeskCurrencies.noCurrenciesSelected')}
+        </Text>
+      ) : (
+        <Table withTableBorder>
+          <Table.Tbody>
+            {value.map((code) => (
+              <Table.Tr key={code}>
+                <Table.Td w={90}>
+                  <Text fw={500}>{code}</Text>
+                </Table.Td>
+                <Table.Td>{byCode.get(code)?.name ?? code}</Table.Td>
+                <Table.Td w={48}>
+                  <ActionIcon
+                    variant="subtle"
+                    color="red"
+                    disabled={disabled}
+                    aria-label={t('common.delete')}
+                    onClick={() => remove(code)}
+                  >
+                    <IconX size={16} />
+                  </ActionIcon>
+                </Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+      )}
+      <Select
+        placeholder={t('cashDeskCurrencies.addCurrency')}
+        searchable
+        nothingFoundMessage={t('cashDeskCurrencies.noCurrenciesToAdd')}
+        data={options}
+        value={null}
+        onChange={(code) => {
+          if (code && !selected.has(code)) onChange([...value, code])
+        }}
+        disabled={disabled || options.length === 0}
+        w={420}
+      />
+    </Stack>
   )
 }
 
@@ -344,7 +392,7 @@ export function CashDeskCurrenciesPage() {
 
                   {deskEditing ? (
                     <>
-                      <CurrencyChecklist
+                      <CurrencyListEditor
                         currencies={currencies}
                         value={deskDraft}
                         onChange={setDeskDraft}
@@ -418,7 +466,7 @@ export function CashDeskCurrenciesPage() {
                 <Text size="sm" c="dimmed">
                   {t('cashDeskCurrencies.bankTemplateHint')}
                 </Text>
-                <CurrencyChecklist
+                <CurrencyListEditor
                   currencies={currencies}
                   value={bankDraft}
                   onChange={setBankDraft}
@@ -469,7 +517,7 @@ export function CashDeskCurrenciesPage() {
                     <Text size="sm" c="dimmed">
                       {t('cashDeskCurrencies.branchTemplateHint')}
                     </Text>
-                    <CurrencyChecklist
+                    <CurrencyListEditor
                       currencies={currencies}
                       value={branchDraft}
                       onChange={setBranchDraft}

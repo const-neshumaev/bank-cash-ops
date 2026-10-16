@@ -50,6 +50,10 @@ msgstr "Ядро"
 msgid "Unknown currencies: %(codes)s."
 msgstr "Неизвестные валюты: %(codes)s."
 
+#: serializers.py:511
+msgid "Unknown currency."
+msgstr "Неизвестная валюта."
+
 #: models.py:16
 msgid "Enter a MAC address in the form AA:BB:CC:DD:EE:FF."
 msgstr "Введите MAC-адрес в формате AA:BB:CC:DD:EE:FF."
@@ -463,10 +467,6 @@ msgstr "У вас нет прав на выполнение этого дейс�
 #: views.py:407
 msgid "The cash desk has shifts."
 msgstr "У кассы есть смены."
-
-#: views.py:436
-msgid "The currency is used by a cash desk."
-msgstr "Валюта используется кассой."
 
 #: views.py:524
 msgid "You can only close your own shift."

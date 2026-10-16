@@ -10,6 +10,9 @@ The currencies allowed at a cash desk are resolved dynamically (see
 
 A template that exists but lists no currencies is a defined, empty template and
 therefore also denies every currency.
+
+A currency is stored (and referenced) by its ISO code; the code catalogue lives
+in the ``references`` module and is consulted through its contract.
 """
 
 from __future__ import annotations
@@ -20,8 +23,15 @@ from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 
+from modules.common.contracts import registry
 from modules.core.backend import scoping
-from modules.core.backend.models import CashDesk, CashDeskCurrency, Currency, CurrencyTemplate
+from modules.core.backend.models import (
+    CashDesk,
+    CashDeskCurrency,
+    CurrencyTemplate,
+    CurrencyTemplateItem,
+)
+from modules.references.contracts import REFERENCE_DIRECTORY
 
 #: Sources of an effective configuration.
 OWN = "own"
@@ -43,7 +53,7 @@ def configured_currency_codes(cash_desk_id: int) -> list[str] | None:
     """Return the currencies set on a cash desk, or ``None`` when not overridden."""
     codes = list(
         CashDeskCurrency.objects.filter(cash_desk_id=cash_desk_id).values_list(
-            "currency__code", flat=True
+            "currency_code", flat=True
         )
     )
     return codes or None
@@ -54,7 +64,7 @@ def template_currency_codes(branch_id: int | None) -> set[str] | None:
     template = CurrencyTemplate.objects.filter(branch_id=branch_id).first()
     if template is None:
         return None
-    return set(template.currencies.values_list("code", flat=True))
+    return set(template.items.values_list("currency_code", flat=True))
 
 
 def effective_currency_config(cash_desk_id: int) -> EffectiveCurrencyConfig:
@@ -86,34 +96,35 @@ def effective_currency_codes(cash_desk_id: int) -> set[str]:
     return set(effective_currency_config(cash_desk_id).codes)
 
 
-def _resolve_currencies(codes) -> list[Currency]:
-    """Validate currency codes and return the matching instances, de-duplicated."""
+def _resolve_currency_codes(codes) -> list[str]:
+    """Validate currency codes against the catalogue, de-duplicated and ordered."""
+    directory = registry.get(REFERENCE_DIRECTORY)
     normalised = [code.strip().upper() for code in codes]
-    found = Currency.objects.filter(code__in=normalised)
-    currencies = {currency.code: currency for currency in found}
-    unknown = sorted(set(normalised) - set(currencies))
+    unknown = sorted({code for code in normalised if directory.get_currency(code) is None})
     if unknown:
         raise ValidationError(
             {"currencies": _("Unknown currencies: %(codes)s.") % {"codes": ", ".join(unknown)}}
         )
-    return [currencies[code] for code in dict.fromkeys(normalised)]
+    return list(dict.fromkeys(normalised))
 
 
 def set_cash_desk_currencies(cash_desk: CashDesk, codes) -> None:
     """Replace the currencies of a cash desk; an empty list removes the override."""
-    currencies = _resolve_currencies(codes)
+    resolved = _resolve_currency_codes(codes)
     with transaction.atomic():
         CashDeskCurrency.objects.filter(cash_desk=cash_desk).delete()
-        for currency in currencies:
-            CashDeskCurrency.objects.create(cash_desk=cash_desk, currency=currency)
+        for code in resolved:
+            CashDeskCurrency.objects.create(cash_desk=cash_desk, currency_code=code)
 
 
 def set_template_currencies(branch_id: int | None, codes) -> CurrencyTemplate:
     """Create or replace a currency template for the bank or a single branch."""
-    currencies = _resolve_currencies(codes)
+    resolved = _resolve_currency_codes(codes)
     with transaction.atomic():
         template, _ = CurrencyTemplate.objects.get_or_create(branch_id=branch_id)
-        template.currencies.set(currencies)
+        CurrencyTemplateItem.objects.filter(template=template).delete()
+        for code in resolved:
+            CurrencyTemplateItem.objects.create(template=template, currency_code=code)
     return template
 
 

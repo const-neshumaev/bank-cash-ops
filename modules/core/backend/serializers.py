@@ -5,17 +5,17 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from modules.common.backend import permissions_catalog
+from modules.common.contracts import registry
 from modules.core.backend.models import (
     BankSettings,
     Branch,
     BranchAccess,
     CashDesk,
-    Currency,
     CurrencyRate,
-    CurrencyTemplate,
     Role,
     Shift,
 )
+from modules.references.contracts import REFERENCE_DIRECTORY
 
 User = get_user_model()
 
@@ -457,20 +457,13 @@ class ShiftOpenSerializer(serializers.Serializer):
     cash_desk = serializers.PrimaryKeyRelatedField(queryset=CashDesk.objects.all())
 
 
-class CurrencySerializer(serializers.ModelSerializer):
-    """Read and write representation of a currency."""
+class CurrencyRefSerializer(serializers.Serializer):
+    """Read-only representation of a currency resolved from the catalogue."""
 
-    class Meta:
-        model = Currency
-        fields = ("code", "name", "symbol", "minor_units", "is_active")
-
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        data["name"] = instance.localized_name()
-        return data
-
-    def validate_code(self, value):
-        return (value or "").strip().upper()
+    code = serializers.CharField()
+    name = serializers.CharField()
+    symbol = serializers.CharField(allow_blank=True)
+    minor_units = serializers.IntegerField()
 
 
 class CashDeskCurrenciesSerializer(serializers.Serializer):
@@ -479,22 +472,14 @@ class CashDeskCurrenciesSerializer(serializers.Serializer):
     currencies = serializers.ListField(child=serializers.CharField(max_length=8), allow_empty=True)
 
 
-class CurrencyTemplateSerializer(serializers.ModelSerializer):
-    """Read representation of a currency template (bank or branch)."""
-
-    branch_id = serializers.IntegerField(read_only=True)
-    currencies = CurrencySerializer(many=True, read_only=True)
-
-    class Meta:
-        model = CurrencyTemplate
-        fields = ("id", "branch_id", "currencies")
-
-
 class CurrencyRateSerializer(serializers.ModelSerializer):
-    """Read and write representation of a currency rate."""
+    """Read and write representation of a currency rate.
 
-    currency = serializers.SlugRelatedField(slug_field="code", queryset=Currency.objects.all())
-    base_currency = serializers.SlugRelatedField(slug_field="code", queryset=Currency.objects.all())
+    The currencies and the rate type are plain codes; the currency codes are
+    validated against the ``references`` catalogue, and ``rate_type`` against the
+    bank rate types (upper-case code comparison is unnecessary for the latter).
+    """
+
     cash_desk = serializers.PrimaryKeyRelatedField(
         queryset=CashDesk.objects.all(), required=False, allow_null=True, default=None
     )
@@ -513,6 +498,19 @@ class CurrencyRateSerializer(serializers.ModelSerializer):
             "updated_at",
         )
         read_only_fields = ("created_at", "updated_at")
+
+    def validate_currency(self, value):
+        return self._checked_currency(value)
+
+    def validate_base_currency(self, value):
+        return self._checked_currency(value)
+
+    @staticmethod
+    def _checked_currency(value):
+        code = (value or "").strip().upper()
+        if registry.get(REFERENCE_DIRECTORY).get_currency(code) is None:
+            raise serializers.ValidationError(_("Unknown currency."))
+        return code
 
     def validate(self, attrs):
         currency = attrs.get("currency", getattr(self.instance, "currency", None))
