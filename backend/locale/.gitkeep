@@ -1,0 +1,3 @@
+# Placeholder so ``compilemessages`` always has a base directory (``./locale``)
+# even before any module catalog exists. Module catalogs live in
+# modules/<name>/backend/locale/ and are discovered automatically.

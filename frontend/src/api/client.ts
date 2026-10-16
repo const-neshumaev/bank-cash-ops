@@ -1,5 +1,7 @@
 import axios, { AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios'
 
+import i18n from '../i18n'
+
 const ACCESS_KEY = 'bco.access'
 const REFRESH_KEY = 'bco.refresh'
 
@@ -22,6 +24,8 @@ export const tokenStorage = {
 export const api: AxiosInstance = axios.create({ baseURL: '/api' })
 
 api.interceptors.request.use((config) => {
+  // Tell the backend which language to render messages and reference data in.
+  config.headers['Accept-Language'] = i18n.language
   const token = tokenStorage.access()
   if (token) {
     config.headers.Authorization = `Bearer ${token}`

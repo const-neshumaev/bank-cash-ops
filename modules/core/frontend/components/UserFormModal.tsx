@@ -15,6 +15,7 @@ import { useForm } from '@mantine/form'
 import { notifications } from '@mantine/notifications'
 import { IconPlus, IconTrash } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { extractErrorMessage } from '@app/api/errors'
 import type { Branch, Role, User } from '@app/api/types'
@@ -64,6 +65,7 @@ function branchLabel(branch: Branch): string {
 }
 
 export function UserFormModal({ opened, user, onClose, onSaved }: UserFormModalProps) {
+  const { t } = useTranslation('core')
   const isEdit = Boolean(user)
   const [submitting, setSubmitting] = useState(false)
   const [roles, setRoles] = useState<Role[]>([])
@@ -73,16 +75,16 @@ export function UserFormModal({ opened, user, onClose, onSaved }: UserFormModalP
   const form = useForm<FormValues>({
     initialValues: EMPTY_VALUES,
     validate: {
-      email: (value) => (/^\S+@\S+\.\S+$/.test(value.trim()) ? null : 'Укажите корректный email'),
-      last_name: (value) => (value.trim() ? null : 'Укажите фамилию'),
-      first_name: (value) => (value.trim() ? null : 'Укажите имя'),
+      email: (value) => (/^\S+@\S+\.\S+$/.test(value.trim()) ? null : t('validation.email')),
+      last_name: (value) => (value.trim() ? null : t('validation.lastName')),
+      first_name: (value) => (value.trim() ? null : t('validation.firstName')),
       password: (value) => {
         if (isEdit) return null
-        return value.length >= 8 ? null : 'Пароль должен содержать не менее 8 символов'
+        return value.length >= 8 ? null : t('validation.password')
       },
       password_confirm: (value, values) => {
         if (isEdit) return null
-        return value === values.password ? null : 'Пароли не совпадают'
+        return value === values.password ? null : t('validation.passwordConfirm')
       },
     },
   })
@@ -166,7 +168,7 @@ export function UserFormModal({ opened, user, onClose, onSaved }: UserFormModalP
           branch_access: access,
           is_active: values.is_active,
         })
-        notifications.show({ color: 'green', message: 'Пользователь обновлён' })
+        notifications.show({ color: 'green', message: t('users.updated') })
       } else {
         await usersApi.createUser({
           email: values.email.trim(),
@@ -180,12 +182,12 @@ export function UserFormModal({ opened, user, onClose, onSaved }: UserFormModalP
           branch_access: access,
           is_active: values.is_active,
         })
-        notifications.show({ color: 'green', message: 'Пользователь создан' })
+        notifications.show({ color: 'green', message: t('users.created') })
       }
       onSaved()
       onClose()
     } catch (error) {
-      notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
+      notifications.show({ color: 'red', title: t('common.error'), message: extractErrorMessage(error) })
     } finally {
       setSubmitting(false)
     }
@@ -195,37 +197,41 @@ export function UserFormModal({ opened, user, onClose, onSaved }: UserFormModalP
     <Modal
       opened={opened}
       onClose={onClose}
-      title={isEdit ? 'Редактирование пользователя' : 'Новый пользователь'}
+      title={isEdit ? t('users.editTitle') : t('users.createTitle')}
       size="lg"
     >
       <form onSubmit={handleSubmit}>
         <Stack>
           <TextInput
-            label="Email"
+            label={t('users.form.email')}
             placeholder="user@example.com"
             required
             {...form.getInputProps('email')}
           />
           <Group grow align="flex-start">
-            <TextInput label="Фамилия" required {...form.getInputProps('last_name')} />
-            <TextInput label="Имя" required {...form.getInputProps('first_name')} />
+            <TextInput label={t('users.form.lastName')} required {...form.getInputProps('last_name')} />
+            <TextInput label={t('users.form.firstName')} required {...form.getInputProps('first_name')} />
           </Group>
           <Group grow align="flex-start">
-            <TextInput label="Отчество" {...form.getInputProps('middle_name')} />
-            <TextInput label="Телефон" placeholder="+7-900-000-00-00" {...form.getInputProps('phone')} />
+            <TextInput label={t('users.form.middleName')} {...form.getInputProps('middle_name')} />
+            <TextInput
+              label={t('users.form.phone')}
+              placeholder="+7-900-000-00-00"
+              {...form.getInputProps('phone')}
+            />
           </Group>
           <MultiSelect
-            label="Роли"
+            label={t('users.form.roles')}
             data={roleOptions}
             searchable
-            placeholder="Выберите роли"
+            placeholder={t('users.form.rolesPlaceholder')}
             {...form.getInputProps('roles')}
           />
           {!isEdit && (
             <Group grow align="flex-start">
-              <PasswordInput label="Пароль" required {...form.getInputProps('password')} />
+              <PasswordInput label={t('users.form.password')} required {...form.getInputProps('password')} />
               <PasswordInput
-                label="Подтверждение пароля"
+                label={t('users.form.passwordConfirm')}
                 required
                 {...form.getInputProps('password_confirm')}
               />
@@ -235,7 +241,7 @@ export function UserFormModal({ opened, user, onClose, onSaved }: UserFormModalP
           <Stack gap="xs">
             <Group justify="space-between">
               <Text fw={500} size="sm">
-                Доступные отделения
+                {t('users.form.branchAccess')}
               </Text>
               <Button
                 size="compact-sm"
@@ -243,22 +249,21 @@ export function UserFormModal({ opened, user, onClose, onSaved }: UserFormModalP
                 leftSection={<IconPlus size={14} />}
                 onClick={addBranchRow}
               >
-                Добавить
+                {t('common.add')}
               </Button>
             </Group>
             <Text size="xs" c="dimmed">
-              Пользователь видит только выбранные отделения. «Включая дочерние» добавляет все
-              вложенные отделения.
+              {t('users.form.branchAccessHint')}
             </Text>
             {branchAccess.length === 0 ? (
               <Text size="sm" c="dimmed">
-                Отделения не выбраны — доступ отсутствует.
+                {t('users.form.noBranches')}
               </Text>
             ) : (
               branchAccess.map((row, index) => (
                 <Group key={index} gap="xs" wrap="nowrap">
                   <Select
-                    placeholder="Отделение"
+                    placeholder={t('users.form.branch')}
                     data={branchOptions}
                     value={row.branch === null ? null : String(row.branch)}
                     onChange={(value) =>
@@ -268,7 +273,7 @@ export function UserFormModal({ opened, user, onClose, onSaved }: UserFormModalP
                     style={{ flex: 1 }}
                   />
                   <Switch
-                    label="Включая дочерние"
+                    label={t('users.form.includeDescendants')}
                     checked={row.include_descendants}
                     onChange={(event) =>
                       updateBranchRow(index, { include_descendants: event.currentTarget.checked })
@@ -283,13 +288,13 @@ export function UserFormModal({ opened, user, onClose, onSaved }: UserFormModalP
             )}
           </Stack>
 
-          <Switch label="Активен" {...form.getInputProps('is_active', { type: 'checkbox' })} />
+          <Switch label={t('users.form.active')} {...form.getInputProps('is_active', { type: 'checkbox' })} />
           <Group justify="flex-end">
             <Button variant="default" onClick={onClose}>
-              Отмена
+              {t('common.cancel')}
             </Button>
             <Button type="submit" loading={submitting}>
-              Сохранить
+              {t('common.save')}
             </Button>
           </Group>
         </Stack>

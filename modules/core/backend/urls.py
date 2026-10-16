@@ -3,6 +3,7 @@ from rest_framework.routers import SimpleRouter
 
 from modules.core.backend.views import (
     BankCurrencyTemplateView,
+    BankSettingsView,
     BranchCurrencyTemplateView,
     BranchViewSet,
     CashDeskViewSet,
@@ -25,6 +26,7 @@ router.register("currency-rates", CurrencyRateViewSet, basename="currency-rate")
 router.register("shifts", ShiftViewSet, basename="shift")
 
 urlpatterns = [
+    path("settings/", BankSettingsView.as_view(), name="bank-settings"),
     path("permissions/", PermissionCatalogView.as_view(), name="permission-catalog"),
     path(
         "currency-templates/",

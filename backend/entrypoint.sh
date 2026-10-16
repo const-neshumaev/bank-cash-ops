@@ -6,6 +6,9 @@ set -e
 echo ">> Applying database migrations"
 python manage.py migrate --noinput
 
+echo ">> Compiling translation catalogs"
+python manage.py compilemessages
+
 echo ">> Creating the initial administrator (if configured)"
 python manage.py ensure_superuser
 

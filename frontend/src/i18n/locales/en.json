@@ -1,0 +1,83 @@
+{
+  "common": {
+    "save": "Save",
+    "error": "Error"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "profile": "Profile",
+    "logout": "Sign out"
+  },
+  "sections": {
+    "admin": "Administration"
+  },
+  "language": {
+    "label": "Interface language",
+    "names": {
+      "ru": "Русский",
+      "en": "English"
+    }
+  },
+  "login": {
+    "subtitle": "Sign in",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "failed": "Sign-in failed. Check your email and password.",
+    "validation": {
+      "email": "Enter a valid email",
+      "password": "Enter your password"
+    }
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "signedInAs": "Signed in as",
+    "description": "The bank's cash operations accounting system. The available menu sections depend on the roles and permissions of your account.",
+    "sections": "Available sections",
+    "available": "Available.",
+    "admin": {
+      "name": "Administration",
+      "text": "— users, roles, bank branches and cash desks.",
+      "restricted": "Available to administrators."
+    },
+    "shifts": {
+      "name": "Cash shifts",
+      "text": "— opening and closing shifts, binding to a cash desk.",
+      "restricted": "Available to cashiers and managers."
+    }
+  },
+  "profile": {
+    "title": "Profile",
+    "account": "Account",
+    "active": "Active",
+    "blocked": "Blocked",
+    "email": "Email:",
+    "roles": "Roles:",
+    "personal": "Personal details",
+    "lastName": "Last name",
+    "firstName": "First name",
+    "middleName": "Middle name",
+    "phone": "Phone",
+    "saved": "Profile saved",
+    "passwordSection": "Change password",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirmation",
+    "changePassword": "Change password",
+    "passwordChanged": "Password changed",
+    "validation": {
+      "lastName": "Enter your last name",
+      "firstName": "Enter your first name",
+      "currentPassword": "Enter your current password",
+      "newPassword": "The password must contain at least 8 characters",
+      "confirmPassword": "Passwords do not match"
+    }
+  },
+  "notFound": {
+    "message": "Page not found",
+    "home": "Go home"
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again."
+  }
+}

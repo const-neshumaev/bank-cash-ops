@@ -1,13 +1,15 @@
 import { AppShell, Button, Group, Menu, Text, Title } from '@mantine/core'
 import { IconCashBanknote, IconChevronDown, IconLogout, IconUser } from '@tabler/icons-react'
+import { useTranslation } from 'react-i18next'
 import { NavLink as RouterNavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../auth/AuthContext'
-import { moduleNav } from '../registry'
-import type { ModuleNavItem } from '../registry/contract'
+import { LanguageSelect } from '../components/LanguageSelect'
+import { moduleNav, type ResolvedNavItem } from '../registry'
 
 export function AppLayout() {
   const { user, hasAnyPermission, signOut } = useAuth()
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -20,7 +22,7 @@ export function AppLayout() {
     (item) => !item.permission || hasAnyPermission(item.permission),
   )
   const plainItems = visibleItems.filter((item) => !item.section)
-  const sections = visibleItems.reduce<Record<string, ModuleNavItem[]>>((acc, item) => {
+  const sections = visibleItems.reduce<Record<string, ResolvedNavItem[]>>((acc, item) => {
     if (item.section) {
       acc[item.section] = [...(acc[item.section] ?? []), item]
     }
@@ -43,7 +45,7 @@ export function AppLayout() {
               variant={isActive('/') && location.pathname === '/' ? 'light' : 'subtle'}
               size="compact-md"
             >
-              Панель
+              {t('nav.dashboard')}
             </Button>
 
             {plainItems.map((item) => (
@@ -55,7 +57,7 @@ export function AppLayout() {
                 variant={isActive(item.to) ? 'light' : 'subtle'}
                 size="compact-md"
               >
-                {item.label}
+                {t(item.labelKey, { ns: item.moduleId })}
               </Button>
             ))}
 
@@ -67,7 +69,7 @@ export function AppLayout() {
                     size="compact-md"
                     rightSection={<IconChevronDown size={16} />}
                   >
-                    {section}
+                    {t(`sections.${section}`, { defaultValue: section })}
                   </Button>
                 </Menu.Target>
                 <Menu.Dropdown>
@@ -78,7 +80,7 @@ export function AppLayout() {
                       to={item.to}
                       leftSection={item.icon}
                     >
-                      {item.label}
+                      {t(item.labelKey, { ns: item.moduleId })}
                     </Menu.Item>
                   ))}
                 </Menu.Dropdown>
@@ -87,6 +89,7 @@ export function AppLayout() {
           </Group>
 
           <Group gap="sm" wrap="nowrap">
+            <LanguageSelect />
             <Text size="sm" c="dimmed" visibleFrom="sm">
               {user?.full_name || user?.email}
             </Text>
@@ -96,14 +99,14 @@ export function AppLayout() {
               variant="subtle"
               leftSection={<IconUser size={16} />}
             >
-              Профиль
+              {t('nav.profile')}
             </Button>
             <Button
               variant="subtle"
               leftSection={<IconLogout size={16} />}
               onClick={handleSignOut}
             >
-              Выйти
+              {t('nav.logout')}
             </Button>
           </Group>
         </Group>

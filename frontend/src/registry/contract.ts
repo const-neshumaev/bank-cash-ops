@@ -19,25 +19,43 @@ export interface ModuleRoute {
 
 /** A navigation entry contributed by a module to the app shell. */
 export interface ModuleNavItem {
-  label: string
+  /**
+   * i18n key of the entry label inside the module's own namespace, resolved by
+   * the host as ``t(labelKey, { ns: moduleId })``.
+   */
+  labelKey: string
   to: string
   icon?: ReactNode
   /** Permission required to see the entry. */
   permission?: PermissionRequirement
-  /** Navigation section the entry belongs to (e.g. «Администрирование»). */
+  /**
+   * Host navigation section the entry belongs to (e.g. ``admin``). The host owns
+   * the shell, so it labels the section (`sections.<id>`); omitted means a
+   * top-level entry.
+   */
   section?: string
 }
 
 /**
+ * Translation resources a module owns, keyed by language code
+ * (``{ ru: {...}, en: {...} }``). The host registers them under the module's
+ * ``id`` as an i18next namespace.
+ */
+export type ModuleResources = Record<string, Record<string, unknown>>
+
+/**
  * Frontend contract a module implements to plug into the host.
  *
- * A module owns its pages and API clients; the host only knows about this
- * manifest. Modules never import each other — shared building blocks come from
- * the host SDK (`@app/...`).
+ * A module owns its pages, API clients and translations; the host only knows
+ * about this manifest and provides the i18n runtime. Modules never import each
+ * other — shared building blocks come from the host SDK (`@app/...`).
  */
 export interface FrontendModule {
   id: string
-  title: string
+  /** i18n key of the module title inside its own namespace. */
+  titleKey: string
   routes: ModuleRoute[]
   nav?: ModuleNavItem[]
+  /** Translation resources contributed by the module. */
+  resources: ModuleResources
 }

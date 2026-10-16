@@ -16,6 +16,7 @@ import { useDebouncedValue } from '@mantine/hooks'
 import { notifications } from '@mantine/notifications'
 import { IconEdit, IconPlus, IconSearch, IconTrash } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { extractErrorMessage } from '@app/api/errors'
 import type { Branch } from '@app/api/types'
@@ -24,6 +25,7 @@ import * as branchesApi from '../api/branches'
 import { BranchFormModal } from '../components/BranchFormModal'
 
 export function BranchesPage() {
+  const { t } = useTranslation('core')
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
@@ -38,7 +40,7 @@ export function BranchesPage() {
       const data = await branchesApi.listBranches({ search: debouncedSearch, pageSize: 100 })
       setBranches(data.results)
     } catch (error) {
-      notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
+      notifications.show({ color: 'red', title: t('common.error'), message: extractErrorMessage(error) })
     } finally {
       setLoading(false)
     }
@@ -61,24 +63,24 @@ export function BranchesPage() {
   const handleDelete = async (branch: Branch) => {
     try {
       await branchesApi.deleteBranch(branch.id)
-      notifications.show({ color: 'green', message: 'Отделение удалено' })
+      notifications.show({ color: 'green', message: t('branches.deleted') })
       void load()
     } catch (error) {
-      notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
+      notifications.show({ color: 'red', title: t('common.error'), message: extractErrorMessage(error) })
     }
   }
 
   return (
     <Stack>
       <Group justify="space-between">
-        <Title order={3}>Отделения банка</Title>
+        <Title order={3}>{t('branches.title')}</Title>
         <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
-          Добавить
+          {t('common.add')}
         </Button>
       </Group>
 
       <TextInput
-        placeholder="Поиск по названию, коду, адресу"
+        placeholder={t('branches.searchPlaceholder')}
         leftSection={<IconSearch size={16} />}
         value={search}
         onChange={(event) => setSearch(event.currentTarget.value)}
@@ -88,11 +90,11 @@ export function BranchesPage() {
       <Table striped highlightOnHover withTableBorder>
         <Table.Thead>
           <Table.Tr>
-            <Table.Th>Название</Table.Th>
-            <Table.Th>Код</Table.Th>
-            <Table.Th>Вышестоящее</Table.Th>
-            <Table.Th>Адрес</Table.Th>
-            <Table.Th>Статус</Table.Th>
+            <Table.Th>{t('branches.columns.name')}</Table.Th>
+            <Table.Th>{t('branches.columns.code')}</Table.Th>
+            <Table.Th>{t('branches.columns.parent')}</Table.Th>
+            <Table.Th>{t('branches.columns.address')}</Table.Th>
+            <Table.Th>{t('branches.columns.status')}</Table.Th>
             <Table.Th />
           </Table.Tr>
         </Table.Thead>
@@ -109,7 +111,7 @@ export function BranchesPage() {
             <Table.Tr>
               <Table.Td colSpan={6}>
                 <Center py="md">
-                  <Text c="dimmed">Отделения не найдены</Text>
+                  <Text c="dimmed">{t('branches.empty')}</Text>
                 </Center>
               </Table.Td>
             </Table.Tr>
@@ -121,7 +123,7 @@ export function BranchesPage() {
                     <Text>{branch.name}</Text>
                     {branch.is_head_office && (
                       <Badge color="blue" variant="light">
-                        головной офис
+                        {t('branches.headOffice')}
                       </Badge>
                     )}
                   </Group>
@@ -131,17 +133,17 @@ export function BranchesPage() {
                 <Table.Td>{branch.address || '—'}</Table.Td>
                 <Table.Td>
                   <Badge color={branch.is_active ? 'green' : 'gray'} variant="light">
-                    {branch.is_active ? 'Активно' : 'Отключено'}
+                    {branch.is_active ? t('branches.active') : t('branches.inactive')}
                   </Badge>
                 </Table.Td>
                 <Table.Td>
                   <Group gap={4} justify="flex-end">
-                    <Tooltip label="Редактировать">
+                    <Tooltip label={t('common.edit')}>
                       <ActionIcon variant="subtle" onClick={() => openEdit(branch)}>
                         <IconEdit size={16} />
                       </ActionIcon>
                     </Tooltip>
-                    <Tooltip label="Удалить">
+                    <Tooltip label={t('common.delete')}>
                       <ActionIcon
                         variant="subtle"
                         color="red"

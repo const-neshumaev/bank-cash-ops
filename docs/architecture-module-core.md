@@ -32,6 +32,15 @@
 действие с кодом права (карта `permission_map` на вьюхе). Класс общий: им
 пользуются все модули. Меню и маршруты SPA фильтруются по тем же кодам прав.
 
+## Язык и локализация
+
+Пользователь имеет поле `language` (пусто — язык по умолчанию банка), а синглтон
+`BankSettings` хранит `default_language` и `enabled_languages`. Язык ответа
+определяется заголовком `Accept-Language` (активируется `LocaleMiddleware`),
+персональный выбор — полем пользователя, дефолт банка — fallback
+(см. `docs/adr/0015-application-language-layers.md`). Значение `language`
+валидируется по списку `enabled_languages`.
+
 ## Публичный контракт
 
 Модуль публикует в реестре (`modules.common.contracts.registry`) три сервиса;
@@ -142,6 +151,10 @@ erDiagram
 «отделение → … → банк» → при отсутствии шаблонов **валюты не разрешены**
 (deny-by-default). Пустой шаблон также запрещает все валюты. Правило и обоснование
 — в `docs/adr/0014-cash-desk-configuration-templates.md`.
+
+Название валюты (`Currency.name`) — базовое (русское); переводы хранятся в
+`CurrencyTranslation` (английские — сид-миграцией) и отдаются на языке запроса
+(см. `docs/adr/0016-translatable-reference-data.md`).
 
 ```mermaid
 erDiagram

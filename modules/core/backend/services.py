@@ -99,7 +99,9 @@ class ReferenceDirectoryService:
     """In-process implementation of the ``ReferenceDirectory`` contract."""
 
     def currencies(self) -> tuple[CurrencyDTO, ...]:
-        queryset = Currency.objects.filter(is_active=True).order_by("code")
+        queryset = (
+            Currency.objects.filter(is_active=True).prefetch_related("translations").order_by("code")
+        )
         return tuple(self._currency_to_dto(currency) for currency in queryset)
 
     def get_currency(self, code: str) -> CurrencyDTO | None:
@@ -168,7 +170,7 @@ class ReferenceDirectoryService:
     def _currency_to_dto(currency: Currency) -> CurrencyDTO:
         return CurrencyDTO(
             code=currency.code,
-            name=currency.name,
+            name=currency.localized_name(),
             symbol=currency.symbol,
             minor_units=currency.minor_units,
         )

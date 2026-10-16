@@ -85,7 +85,7 @@ Workflow `.github/workflows/ci.yml` состоит из двух заданий:
 
 | Задание | Проверки |
 | --- | --- |
-| Backend (ruff, pytest) | `ruff check`, поиск забытых миграций (`makemigrations --check`), `pytest` |
+| Backend (ruff, pytest) | `ruff check`, компиляция каталогов переводов (`compilemessages`), поиск забытых миграций (`makemigrations --check`), `pytest` |
 | Frontend (build) | `npm ci` и сборка SPA (`npm run build`) |
 
 Те же проверки можно выполнить локально в контейнерах:
@@ -121,6 +121,29 @@ docker compose exec backend black .
 `dispatch_outbox` доставляет доменные события (outbox) подписчикам. С флагом
 `--loop` работает непрерывно (воркер): `python manage.py dispatch_outbox --loop`.
 Одиночный запуск годится для cron.
+
+### Переводы (i18n)
+
+Приложение мультиязычно. Слои и приоритеты языка — в
+`docs/adr/0015-application-language-layers.md`, перевод справочных данных — в
+`docs/adr/0016-translatable-reference-data.md`.
+
+Каталоги переводов модуля живут в `modules/<name>/backend/locale/<lang>/LC_MESSAGES/`.
+Исходные строки — английские, поэтому каталог нужен только для `ru`: при
+отсутствии перевода отдаётся исходный английский текст. Строки собираются командой
+`makemessages`, запущенной **в каталоге модуля** (тогда файлы попадают в его
+`locale/`; сам каталог `locale/` должен существовать заранее — создайте его перед
+первым запуском):
+
+```bash
+# Из корня репозитория; <module> — имя модуля (например core).
+docker compose exec backend sh -c \
+    "cd /app/modules/<module>/backend && python /app/manage.py makemessages -l ru"
+```
+
+Компиляция `.po` в `.mo` выполняется автоматически при старте backend
+(`entrypoint.sh`); вручную — `python manage.py compilemessages`. Компилированные
+`.mo` не коммитятся.
 
 ### Добавление модуля
 

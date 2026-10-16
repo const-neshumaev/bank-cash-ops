@@ -14,6 +14,7 @@ import { useDebouncedValue } from '@mantine/hooks'
 import dayjs from 'dayjs'
 import { notifications } from '@mantine/notifications'
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { extractErrorMessage } from '@app/api/errors'
 import type { BranchOption, CashDeskOption, Shift } from '@app/api/types'
@@ -31,6 +32,7 @@ function cashDeskLabel(cashDesk: CashDeskOption): string {
 }
 
 export function WorkplacePage() {
+  const { t } = useTranslation('core')
   const [shift, setShift] = useState<Shift | null>(null)
   const [branches, setBranches] = useState<BranchOption[]>([])
   const [cashDesks, setCashDesks] = useState<CashDeskOption[]>([])
@@ -48,7 +50,7 @@ export function WorkplacePage() {
     try {
       setShift(await shiftsApi.fetchCurrentShift())
     } catch (error) {
-      notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
+      notifications.show({ color: 'red', title: t('common.error'), message: extractErrorMessage(error) })
     } finally {
       setLoading(false)
     }
@@ -63,7 +65,7 @@ export function WorkplacePage() {
       .listSelectableBranches(debouncedBranchSearch)
       .then(setBranches)
       .catch((error) => {
-        notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
+        notifications.show({ color: 'red', title: t('common.error'), message: extractErrorMessage(error) })
       })
   }, [debouncedBranchSearch])
 
@@ -76,7 +78,7 @@ export function WorkplacePage() {
       .listSelectableCashDesks(Number(selectedBranch), debouncedDeskSearch)
       .then(setCashDesks)
       .catch((error) => {
-        notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
+        notifications.show({ color: 'red', title: t('common.error'), message: extractErrorMessage(error) })
       })
   }, [selectedBranch, debouncedDeskSearch])
 
@@ -85,12 +87,12 @@ export function WorkplacePage() {
     setSubmitting(true)
     try {
       await shiftsApi.openShift(Number(selectedDesk))
-      notifications.show({ color: 'green', message: 'Смена открыта' })
+      notifications.show({ color: 'green', message: t('workplace.openedMessage') })
       setSelectedBranch(null)
       setSelectedDesk(null)
       await loadCurrent()
     } catch (error) {
-      notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
+      notifications.show({ color: 'red', title: t('common.error'), message: extractErrorMessage(error) })
     } finally {
       setSubmitting(false)
     }
@@ -101,10 +103,10 @@ export function WorkplacePage() {
     setSubmitting(true)
     try {
       await shiftsApi.closeShift(shift.id)
-      notifications.show({ color: 'green', message: 'Смена закрыта' })
+      notifications.show({ color: 'green', message: t('workplace.closedMessage') })
       await loadCurrent()
     } catch (error) {
-      notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
+      notifications.show({ color: 'red', title: t('common.error'), message: extractErrorMessage(error) })
     } finally {
       setSubmitting(false)
     }
@@ -120,26 +122,26 @@ export function WorkplacePage() {
 
   return (
     <Stack maw={640}>
-      <Title order={3}>Рабочее место кассира</Title>
+      <Title order={3}>{t('workplace.title')}</Title>
 
       {shift ? (
         <Card withBorder padding="lg" radius="md">
           <Stack>
             <Group justify="space-between">
-              <Text fw={500}>Открытая смена</Text>
+              <Text fw={500}>{t('workplace.openShift')}</Text>
               <Badge color="green" variant="light">
                 {shift.status_display}
               </Badge>
             </Group>
             <Group>
               <Text size="sm" c="dimmed">
-                Отделение:
+                {t('workplace.branch')}
               </Text>
               <Text size="sm">{shift.cash_desk_branch_name}</Text>
             </Group>
             <Group>
               <Text size="sm" c="dimmed">
-                Касса:
+                {t('workplace.cashDesk')}
               </Text>
               <Text size="sm">
                 {shift.cash_desk_code
@@ -149,16 +151,16 @@ export function WorkplacePage() {
             </Group>
             <Group>
               <Text size="sm" c="dimmed">
-                Открыта:
+                {t('workplace.openedAt')}
               </Text>
               <Text size="sm">{dayjs(shift.opened_at).format('DD.MM.YYYY HH:mm')}</Text>
             </Group>
             <Text size="sm" c="dimmed">
-              Смена привязана к выбранной кассе и сохраняется на сервере, пока вы её не закроете.
+              {t('workplace.shiftBoundHint')}
             </Text>
             <Group justify="flex-end">
               <Button color="red" loading={submitting} onClick={() => void handleClose()}>
-                Закрыть смену
+                {t('workplace.closeShift')}
               </Button>
             </Group>
           </Stack>
@@ -166,13 +168,13 @@ export function WorkplacePage() {
       ) : (
         <Card withBorder padding="lg" radius="md">
           <Stack>
-            <Text fw={500}>Смена не открыта</Text>
+            <Text fw={500}>{t('workplace.noShift')}</Text>
             <Text size="sm" c="dimmed">
-              Выберите отделение и кассу, затем откройте смену, чтобы начать работу.
+              {t('workplace.noShiftHint')}
             </Text>
             <Select
-              label="Отделение"
-              placeholder="Выберите отделение"
+              label={t('workplace.branchLabel')}
+              placeholder={t('workplace.selectBranch')}
               data={branches.map((branch) => ({
                 value: String(branch.id),
                 label: branchLabel(branch),
@@ -185,11 +187,11 @@ export function WorkplacePage() {
                 setSelectedBranch(value)
                 setSelectedDesk(null)
               }}
-              nothingFoundMessage="Отделения не найдены"
+              nothingFoundMessage={t('workplace.noBranchesFound')}
             />
             <Select
-              label="Касса"
-              placeholder={selectedBranch ? 'Выберите кассу' : 'Сначала выберите отделение'}
+              label={t('workplace.cashDeskLabel')}
+              placeholder={selectedBranch ? t('workplace.selectCashDesk') : t('workplace.selectBranchFirst')}
               data={cashDesks.map((desk) => ({
                 value: String(desk.id),
                 label: cashDeskLabel(desk),
@@ -200,7 +202,7 @@ export function WorkplacePage() {
               value={selectedDesk}
               onChange={setSelectedDesk}
               disabled={!selectedBranch}
-              nothingFoundMessage="Кассы не найдены"
+              nothingFoundMessage={t('workplace.noCashDesksFound')}
             />
             <Group justify="flex-end">
               <Button
@@ -208,7 +210,7 @@ export function WorkplacePage() {
                 loading={submitting}
                 onClick={() => void handleOpen()}
               >
-                Открыть смену
+                {t('workplace.openShiftButton')}
               </Button>
             </Group>
           </Stack>

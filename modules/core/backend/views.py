@@ -4,7 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
@@ -17,6 +17,7 @@ from modules.common.backend.permissions import PermissionRequired
 from modules.core.backend import currency_config, scoping, serializers, shifts
 from modules.core.backend.filters import ShiftFilter
 from modules.core.backend.models import (
+    BankSettings,
     Branch,
     CashDesk,
     Currency,
@@ -33,7 +34,11 @@ User = get_user_model()
 def _cash_desk_currencies_payload(cash_desk):
     """Return the effective currencies of ``cash_desk`` and where they come from."""
     effective = currency_config.effective_currency_config(cash_desk.id)
-    currencies = Currency.objects.filter(code__in=effective.codes).order_by("code")
+    currencies = (
+        Currency.objects.filter(code__in=effective.codes)
+        .prefetch_related("translations")
+        .order_by("code")
+    )
     return {
         "cash_desk": cash_desk.id,
         "configured": effective.source == currency_config.OWN,
@@ -124,6 +129,19 @@ class PermissionCatalogView(APIView):
     def get(self, request):
         entries = permissions_catalog.all_entries()
         return Response(serializers.PermissionSerializer(entries, many=True).data)
+
+
+class BankSettingsView(APIView):
+    """Read the bank-wide settings: the offered languages and the default one.
+
+    Public on purpose: the SPA reads it before authentication to render the login
+    screen in the bank's default language (see ADR 0015).
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response(serializers.BankSettingsSerializer(BankSettings.load()).data)
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -397,7 +415,7 @@ class CashDeskViewSet(viewsets.ModelViewSet):
 class CurrencyViewSet(viewsets.ModelViewSet):
     """CRUD administration of the currency reference data."""
 
-    queryset = Currency.objects.all()
+    queryset = Currency.objects.prefetch_related("translations")
     serializer_class = serializers.CurrencySerializer
     permission_classes = [PermissionRequired]
     permission_map = {

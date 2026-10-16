@@ -86,13 +86,19 @@ class PostingPlan:
 
 @dataclass(frozen=True)
 class SlotSpec:
-    """Declaration of an amount slot an operation type expects."""
+    """Declaration of an amount slot an operation type expects.
+
+    ``translations`` maps a language code to the slot name in that language;
+    ``name`` stays the base-language value (see
+    ``docs/adr/0016-translatable-reference-data.md``).
+    """
 
     code: str
     name: str
     required: bool = True
     fixed_currency: str = ""
     order: int = 0
+    translations: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -103,6 +109,10 @@ class OperationTypeSpec:
     materialises them into its own tables (see the ``sync_operation_types``
     command). Simple operations are fully described by ``slots`` and
     ``template``; non-trivial ones also register a handler.
+
+    ``translations`` maps a language code to the type name in that language;
+    ``name`` stays the base-language value (see
+    ``docs/adr/0016-translatable-reference-data.md``).
     """
 
     code: str
@@ -114,3 +124,4 @@ class OperationTypeSpec:
     requires_client: bool = False
     client_id_threshold: Decimal | None = None
     permission_code: str = ""
+    translations: dict[str, str] = field(default_factory=dict)

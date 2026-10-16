@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from django.utils.translation import gettext_lazy as _
+
 
 class PermissionCode:
     """Stable identifiers of the permissions the ``operations`` module understands."""
@@ -32,14 +34,14 @@ class Permission:
 
 
 CATALOG: tuple[Permission, ...] = (
-    Permission(PermissionCode.VIEW, "Просмотр кассовых операций"),
-    Permission(PermissionCode.CREATE, "Выполнение кассовых операций"),
-    Permission(PermissionCode.REVERSE, "Сторнирование операций"),
-    Permission(PermissionCode.TYPES_MANAGE, "Управление типами операций"),
-    Permission(PermissionCode.CONFIG_MANAGE, "Настройка операций касс"),
+    Permission(PermissionCode.VIEW, _("View cash operations")),
+    Permission(PermissionCode.CREATE, _("Perform cash operations")),
+    Permission(PermissionCode.REVERSE, _("Reverse operations")),
+    Permission(PermissionCode.TYPES_MANAGE, _("Manage operation types")),
+    Permission(PermissionCode.CONFIG_MANAGE, _("Configure cash desk operations")),
     Permission(
         PermissionCode.CONFIG_MANAGE_BRANCH,
-        "Настройка операций касс своего отделения",
+        _("Configure cash desk operations of own branch"),
     ),
 )
 

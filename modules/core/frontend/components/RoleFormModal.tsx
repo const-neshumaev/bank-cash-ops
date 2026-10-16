@@ -2,6 +2,7 @@ import { Button, Checkbox, Group, Modal, Stack, Textarea, TextInput } from '@man
 import { useForm } from '@mantine/form'
 import { notifications } from '@mantine/notifications'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { extractErrorMessage } from '@app/api/errors'
 import type { Permission, Role } from '@app/api/types'
@@ -24,6 +25,7 @@ interface FormValues {
 const EMPTY_VALUES: FormValues = { name: '', description: '', permissions: [] }
 
 export function RoleFormModal({ opened, role, onClose, onSaved }: RoleFormModalProps) {
+  const { t } = useTranslation('core')
   const isEdit = Boolean(role)
   const [submitting, setSubmitting] = useState(false)
   const [permissions, setPermissions] = useState<Permission[]>([])
@@ -31,7 +33,7 @@ export function RoleFormModal({ opened, role, onClose, onSaved }: RoleFormModalP
   const form = useForm<FormValues>({
     initialValues: EMPTY_VALUES,
     validate: {
-      name: (value) => (value.trim() ? null : 'Укажите название роли'),
+      name: (value) => (value.trim() ? null : t('validation.roleName')),
     },
   })
 
@@ -68,15 +70,15 @@ export function RoleFormModal({ opened, role, onClose, onSaved }: RoleFormModalP
       }
       if (role) {
         await rolesApi.updateRole(role.id, payload)
-        notifications.show({ color: 'green', message: 'Роль обновлена' })
+        notifications.show({ color: 'green', message: t('roles.updated') })
       } else {
         await rolesApi.createRole(payload)
-        notifications.show({ color: 'green', message: 'Роль создана' })
+        notifications.show({ color: 'green', message: t('roles.created') })
       }
       onSaved()
       onClose()
     } catch (error) {
-      notifications.show({ color: 'red', title: 'Ошибка', message: extractErrorMessage(error) })
+      notifications.show({ color: 'red', title: t('common.error'), message: extractErrorMessage(error) })
     } finally {
       setSubmitting(false)
     }
@@ -86,14 +88,14 @@ export function RoleFormModal({ opened, role, onClose, onSaved }: RoleFormModalP
     <Modal
       opened={opened}
       onClose={onClose}
-      title={isEdit ? 'Редактирование роли' : 'Новая роль'}
+      title={isEdit ? t('roles.editTitle') : t('roles.createTitle')}
       size="lg"
     >
       <form onSubmit={handleSubmit}>
         <Stack>
-          <TextInput label="Название" required {...form.getInputProps('name')} />
-          <Textarea label="Описание" autosize minRows={2} {...form.getInputProps('description')} />
-          <Checkbox.Group label="Права" {...form.getInputProps('permissions')}>
+          <TextInput label={t('roles.form.name')} required {...form.getInputProps('name')} />
+          <Textarea label={t('roles.form.description')} autosize minRows={2} {...form.getInputProps('description')} />
+          <Checkbox.Group label={t('roles.form.permissions')} {...form.getInputProps('permissions')}>
             <Stack gap="xs" mt="xs">
               {permissions.map((permission) => (
                 <Checkbox
@@ -107,10 +109,10 @@ export function RoleFormModal({ opened, role, onClose, onSaved }: RoleFormModalP
           </Checkbox.Group>
           <Group justify="flex-end">
             <Button variant="default" onClick={onClose}>
-              Отмена
+              {t('common.cancel')}
             </Button>
             <Button type="submit" loading={submitting}>
-              Сохранить
+              {t('common.save')}
             </Button>
           </Group>
         </Stack>

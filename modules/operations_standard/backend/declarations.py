@@ -25,8 +25,20 @@ PERMISSION = "operations.create"
 BASE_CURRENCY = "BYN"
 
 
+def _en(name: str) -> dict[str, str]:
+    """Return a translations mapping holding only the English name."""
+    return {"en": name}
+
+
 def _amount_slots(currency: str = "") -> tuple[SlotSpec, ...]:
-    return (SlotSpec(code="amount", name="Сумма", fixed_currency=currency),)
+    return (
+        SlotSpec(
+            code="amount",
+            name="Сумма",
+            fixed_currency=currency,
+            translations=_en("Amount"),
+        ),
+    )
 
 
 def _amount_template(sign: int) -> dict:
@@ -40,8 +52,18 @@ def _amount_template(sign: int) -> dict:
 
 def _exchange_slots() -> tuple[SlotSpec, ...]:
     return (
-        SlotSpec(code="received", name="Принято от клиента", order=0),
-        SlotSpec(code="issued", name="Выдано клиенту", order=1),
+        SlotSpec(
+            code="received",
+            name="Принято от клиента",
+            order=0,
+            translations=_en("Received from client"),
+        ),
+        SlotSpec(
+            code="issued",
+            name="Выдано клиенту",
+            order=1,
+            translations=_en("Issued to client"),
+        ),
     )
 
 
@@ -56,7 +78,14 @@ def _exchange_template() -> dict:
     }
 
 
-def _income(code: str, name: str, *, currency: str = "", requires_client: bool = False):
+def _income(
+    code: str,
+    name: str,
+    *,
+    translations: dict[str, str],
+    currency: str = "",
+    requires_client: bool = False,
+):
     return OperationTypeSpec(
         code=code,
         name=name,
@@ -65,10 +94,18 @@ def _income(code: str, name: str, *, currency: str = "", requires_client: bool =
         template=_amount_template(1),
         requires_client=requires_client,
         permission_code=PERMISSION,
+        translations=translations,
     )
 
 
-def _expense(code: str, name: str, *, currency: str = "", requires_client: bool = False):
+def _expense(
+    code: str,
+    name: str,
+    *,
+    translations: dict[str, str],
+    currency: str = "",
+    requires_client: bool = False,
+):
     return OperationTypeSpec(
         code=code,
         name=name,
@@ -77,10 +114,11 @@ def _expense(code: str, name: str, *, currency: str = "", requires_client: bool 
         template=_amount_template(-1),
         requires_client=requires_client,
         permission_code=PERMISSION,
+        translations=translations,
     )
 
 
-def _exchange(code: str, name: str):
+def _exchange(code: str, name: str, *, translations: dict[str, str]):
     return OperationTypeSpec(
         code=code,
         name=name,
@@ -89,63 +127,110 @@ def _exchange(code: str, name: str):
         template=_exchange_template(),
         requires_client=True,
         permission_code=PERMISSION,
+        translations=translations,
     )
 
 
 #: The baseline operation types declared to the operations engine.
 OPERATION_TYPES: tuple[OperationTypeSpec, ...] = (
     # Income
-    _income("cash_replenishment", "Подкрепление кассы"),
-    _income("cash_receipt", "Приход наличных от клиента", requires_client=True),
+    _income(
+        "cash_replenishment",
+        "Подкрепление кассы",
+        translations=_en("Cash desk replenishment"),
+    ),
+    _income(
+        "cash_receipt",
+        "Приход наличных от клиента",
+        translations=_en("Cash receipt from client"),
+        requires_client=True,
+    ),
     _income(
         "utility_payment",
         "Приём коммунальных платежей",
+        translations=_en("Utility payments acceptance"),
         currency=BASE_CURRENCY,
         requires_client=True,
     ),
     _income(
         "loan_repayment",
         "Погашение кредита наличными",
+        translations=_en("Loan repayment in cash"),
         currency=BASE_CURRENCY,
         requires_client=True,
     ),
     _income(
         "deposit_topup",
         "Пополнение вклада наличными",
+        translations=_en("Deposit top-up in cash"),
         currency=BASE_CURRENCY,
         requires_client=True,
     ),
-    _income("fee_income", "Приём комиссии", requires_client=True),
+    _income(
+        "fee_income",
+        "Приём комиссии",
+        translations=_en("Fee collection"),
+        requires_client=True,
+    ),
     # Expense
-    _expense("cash_disbursement", "Выдача наличных клиенту", requires_client=True),
+    _expense(
+        "cash_disbursement",
+        "Выдача наличных клиенту",
+        translations=_en("Cash disbursement to client"),
+        requires_client=True,
+    ),
     _expense(
         "deposit_withdrawal",
         "Снятие вклада наличными",
+        translations=_en("Deposit withdrawal in cash"),
         currency=BASE_CURRENCY,
         requires_client=True,
     ),
     _expense(
         "loan_issuance",
         "Выдача кредита наличными",
+        translations=_en("Loan issuance in cash"),
         currency=BASE_CURRENCY,
         requires_client=True,
     ),
     _expense(
         "salary_payment",
         "Выплата заработной платы",
+        translations=_en("Salary payment"),
         currency=BASE_CURRENCY,
         requires_client=True,
     ),
     _expense(
         "pension_payment",
         "Выплата пенсии и пособий",
+        translations=_en("Pension and benefit payment"),
         currency=BASE_CURRENCY,
         requires_client=True,
     ),
-    _expense("cash_handover", "Сдача наличных в кассу банка"),
+    _expense(
+        "cash_handover",
+        "Сдача наличных в кассу банка",
+        translations=_en("Cash handover to the bank"),
+    ),
     # Exchange
-    _exchange("currency_sale", "Продажа валюты клиенту"),
-    _exchange("currency_purchase", "Покупка валюты у клиента"),
-    _exchange("currency_conversion", "Конвертация валюты"),
-    _exchange("fractional_currency_purchase", "Покупка дробной части валюты"),
+    _exchange(
+        "currency_sale",
+        "Продажа валюты клиенту",
+        translations=_en("Currency sale to client"),
+    ),
+    _exchange(
+        "currency_purchase",
+        "Покупка валюты у клиента",
+        translations=_en("Currency purchase from client"),
+    ),
+    _exchange(
+        "currency_conversion",
+        "Конвертация валюты",
+        translations=_en("Currency conversion"),
+    ),
+    _exchange(
+        "fractional_currency_purchase",
+        "Покупка дробной части валюты",
+        translations=_en("Fractional currency purchase"),
+    ),
 )

@@ -75,6 +75,10 @@ erDiagram
   обработчик `OperationHandler`, регистрируя их в реестре `operations.types`
   (`AppConfig.ready()`). Публикуются также `OperationTypeDTO`, `OperationRequest`,
   `PostingPlan`, `MovementSpec`, `RegisterCode`.
+- **Локализация.** Названия типов и слотов — базовые (русские); переводы хранятся
+  в `OperationTypeTranslation`/`SlotDefTranslation` и синхронизируются из объявлений
+  (`OperationTypeSpec.translations`, `SlotSpec.translations`), отдаются на языке
+  запроса (см. `docs/adr/0016-translatable-reference-data.md`).
 - **Хранит типы `operations`.** По команде `sync_operation_types` объявленные типы
   создаются/обновляются в таблицах `operations`; команда идемпотентна и
   выполняется при старте (entrypoint, после миграций). Так соблюдается правило

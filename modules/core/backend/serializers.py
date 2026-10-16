@@ -6,6 +6,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from modules.common.backend import permissions_catalog
 from modules.core.backend.models import (
+    BankSettings,
     Branch,
     BranchAccess,
     CashDesk,
@@ -86,6 +87,25 @@ class RoleSerializer(serializers.ModelSerializer):
         return value
 
 
+class LanguageChoiceMixin:
+    """Validate a user's language choice against the bank's enabled languages."""
+
+    def validate_language(self, value):
+        if not value:
+            return value
+        if value not in BankSettings.load().enabled_languages:
+            raise serializers.ValidationError(_("Unsupported language."))
+        return value
+
+
+class BankSettingsSerializer(serializers.ModelSerializer):
+    """Read representation of the bank-wide settings."""
+
+    class Meta:
+        model = BankSettings
+        fields = ("default_language", "enabled_languages")
+
+
 class UserSerializer(serializers.ModelSerializer):
     """Read-only representation of a user."""
 
@@ -109,6 +129,7 @@ class UserSerializer(serializers.ModelSerializer):
             "permissions",
             "branch_access",
             "phone",
+            "language",
             "is_active",
             "is_staff",
             "is_superuser",
@@ -124,7 +145,7 @@ class UserSerializer(serializers.ModelSerializer):
         return sorted(obj.permission_codes)
 
 
-class UserCreateSerializer(serializers.ModelSerializer):
+class UserCreateSerializer(LanguageChoiceMixin, serializers.ModelSerializer):
     """Create a new user (permission ``core.users.manage``)."""
 
     password = serializers.CharField(write_only=True, style={"input_type": "password"})
@@ -147,6 +168,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
             "last_name",
             "middle_name",
             "phone",
+            "language",
             "roles",
             "branch_access",
             "is_active",
@@ -172,7 +194,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
         return user
 
 
-class UserUpdateSerializer(serializers.ModelSerializer):
+class UserUpdateSerializer(LanguageChoiceMixin, serializers.ModelSerializer):
     """Update an existing user (permission ``core.users.manage``)."""
 
     roles = serializers.SlugRelatedField(
@@ -191,6 +213,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
             "last_name",
             "middle_name",
             "phone",
+            "language",
             "roles",
             "branch_access",
             "is_active",
@@ -209,12 +232,12 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         return user
 
 
-class UserSelfUpdateSerializer(serializers.ModelSerializer):
+class UserSelfUpdateSerializer(LanguageChoiceMixin, serializers.ModelSerializer):
     """Fields a user is allowed to change on their own profile."""
 
     class Meta:
         model = User
-        fields = ("first_name", "last_name", "middle_name", "phone")
+        fields = ("first_name", "last_name", "middle_name", "phone", "language")
 
 
 class ChangePasswordSerializer(serializers.Serializer):
@@ -440,6 +463,11 @@ class CurrencySerializer(serializers.ModelSerializer):
     class Meta:
         model = Currency
         fields = ("code", "name", "symbol", "minor_units", "is_active")
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["name"] = instance.localized_name()
+        return data
 
     def validate_code(self, value):
         return (value or "").strip().upper()
