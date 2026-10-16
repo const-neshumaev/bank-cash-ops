@@ -37,16 +37,6 @@ class ShiftDTO:
 
 
 @dataclass(frozen=True)
-class CurrencyDTO:
-    """Immutable view of a currency."""
-
-    code: str
-    name: str
-    symbol: str
-    minor_units: int
-
-
-@dataclass(frozen=True)
 class CurrencyRateDTO:
     """Immutable view of a currency rate."""
 

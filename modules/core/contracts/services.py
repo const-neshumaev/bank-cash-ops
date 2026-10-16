@@ -10,7 +10,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Protocol
 
-from modules.core.contracts.dto import CashDeskDTO, CurrencyDTO, CurrencyRateDTO, ShiftDTO, UserDTO
+from modules.core.contracts.dto import CashDeskDTO, CurrencyRateDTO, ShiftDTO, UserDTO
 
 
 class UserDirectory(Protocol):
@@ -50,12 +50,14 @@ class OrgDirectory(Protocol):
     def user_can_access_cash_desk(self, user_id: int, cash_desk_id: int) -> bool: ...
 
 
-class ReferenceDirectory(Protocol):
-    """Read-only access to reference data: currencies and cash desk limits."""
+class CashDeskConfigDirectory(Protocol):
+    """Read-only access to a cash desk's currency configuration and rates.
 
-    def currencies(self) -> tuple[CurrencyDTO, ...]: ...
-
-    def get_currency(self, code: str) -> CurrencyDTO | None: ...
+    The currency and rate-type *dictionaries* live in the ``references`` module;
+    this contract only exposes the cash desk specific configuration (which
+    currencies are enabled and the effective rates). Currency and rate type
+    values are addressed by their codes.
+    """
 
     def cash_desk_currency_codes(self, cash_desk_id: int) -> set[str]:
         """Effective currencies enabled at a cash desk.

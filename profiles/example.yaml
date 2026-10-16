@@ -4,8 +4,14 @@ product: bank-cash-ops
 version: 0.1.0
 
 modules:
+  - name: references
+    version: 0.1.0
+
   - name: core
     version: 0.2.0
+    connections:
+      references:
+        access: inprocess
 
   - name: operations
     version: 0.2.0
@@ -13,6 +19,8 @@ modules:
       core:
         access: inprocess
         # url: http://core:8000    # обязателен при access: http
+      references:
+        access: inprocess
 
   - name: reports
     version: 0.1.0

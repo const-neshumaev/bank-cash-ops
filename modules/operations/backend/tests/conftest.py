@@ -14,14 +14,14 @@ from rest_framework.test import APIClient
 
 from modules.common.contracts import registry
 from modules.core.contracts import (
+    CASH_DESK_CONFIG,
     ORG_DIRECTORY,
-    REFERENCE_DIRECTORY,
     CashDeskDTO,
-    CurrencyDTO,
     ShiftDTO,
 )
 from modules.operations.backend.models import OperationType, SlotDef
 from modules.operations.contracts import OperationKind
+from modules.references.contracts import REFERENCE_DIRECTORY, CurrencyDTO
 
 User = get_user_model()
 
@@ -68,17 +68,27 @@ class FakeOrgDirectory:
 
 
 class FakeReferenceDirectory:
-    """Minimal ``ReferenceDirectory``; by default every currency is allowed."""
-
-    def __init__(self, allowed=None, rates=()):
-        self.allowed = allowed if allowed is not None else {c.code for c in DEFAULT_CURRENCIES}
-        self.rates = rates
+    """Minimal ``references`` directory: the currency dictionary."""
 
     def currencies(self):
         return DEFAULT_CURRENCIES
 
     def get_currency(self, code):
         return next((currency for currency in DEFAULT_CURRENCIES if currency.code == code), None)
+
+    def rate_types(self):
+        return ()
+
+    def get_rate_type(self, code):
+        return None
+
+
+class FakeCashDeskConfig:
+    """Minimal ``core`` cash desk configuration; by default every currency is allowed."""
+
+    def __init__(self, allowed=None, rates=()):
+        self.allowed = allowed if allowed is not None else {c.code for c in DEFAULT_CURRENCIES}
+        self.rates = rates
 
     def cash_desk_currency_codes(self, cash_desk_id):
         return self.allowed
@@ -92,12 +102,13 @@ class FakeReferenceDirectory:
 
 @pytest.fixture
 def contracts(monkeypatch):
-    """Replace the ``core`` contracts the operations API depends on."""
+    """Replace the ``core`` and ``references`` contracts the operations API depends on."""
     org = FakeOrgDirectory(
         shift=ShiftDTO(id=SHIFT, cash_desk_id=CASH_DESK, cashier_id=1, status="open"),
         accessible=None,
     )
     references = FakeReferenceDirectory()
+    cash_desk_config = FakeCashDeskConfig()
     original_get = registry.get
 
     def _get(name):
@@ -105,10 +116,12 @@ def contracts(monkeypatch):
             return org
         if name == REFERENCE_DIRECTORY:
             return references
+        if name == CASH_DESK_CONFIG:
+            return cash_desk_config
         return original_get(name)
 
     monkeypatch.setattr(registry, "get", _get)
-    return SimpleNamespace(org=org, references=references)
+    return SimpleNamespace(org=org, references=references, cash_desk_config=cash_desk_config)
 
 
 @pytest.fixture

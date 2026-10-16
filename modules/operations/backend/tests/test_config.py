@@ -127,7 +127,7 @@ def test_posting_a_currency_not_enabled_on_the_desk_is_rejected(
     auth_client, contracts, income_type
 ):
     OperationTemplate.objects.create(branch_id=None).operation_types.set([income_type])
-    contracts.references.allowed = {"BYN"}
+    contracts.cash_desk_config.allowed = {"BYN"}
 
     response = auth_client.post(
         OPERATIONS_URL, _post_payload(income_type, currency="USD"), format="json"

@@ -1,0 +1,81 @@
+{
+  "title": "Reference data",
+  "nav": {
+    "currencies": "Currencies",
+    "rateTypes": "Rate types"
+  },
+  "common": {
+    "error": "Error",
+    "add": "Add",
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete"
+  },
+  "validation": {
+    "code": "Enter a code",
+    "name": "Enter a name"
+  },
+  "currencies": {
+    "title": "Currencies",
+    "searchPlaceholder": "Search by code, name, numeric code",
+    "activeOnly": "Active only",
+    "empty": "No currencies found",
+    "active": "Active",
+    "inactive": "Disabled",
+    "columns": {
+      "code": "Code",
+      "numericCode": "Numeric code",
+      "name": "Name",
+      "symbol": "Symbol",
+      "minorUnits": "Minor units",
+      "status": "Status"
+    },
+    "created": "Currency created",
+    "updated": "Currency updated",
+    "deleted": "Currency deleted",
+    "createTitle": "New currency",
+    "editTitle": "Edit currency",
+    "form": {
+      "code": "Code",
+      "numericCode": "ISO numeric code",
+      "name": "Name",
+      "symbol": "Symbol",
+      "minorUnits": "Minor units",
+      "active": "Active"
+    }
+  },
+  "rateTypes": {
+    "title": "Rate types",
+    "hint": "Rate types define which rates the bank keeps. Each type is based on a principle that the operation logic relies on.",
+    "empty": "No rate types found",
+    "system": "system",
+    "systemDeleteHint": "A system rate type cannot be deleted",
+    "active": "Active",
+    "inactive": "Disabled",
+    "columns": {
+      "name": "Name",
+      "code": "Code",
+      "principle": "Principle",
+      "status": "Status"
+    },
+    "created": "Rate type created",
+    "updated": "Rate type updated",
+    "deleted": "Rate type deleted",
+    "createTitle": "New rate type",
+    "editTitle": "Edit rate type",
+    "principle": {
+      "official": "National bank rate",
+      "buy": "Buy rate",
+      "sell": "Sell rate",
+      "conversion": "Conversion rate"
+    },
+    "form": {
+      "code": "Code",
+      "name": "Name",
+      "principle": "Principle",
+      "order": "Order",
+      "active": "Active"
+    }
+  }
+}

@@ -297,21 +297,47 @@ Content-Type: application/json
 шаблон**, запрещающий все валюты. Отдельный GET возвращает `defined: false`,
 когда шаблон не задан, и `defined: true` с содержимым, когда задан.
 
-## Валюты (`/api/currencies/`)
+## Справочники (`/api/references/`)
 
-Справочник валют банка. Требуется право `core.structure.view` для чтения и
-`core.structure.manage` для изменения.
+Общесистемные справочные данные модуля `references` (см.
+`docs/adr/0017-references-module.md`). Валюты и типы курсов живут в схеме
+`references`; другие модули ссылаются на них по коду.
+
+### Валюты (`/api/references/currencies/`)
+
+Справочник валют ISO 4217. Требуется право `references.view` для чтения и
+`references.manage` для изменения.
 
 | Метод | Путь | Описание |
 | --- | --- | --- |
-| GET | `/api/currencies/` | Список валют (фильтр `is_active`, поиск по `code`, `name`) |
-| POST | `/api/currencies/` | Добавить валюту: `code`, `name`, `symbol?`, `minor_units?` |
-| GET | `/api/currencies/{code}/` | Карточка валюты |
-| PATCH | `/api/currencies/{code}/` | Изменение валюты |
-| DELETE | `/api/currencies/{code}/` | Удаление (запрещено, если валюта включена на кассе) |
+| GET | `/api/references/currencies/` | Список валют (фильтр `is_active`, поиск по `code`, `numeric_code`, `name`) |
+| POST | `/api/references/currencies/` | Добавить валюту: `code`, `name`, `numeric_code?`, `symbol?`, `minor_units?`, `is_active?` |
+| GET | `/api/references/currencies/{code}/` | Карточка валюты |
+| PATCH | `/api/references/currencies/{code}/` | Изменение валюты |
+| DELETE | `/api/references/currencies/{code}/` | Удаление |
 
-Код валюты приводится к верхнему регистру и уникален. При поставке добавляются
-`BYN`, `USD`, `EUR`, `RUB`.
+Код приводится к верхнему регистру и уникален. Справочник наполняется полным
+списком действующих кодов ISO 4217 командой `seed_iso_currencies`. Название —
+базовое (русское), английское хранится в таблице переводов и отдаётся на языке
+запроса (ADR 0016).
+
+### Типы курсов (`/api/references/rate-types/`)
+
+Банковские типы курсов. Требуется право `references.view` для чтения и
+`references.manage` для изменения.
+
+| Метод | Путь | Описание |
+| --- | --- | --- |
+| GET | `/api/references/rate-types/` | Список типов (фильтры `is_active`, `principle`) |
+| POST | `/api/references/rate-types/` | Добавить тип: `code`, `name`, `principle`, `is_active?`, `order?` |
+| GET | `/api/references/rate-types/{id}/` | Карточка типа |
+| PATCH | `/api/references/rate-types/{id}/` | Изменение типа |
+| DELETE | `/api/references/rate-types/{id}/` | Удаление (системный тип удалить нельзя) |
+
+`principle` — один из фиксированных принципов `official` (курс Нацбанка), `buy`,
+`sell`, `conversion`; на него опирается логика операций. Системные типы (по одному
+на принцип) поставляются и не удаляются; банк может добавлять свои типы с любым
+принципом.
 
 ## Курсы валют (`/api/currency-rates/`)
 
@@ -326,13 +352,16 @@ Content-Type: application/json
 | PATCH | `/api/currency-rates/{id}/` | Изменение курса |
 | DELETE | `/api/currency-rates/{id}/` | Удаление курса |
 
-Поля: `currency` и `base_currency` (коды из справочника валют), `rate_type`
-(`buy` / `sell` / `central`), `value`, `effective_from` (ISO 8601), `cash_desk`
-(необязательно; пусто — курс банка). Базовая валюта должна отличаться от валюты.
+Поля: `currency` и `base_currency` — коды из справочника
+`/api/references/currencies/`; `rate_type` — код типа курса из
+`/api/references/rate-types/` (например `official`, `buy`); `value`;
+`effective_from` (ISO 8601); `cash_desk` (необязательно; пусто — курс банка).
+Базовая валюта должна отличаться от валюты. Базовая валюта банка задаётся в
+настройках банка (`base_currency`).
 
 Курсы **действуют по времени**: применяется запись с наибольшим
 `effective_from` не в будущем. Курс кассы **перекрывает** курс банка. Разрешение
-курса доступно модулям через контракт `core.references`.
+курса доступно модулям через контракт `core.cash_desk_config`.
 
 ## Кассовые смены (`/api/shifts/`)
 

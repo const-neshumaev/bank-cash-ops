@@ -6,11 +6,11 @@ from django.db import models
 from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
 
-from modules.common.backend.i18n import pick_translation
 from modules.common.backend.models import TimeStampedModel
 from modules.common.backend.schemas import qualified_table
 from modules.core.backend.managers import UserManager
 from modules.core.backend.permission_codes import PermissionCode
+from modules.references.contracts import CurrencyRatePrinciple
 
 mac_address_validator = RegexValidator(
     regex=r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$",
@@ -328,72 +328,6 @@ class Shift(TimeStampedModel):
         return f"{self.cash_desk} @ {self.opened_at:%Y-%m-%d %H:%M}"
 
 
-class Currency(TimeStampedModel):
-    """A currency the bank works with (reference data).
-
-    The code is the stable identifier stored in operations; the name, symbol and
-    number of minor units are presentation data.
-    """
-
-    code = models.CharField(_("code"), max_length=8, unique=True)
-    name = models.CharField(_("name"), max_length=100)
-    symbol = models.CharField(_("symbol"), max_length=8, blank=True)
-    minor_units = models.PositiveSmallIntegerField(_("minor units"), default=2)
-    is_active = models.BooleanField(_("active"), default=True)
-
-    class Meta:
-        verbose_name = _("currency")
-        verbose_name_plural = _("currencies")
-        db_table = qualified_table("core", "core_currency")
-        ordering = ("code",)
-
-    def __str__(self):
-        return self.code
-
-    def save(self, *args, **kwargs):
-        self.code = (self.code or "").strip().upper()
-        return super().save(*args, **kwargs)
-
-    def localized_name(self, language: str | None = None) -> str:
-        """Return the currency name for ``language`` (the active one when omitted)."""
-        return pick_translation(
-            self.name,
-            ((t.language, t.name) for t in self.translations.all()),
-            language,
-        )
-
-
-class CurrencyTranslation(TimeStampedModel):
-    """A localized name of a currency for a single language.
-
-    The base value lives in :attr:`Currency.name`; a row here overrides it for the
-    given language. See ``docs/adr/0016-translatable-reference-data.md``.
-    """
-
-    currency = models.ForeignKey(
-        Currency,
-        on_delete=models.CASCADE,
-        related_name="translations",
-        verbose_name=_("currency"),
-    )
-    language = models.CharField(_("language"), max_length=8)
-    name = models.CharField(_("name"), max_length=100)
-
-    class Meta:
-        verbose_name = _("currency translation")
-        verbose_name_plural = _("currency translations")
-        db_table = qualified_table("core", "core_currencytranslation")
-        constraints = (
-            models.UniqueConstraint(
-                fields=["currency", "language"],
-                name="core_unique_currency_translation",
-            ),
-        )
-
-    def __str__(self):
-        return f"{self.currency} ({self.language})"
-
-
 class CashDeskCurrency(TimeStampedModel):
     """A currency enabled on a specific cash desk (an explicit override).
 
@@ -408,27 +342,22 @@ class CashDeskCurrency(TimeStampedModel):
         related_name="allowed_currencies",
         verbose_name=_("cash desk"),
     )
-    currency = models.ForeignKey(
-        Currency,
-        on_delete=models.PROTECT,
-        related_name="cash_desks",
-        verbose_name=_("currency"),
-    )
+    currency_code = models.CharField(_("currency"), max_length=8)
 
     class Meta:
         verbose_name = _("cash desk currency")
         verbose_name_plural = _("cash desk currencies")
         db_table = qualified_table("core", "core_cashdeskcurrency")
-        ordering = ("currency__code",)
+        ordering = ("currency_code",)
         constraints = (
             models.UniqueConstraint(
-                fields=["cash_desk", "currency"],
+                fields=["cash_desk", "currency_code"],
                 name="core_unique_cash_desk_currency",
             ),
         )
 
     def __str__(self):
-        return f"{self.cash_desk} — {self.currency}"
+        return f"{self.cash_desk} — {self.currency_code}"
 
 
 class CurrencyTemplate(TimeStampedModel):
@@ -449,12 +378,6 @@ class CurrencyTemplate(TimeStampedModel):
         verbose_name=_("branch"),
         help_text=_("Empty for the bank-wide template."),
     )
-    currencies = models.ManyToManyField(
-        Currency,
-        related_name="templates",
-        blank=True,
-        verbose_name=_("currencies"),
-    )
 
     class Meta:
         verbose_name = _("currency template")
@@ -472,31 +395,50 @@ class CurrencyTemplate(TimeStampedModel):
         return _("Bank template") if self.branch_id is None else str(self.branch)
 
 
+class CurrencyTemplateItem(TimeStampedModel):
+    """A currency included in a currency template.
+
+    The currency is referenced by its ISO code (owned by the ``references``
+    module); the code-based link keeps the modules' data apart (see
+    ``docs/adr/0017-references-module.md``).
+    """
+
+    template = models.ForeignKey(
+        CurrencyTemplate,
+        on_delete=models.CASCADE,
+        related_name="items",
+        verbose_name=_("template"),
+    )
+    currency_code = models.CharField(_("currency"), max_length=8)
+
+    class Meta:
+        verbose_name = _("currency template item")
+        verbose_name_plural = _("currency template items")
+        db_table = qualified_table("core", "core_currencytemplateitem")
+        ordering = ("currency_code",)
+        constraints = (
+            models.UniqueConstraint(
+                fields=["template", "currency_code"],
+                name="core_unique_currency_template_item",
+            ),
+        )
+
+    def __str__(self):
+        return f"{self.template} — {self.currency_code}"
+
+
 class CurrencyRate(TimeStampedModel):
     """An exchange rate of a currency against a base currency.
 
     Rates are dated: the effective rate is the row with the greatest
     ``effective_from`` not in the future. A rate scoped to a cash desk overrides
-    the bank-wide one (``cash_desk`` is null).
+    the bank-wide one (``cash_desk`` is null). The currencies and the rate type
+    are referenced by their codes (see ``docs/adr/0017-references-module.md``);
+    ``rate_type`` is the code of a bank rate type owned by ``references``.
     """
 
-    class RateType(models.TextChoices):
-        BUY = "buy", _("Buy")
-        SELL = "sell", _("Sell")
-        CENTRAL = "central", _("Central")
-
-    currency = models.ForeignKey(
-        Currency,
-        on_delete=models.CASCADE,
-        related_name="rates",
-        verbose_name=_("currency"),
-    )
-    base_currency = models.ForeignKey(
-        Currency,
-        on_delete=models.CASCADE,
-        related_name="base_rates",
-        verbose_name=_("base currency"),
-    )
+    currency = models.CharField(_("currency"), max_length=8)
+    base_currency = models.CharField(_("base currency"), max_length=8)
     cash_desk = models.ForeignKey(
         CashDesk,
         null=True,
@@ -507,9 +449,8 @@ class CurrencyRate(TimeStampedModel):
     )
     rate_type = models.CharField(
         _("rate type"),
-        max_length=16,
-        choices=RateType.choices,
-        default=RateType.CENTRAL,
+        max_length=32,
+        default=CurrencyRatePrinciple.OFFICIAL,
     )
     value = models.DecimalField(_("value"), max_digits=18, decimal_places=6)
     effective_from = models.DateTimeField(_("effective from"))
@@ -518,7 +459,7 @@ class CurrencyRate(TimeStampedModel):
         verbose_name = _("currency rate")
         verbose_name_plural = _("currency rates")
         db_table = qualified_table("core", "core_currencyrate")
-        ordering = ("currency__code", "rate_type", "-effective_from")
+        ordering = ("currency", "rate_type", "-effective_from")
         constraints = (
             models.UniqueConstraint(
                 fields=["currency", "base_currency", "cash_desk", "rate_type", "effective_from"],
@@ -532,7 +473,7 @@ class CurrencyRate(TimeStampedModel):
 
     def clean(self):
         super().clean()
-        if self.currency_id and self.currency_id == self.base_currency_id:
+        if self.currency and self.currency == self.base_currency:
             raise ValidationError(
                 {"base_currency": _("The base currency must differ from the currency.")}
             )
@@ -549,6 +490,7 @@ class BankSettings(TimeStampedModel):
 
     default_language = models.CharField(_("default language"), max_length=8, default="ru")
     enabled_languages = models.JSONField(_("enabled languages"), default=list, blank=True)
+    base_currency = models.CharField(_("base currency"), max_length=8, default="BYN")
 
     class Meta:
         verbose_name = _("bank settings")
@@ -588,6 +530,7 @@ class BankSettings(TimeStampedModel):
             defaults={
                 "default_language": settings.LANGUAGE_CODE.split("-")[0],
                 "enabled_languages": [code for code, _name in settings.LANGUAGES],
+                "base_currency": "BYN",
             },
         )
         return obj

@@ -49,12 +49,14 @@
 - `core.users` (`UserDirectory`) — чтение пользователя, проверка прав и админа;
 - `core.org` (`OrgDirectory`) — открытая смена кассира, доступные кассы и
   отделения, проверка доступа к кассе, путь по дереву отделений (`branch_ancestor_ids`);
-- `core.references` (`ReferenceDirectory`) — справочник валют, **действующие**
-  валюты кассы и действующие курсы (в том числе кассовые).
+- `core.cash_desk_config` (`CashDeskConfigDirectory`) — **действующие** валюты
+  кассы и действующие курсы (в том числе кассовые).
 
-`core.users` и `core.org` нужны модулю `operations`; `core.references` — для
+`core.users` и `core.org` нужны модулю `operations`; `core.cash_desk_config` — для
 проверки доступных кассе валют при проведении (возвращает эффективный набор,
-пустой = ничего не разрешено).
+пустой = ничего не разрешено). Сам справочник валют и типы курсов живут в модуле
+`references` (контракт `references.directory`) — см.
+`docs/adr/0017-references-module.md`.
 
 ## Схема данных
 
@@ -143,60 +145,66 @@ erDiagram
   учётный атрибут рабочего места (`unique`); автоматическое определение кассы по
   MAC отложено, кассир выбирает кассу вручную при открытии смены.
 
-### Валюты
+### Валюты и курсы
 
-Справочник валют банка, валюты, включённые на конкретной кассе, и **шаблоны
-комплектации** (банк и отделение). Действующий набор валют кассы вычисляется
-динамически: своя настройка кассы → ближайший определённый шаблон по пути
-«отделение → … → банк» → при отсутствии шаблонов **валюты не разрешены**
-(deny-by-default). Пустой шаблон также запрещает все валюты. Правило и обоснование
-— в `docs/adr/0014-cash-desk-configuration-templates.md`.
+Справочник валют ISO 4217 и типы курсов вынесены в модуль `references`
+(`docs/adr/0017-references-module.md`); `core` ссылается на валюту и тип курса
+**по коду** (строкой), а не внешним ключом. В `core` остаются конфигурация кассы
+и курсы:
 
-Название валюты (`Currency.name`) — базовое (русское); переводы хранятся в
-`CurrencyTranslation` (английские — сид-миграцией) и отдаются на языке запроса
-(см. `docs/adr/0016-translatable-reference-data.md`).
+- валюты, включённые на конкретной кассе (`CashDeskCurrency.currency_code`);
+- **шаблоны комплектации** (банк и отделение) — `CurrencyTemplate` и её элементы
+  `CurrencyTemplateItem.currency_code`;
+- курсы (`CurrencyRate` — `currency`, `base_currency`, `rate_type` как коды).
+
+Действующий набор валют кассы вычисляется **динамически**: своя настройка кассы →
+ближайший определённый шаблон по пути «отделение → … → банк» → при отсутствии
+шаблонов **валюты не разрешены** (deny-by-default). Пустой шаблон также запрещает
+все валюты. Правило и обоснование — в
+`docs/adr/0014-cash-desk-configuration-templates.md`.
+
+Курсы действуют **по времени** (применяется запись с наибольшим `effective_from`
+не в будущем), задаются как для банка, так и для отдельной кассы; курс кассы
+**перекрывает** курс банка. Базовая валюта банка хранится в настройках банка
+(`BankSettings.base_currency`). Разрешение курса доступно модулям через контракт
+`core.cash_desk_config` (`rate`, `cash_desk_rates`).
 
 ```mermaid
 erDiagram
-    CURRENCY {
-        string code UK
-        string name
-        string symbol
-        int minor_units
-        bool is_active
-    }
     CASH_DESK_CURRENCY {
         bigint id PK
         bigint cash_desk_id FK
-        bigint currency_id FK
+        string currency_code
     }
     CURRENCY_TEMPLATE {
         bigint id PK
         bigint branch_id FK
     }
+    CURRENCY_TEMPLATE_ITEM {
+        bigint id PK
+        bigint template_id FK
+        string currency_code
+    }
     CURRENCY_RATE {
         bigint id PK
-        bigint currency_id FK
-        bigint base_currency_id FK
-        bigint cash_desk_id FK
+        string currency
+        string base_currency
         string rate_type
+        bigint cash_desk_id FK
         decimal value
         datetime effective_from
     }
     CASH_DESK ||--o{ CASH_DESK_CURRENCY : allows
-    CURRENCY ||--o{ CASH_DESK_CURRENCY : "enabled on"
     BRANCH ||--o| CURRENCY_TEMPLATE : "default for"
-    CURRENCY_TEMPLATE }o--o{ CURRENCY : defaults
-    CURRENCY ||--o{ CURRENCY_RATE : quotes
+    CURRENCY_TEMPLATE ||--o{ CURRENCY_TEMPLATE_ITEM : contains
     CASH_DESK ||--o{ CURRENCY_RATE : "scoped to"
 ```
 
-При поставке добавляются `BYN`, `USD`, `EUR`, `RUB`. Курсы (`CurrencyRate`)
-действуют **по времени** (применяется запись с наибольшим `effective_from` не в
-будущем), задаются как для банка, так и для отдельной кассы; курс кассы
-**перекрывает** курс банка. Разрешение курса доступно модулям через контракт
-`core.references` (`rate`, `cash_desk_rates`) — см.
-`docs/adr/0007-currencies-and-rates-in-core.md`.
+`currency_code` / `currency` / `base_currency` — коды из справочника
+`references`; `rate_type` — код банковского типа курса из `references`.
+Поставляется полный список действующих кодов ISO 4217 (команда
+`seed_iso_currencies`); перевод названий — в модуле `references`
+(`docs/adr/0016-translatable-reference-data.md`).
 
 ### Кассовые смены
 

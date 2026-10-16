@@ -9,8 +9,8 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from modules.common.contracts import registry
-from modules.core.backend.models import Branch, CashDesk, Currency, CurrencyRate
-from modules.core.contracts import REFERENCE_DIRECTORY
+from modules.core.backend.models import Branch, CashDesk, CurrencyRate
+from modules.core.contracts import CASH_DESK_CONFIG
 
 User = get_user_model()
 
@@ -37,12 +37,12 @@ def auth_client(client, admin_user):
 
 @pytest.fixture
 def usd():
-    return Currency.objects.get(code="USD")
+    return "USD"
 
 
 @pytest.fixture
 def byn():
-    return Currency.objects.get(code="BYN")
+    return "BYN"
 
 
 @pytest.fixture
@@ -53,7 +53,7 @@ def cash_desk():
 
 
 def _directory():
-    return registry.get(REFERENCE_DIRECTORY)
+    return registry.get(CASH_DESK_CONFIG)
 
 
 def test_a_rate_can_be_created_through_the_api(auth_client, usd):
@@ -71,6 +71,22 @@ def test_a_rate_can_be_created_through_the_api(auth_client, usd):
 
     assert response.status_code == 201, response.content
     assert CurrencyRate.objects.count() == 1
+
+
+def test_an_unknown_currency_is_rejected(auth_client):
+    response = auth_client.post(
+        RATES_URL,
+        {
+            "currency": "XXX",
+            "base_currency": "BYN",
+            "rate_type": "buy",
+            "value": "1",
+            "effective_from": timezone.now().isoformat(),
+        },
+        format="json",
+    )
+
+    assert response.status_code == 400
 
 
 def test_the_base_currency_must_differ(auth_client):

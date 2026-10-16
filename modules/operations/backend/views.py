@@ -19,7 +19,7 @@ from rest_framework.views import APIView
 
 from modules.common.backend.permissions import PermissionRequired
 from modules.common.contracts import registry
-from modules.core.contracts import ORG_DIRECTORY, REFERENCE_DIRECTORY
+from modules.core.contracts import CASH_DESK_CONFIG, ORG_DIRECTORY
 from modules.operations.backend import config, serializers
 from modules.operations.backend.engine import post_operation, reverse_operation
 from modules.operations.backend.filters import CashBalanceFilter, OperationFilter
@@ -32,6 +32,7 @@ from modules.operations.backend.models import (
 )
 from modules.operations.backend.permission_codes import PermissionCode
 from modules.operations.contracts import SlotValue
+from modules.references.contracts import REFERENCE_DIRECTORY
 
 
 def _org_directory():
@@ -40,6 +41,10 @@ def _org_directory():
 
 def _reference_directory():
     return registry.get(REFERENCE_DIRECTORY)
+
+
+def _cash_desk_config():
+    return registry.get(CASH_DESK_CONFIG)
 
 
 def _can_view_cash_desk_config(user, cash_desk_id) -> bool:
@@ -204,7 +209,7 @@ class OperationViewSet(
             for line in data["lines"]
         )
 
-        allowed_currencies = _reference_directory().cash_desk_currency_codes(shift.cash_desk_id)
+        allowed_currencies = _cash_desk_config().cash_desk_currency_codes(shift.cash_desk_id)
         for line in lines:
             if line.currency not in allowed_currencies:
                 raise ValidationError(
@@ -405,10 +410,13 @@ class WorkplaceView(APIView):
             )
 
         cash_desk_id = shift.cash_desk_id
-        references = _reference_directory()
-        allowed = references.cash_desk_currency_codes(cash_desk_id)
-        currencies = [currency for currency in references.currencies() if currency.code in allowed]
-        rates = references.cash_desk_rates(cash_desk_id)
+        currencies_directory = _reference_directory()
+        cash_desk_config = _cash_desk_config()
+        allowed = cash_desk_config.cash_desk_currency_codes(cash_desk_id)
+        currencies = [
+            currency for currency in currencies_directory.currencies() if currency.code in allowed
+        ]
+        rates = cash_desk_config.cash_desk_rates(cash_desk_id)
         balances = CashBalance.objects.filter(cash_desk_id=cash_desk_id).order_by("currency")
         return Response(
             {
