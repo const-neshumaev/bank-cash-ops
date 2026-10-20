@@ -4,6 +4,8 @@ import {
   IconClock,
   IconCoin,
   IconDeviceDesktop,
+  IconRuler2,
+  IconSettings,
   IconShieldLock,
   IconUsers,
 } from '@tabler/icons-react'
@@ -12,6 +14,8 @@ import type { FrontendModule } from '@app/registry/contract'
 
 import en from './locales/en.json'
 import ru from './locales/ru.json'
+import { BankSettingsPage } from './pages/BankSettingsPage'
+import { BaseValuesPage } from './pages/BaseValuesPage'
 import { BranchesPage } from './pages/BranchesPage'
 import { CashDeskCurrenciesPage } from './pages/CashDeskCurrenciesPage'
 import { CashDesksPage } from './pages/CashDesksPage'
@@ -39,6 +43,16 @@ export const coreFrontend: FrontendModule = {
       path: 'cash-desk-currencies',
       element: <CashDeskCurrenciesPage />,
       permission: CURRENCIES_PERMISSIONS,
+    },
+    {
+      path: 'bank-settings',
+      element: <BankSettingsPage />,
+      permission: 'core.bank_settings.manage',
+    },
+    {
+      path: 'base-values',
+      element: <BaseValuesPage />,
+      permission: 'core.base_values.view',
     },
     { path: 'shifts', element: <ShiftsPage />, permission: 'core.shifts.view' },
     { path: 'workplace', element: <WorkplacePage />, permission: 'core.shifts.open' },
@@ -78,6 +92,19 @@ export const coreFrontend: FrontendModule = {
       icon: <IconCoin size={18} />,
       permission: CURRENCIES_PERMISSIONS,
       section: ADMIN_SECTION,
+    },
+    {
+      labelKey: 'nav.bankSettings',
+      to: '/bank-settings',
+      icon: <IconSettings size={18} />,
+      permission: 'core.bank_settings.manage',
+      section: ADMIN_SECTION,
+    },
+    {
+      labelKey: 'nav.baseValues',
+      to: '/base-values',
+      icon: <IconRuler2 size={18} />,
+      permission: 'core.base_values.view',
     },
     {
       labelKey: 'nav.shifts',

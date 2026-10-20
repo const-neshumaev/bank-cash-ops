@@ -6,6 +6,8 @@
     "branches": "Branches",
     "cashDesks": "Cash desks",
     "cashDeskCurrencies": "Cash desk currencies",
+    "bankSettings": "Bank settings",
+    "baseValues": "Base values",
     "shifts": "Shifts",
     "workplace": "Workplace"
   },
@@ -194,6 +196,34 @@
       "branch": "Branch template \"{{branch}}\"",
       "bank": "Bank template",
       "none": "Not set — the currency is not allowed"
+    }
+  },
+  "bankSettings": {
+    "title": "Bank settings",
+    "baseCurrency": "National (base) currency",
+    "baseCurrencyHint": "The bank's national currency is used as the base for thresholds, rates and base values.",
+    "baseCurrencyReadonlyHint": "Changing the currency is blocked while rates or base values in another currency exist.",
+    "saved": "Bank settings saved"
+  },
+  "baseValues": {
+    "title": "Base values",
+    "currencyHint": "The amounts are expressed in the national currency ({{currency}}). The value in force is the one with the latest date not after the operation date.",
+    "empty": "No base values configured",
+    "created": "Base value added",
+    "updated": "Base value updated",
+    "deleted": "Base value deleted",
+    "createTitle": "New base value",
+    "editTitle": "Edit base value",
+    "statusActive": "in force",
+    "statusFuture": "future",
+    "columns": {
+      "effectiveFrom": "Effective from",
+      "amount": "Amount",
+      "status": "Status"
+    },
+    "form": {
+      "effectiveFrom": "Effective from",
+      "amount": "Amount, {{currency}}"
     }
   },
   "shifts": {

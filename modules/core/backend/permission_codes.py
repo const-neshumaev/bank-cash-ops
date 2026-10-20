@@ -29,6 +29,10 @@ class PermissionCode:
     CURRENCIES_CONFIG_MANAGE = "core.currencies.config.manage"
     CURRENCIES_CONFIG_MANAGE_BRANCH = "core.currencies.config.manage.branch"
 
+    BANK_SETTINGS_MANAGE = "core.bank_settings.manage"
+    BASE_VALUES_VIEW = "core.base_values.view"
+    BASE_VALUES_MANAGE = "core.base_values.manage"
+
     SHIFTS_VIEW = "core.shifts.view"
     SHIFTS_OPEN = "core.shifts.open"
     SHIFTS_CLOSE = "core.shifts.close"
@@ -55,6 +59,9 @@ CATALOG: tuple[Permission, ...] = (
         PermissionCode.CURRENCIES_CONFIG_MANAGE_BRANCH,
         _("Configure cash desk currencies of own branch"),
     ),
+    Permission(PermissionCode.BANK_SETTINGS_MANAGE, _("Manage bank settings")),
+    Permission(PermissionCode.BASE_VALUES_VIEW, _("View base values")),
+    Permission(PermissionCode.BASE_VALUES_MANAGE, _("Manage base values")),
     Permission(PermissionCode.SHIFTS_VIEW, _("View cash shifts")),
     Permission(PermissionCode.SHIFTS_OPEN, _("Open a cash shift")),
     Permission(PermissionCode.SHIFTS_CLOSE, _("Close own shift")),

@@ -110,6 +110,13 @@ class OperationTypeSpec:
     command). Simple operations are fully described by ``slots`` and
     ``template``; non-trivial ones also register a handler.
 
+    The client-data settings are seeded on creation only: an administrator may
+    change them later, and synchronisation never overwrites them. ``requires_client``
+    and ``client_id_threshold`` are kept for compatibility with existing
+    extensions; new declarations should use ``client_data_policy``,
+    ``threshold_type``, ``threshold_value`` and ``threshold_currency``. A legacy
+    declaration with ``requires_client=True`` seeds the ``always`` policy.
+
     ``translations`` maps a language code to the type name in that language;
     ``name`` stays the base-language value (see
     ``docs/adr/0016-translatable-reference-data.md``).
@@ -123,5 +130,9 @@ class OperationTypeSpec:
     is_external: bool = False
     requires_client: bool = False
     client_id_threshold: Decimal | None = None
+    client_data_policy: str = ""
+    threshold_type: str = ""
+    threshold_value: Decimal | None = None
+    threshold_currency: str = ""
     permission_code: str = ""
     translations: dict[str, str] = field(default_factory=dict)

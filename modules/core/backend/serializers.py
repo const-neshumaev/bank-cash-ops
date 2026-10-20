@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -8,6 +9,7 @@ from modules.common.backend import permissions_catalog
 from modules.common.contracts import registry
 from modules.core.backend.models import (
     BankSettings,
+    BaseValue,
     Branch,
     BranchAccess,
     CashDesk,
@@ -99,11 +101,91 @@ class LanguageChoiceMixin:
 
 
 class BankSettingsSerializer(serializers.ModelSerializer):
-    """Read representation of the bank-wide settings."""
+    """Read and update representation of the bank-wide settings."""
 
     class Meta:
         model = BankSettings
-        fields = ("default_language", "enabled_languages")
+        fields = ("default_language", "enabled_languages", "base_currency", "updated_at")
+        read_only_fields = ("updated_at",)
+
+    def validate_base_currency(self, value):
+        code = (value or "").strip().upper()
+        if not code:
+            raise serializers.ValidationError(_("The base currency is required."))
+        if registry.get(REFERENCE_DIRECTORY).get_currency(code) is None:
+            raise serializers.ValidationError(_("Unknown currency."))
+        return code
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        new_code = attrs.get("base_currency")
+        previous = getattr(self.instance, "base_currency", None)
+        if new_code and previous and new_code != previous:
+            if CurrencyRate.objects.exclude(base_currency=new_code).exists():
+                raise serializers.ValidationError(
+                    {
+                        "base_currency": _(
+                            "The base currency cannot be changed while currency rates "
+                            "with another base currency exist."
+                        )
+                    }
+                )
+            if BaseValue.objects.exclude(currency_code=new_code).exists():
+                raise serializers.ValidationError(
+                    {
+                        "base_currency": _(
+                            "The base currency cannot be changed while base values "
+                            "in another currency exist."
+                        )
+                    }
+                )
+        return attrs
+
+    def update(self, instance, validated_data):
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        instance.clean()
+        instance.save()
+        return instance
+
+
+class BaseValueSerializer(serializers.ModelSerializer):
+    """Read and write representation of a base value.
+
+    The currency code is a snapshot taken from the bank settings on creation, so
+    it is read-only. A row that has already taken effect is immutable.
+    """
+
+    class Meta:
+        model = BaseValue
+        fields = (
+            "id",
+            "effective_from",
+            "amount",
+            "currency_code",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = ("currency_code", "created_at", "updated_at")
+
+    def validate_amount(self, value):
+        if value <= 0:
+            raise serializers.ValidationError(_("The amount must be greater than zero."))
+        return value
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        instance = self.instance
+        if instance is not None and instance.effective_from <= timezone.localdate():
+            changed = any(
+                field in attrs and attrs[field] != getattr(instance, field)
+                for field in ("effective_from", "amount")
+            )
+            if changed:
+                raise serializers.ValidationError(
+                    _("An effective base value cannot be changed.")
+                )
+        return attrs
 
 
 class UserSerializer(serializers.ModelSerializer):

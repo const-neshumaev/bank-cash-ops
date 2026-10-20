@@ -23,10 +23,29 @@ Authorization: Bearer <access_token>
 
 | Метод | Путь | Доступ | Описание |
 | --- | --- | --- | --- |
-| GET | `/api/settings/` | публичный | Языки банка: `{ "default_language", "enabled_languages" }` |
+| GET | `/api/settings/` | публичный | Языки банка и национальная валюта: `{ "default_language", "enabled_languages", "base_currency" }` |
+| PATCH | `/api/settings/` | `core.bank_settings.manage` | Изменить настройки, например `{ "base_currency": "BYN" }` |
 
-Публичный эндпоинт: SPA читает его до входа, чтобы показать экран входа на языке
-по умолчанию банка. `language` в профиле валидируется по `enabled_languages`.
+Публичный GET: SPA читает его до входа, чтобы показать экран входа на языке
+по умолчанию банка. `language` в профиле валидируется по `enabled_languages`, а
+`base_currency` — по активным валютам справочника `references`.
+
+Смена `base_currency` запрещена, пока в системе есть курсы или базовые величины
+в другой валюте: это защищает исторические данные от переинтерпретации.
+
+## Базовые величины (`/api/base-values/`)
+
+| Метод | Путь | Право | Описание |
+| --- | --- | --- | --- |
+| GET | `/api/base-values/` | `core.base_values.view` | Справочник базовых величин |
+| POST | `/api/base-values/` | `core.base_values.manage` | Добавить величину |
+| PATCH | `/api/base-values/{id}/` | `core.base_values.manage` | Изменить будущую величину |
+| DELETE | `/api/base-values/{id}/` | `core.base_values.manage` | Удалить будущую величину |
+
+Запись содержит `effective_from` (дата начала действия), `amount` и
+`currency_code`. `currency_code` — снимок национальной валюты на момент создания,
+поэтому в запросе не передаётся. Дата уникальна; будущие записи можно менять и
+удалять, уже вступившие в силу — нельзя (append-only).
 
 ## Служебные методы
 
@@ -408,7 +427,8 @@ Content-Type: application/json
 
 Движок кассовых операций. Требуется право `operations.view` для чтения,
 `operations.create` для проведения, `operations.reverse` для сторнирования,
-`operations.config.manage` для изменения настроек. Если у типа операции задан
+`operations.config.manage` для изменения настроек комплектации,
+`operations.types.manage` для изменения настроек типов. Если у типа операции задан
 `permission_code`, он проверяется дополнительно.
 
 Коды `operations.*` назначаются ролям через интерфейс ролей (каталог прав
@@ -424,12 +444,38 @@ Content-Type: application/json
 | --- | --- | --- | --- |
 | GET | `/api/operations/types/` | `operations.view` | Каталог типов операций |
 | GET | `/api/operations/types/{code}/` | `operations.view` | Тип операции со слотами сумм |
+| PATCH | `/api/operations/types/{code}/` | `operations.types.manage` | Изменить настройки типа |
+| GET | `/api/operations/types/{code}/history/` | `operations.view` | История изменений настроек |
+| GET | `/api/operations/threshold-types/` | `operations.view` | Предопределённые способы задания порога |
 
-Параметры списка: `kind`, `is_active`, `is_external`, `requires_client` (фильтры),
-`search` (по `code`, `name`), `ordering` (`name`, `code`).
+Параметры списка: `kind`, `is_active`, `is_external`, `client_data_policy`
+(фильтры), `search` (по `code`, `name`), `ordering` (`name`, `code`).
 
 В ответе тип содержит массив `slots` (`code`, `name`, `required`,
 `fixed_currency`, `order`) — по нему строится форма проведения.
+
+Администратор может изменить только настройки: `client_data_policy`, `threshold_type`,
+`threshold_value`, `threshold_currency`, `is_active`. Код, название, вид, слоты и
+шаблон проводок остаются декларативными и не перезаписываются.
+
+Политика данных клиента:
+
+| Значение | Смысл |
+| --- | --- |
+| `never` | данные клиента не запрашиваются; порог не задаётся |
+| `always` | данные клиента запрашиваются всегда |
+| `threshold` | данные запрашиваются при превышении порога; тип и значение порога обязательны |
+
+Способы задания порога (`threshold_type`) заданы в коде:
+
+| Код | Параметры |
+| --- | --- |
+| `base_value` | `threshold_value` — количество базовых величин |
+| `currency` | `threshold_value` — сумма, `threshold_currency` — код валюты |
+
+Изменения настроек фиксируются в истории с датой, временем и пользователем; история
+ведётся и при изменении через Django admin. В элементе истории поле `changes`
+содержит значения «до/после» по каждому изменённому полю.
 
 ### Остатки наличных (`/api/operations/balances/`)
 
@@ -519,8 +565,8 @@ Content-Type: application/json
       "code": "cash_receipt",
       "name": "Приход наличных",
       "kind": "income",
+      "client_data_policy": "always",
       "requires_client": true,
-      "client_id_threshold": null,
       "slots": [ { "code": "amount", "name": "Сумма", "required": true, "fixed_currency": "", "order": 0 } ]
     }
   ]
@@ -579,16 +625,6 @@ Content-Type: application/json
 Тело PUT — `{ "operations": [...] }`. Пустой список — определённый **пустой
 шаблон**, запрещающий все операции. Отдельный GET возвращает `defined: false`,
 когда шаблон не задан.
-
-### Настройки (`/api/operations/settings/`)
-
-| Метод | Путь | Право | Описание |
-| --- | --- | --- | --- |
-| GET | `/api/operations/settings/` | `operations.view` | Настройки операций |
-| PATCH | `/api/operations/settings/` | `operations.config.manage` | Изменить настройки |
-
-Единственный объект настроек банка: `base_currency`, `client_id_threshold`,
-`require_client`.
 
 ## Коды ошибок
 

@@ -11,7 +11,6 @@ identifiers, never as ORM relations — see ``docs/modules.md`` and
 
 from __future__ import annotations
 
-import os
 from decimal import Decimal
 
 from django.db import models
@@ -22,11 +21,11 @@ from modules.common.backend.i18n import pick_translation
 from modules.common.backend.models import TimeStampedModel
 from modules.common.backend.schemas import qualified_table
 from modules.operations.backend.registers import RegisterCode
+from modules.operations.backend.thresholds import (
+    ClientDataPolicy,
+    raise_threshold_errors,
+)
 from modules.operations.contracts.dto import OperationKind
-
-
-def _env_flag(name: str, default: bool = False) -> bool:
-    return os.environ.get(name, str(default)).strip().lower() in {"1", "true", "yes", "on"}
 
 
 class OperationType(TimeStampedModel):
@@ -51,14 +50,31 @@ class OperationType(TimeStampedModel):
         default=False,
         help_text=_("The operation calls a bank subsystem over REST."),
     )
-    requires_client = models.BooleanField(_("requires client data"), default=False)
-    client_id_threshold = models.DecimalField(
-        _("client document threshold"),
+    client_data_policy = models.CharField(
+        _("client data policy"),
+        max_length=16,
+        choices=ClientDataPolicy.CHOICES,
+        default=ClientDataPolicy.NEVER,
+        help_text=_("When the operation asks for the client's data."),
+    )
+    threshold_type = models.CharField(
+        _("threshold type"),
+        max_length=32,
+        blank=True,
+        help_text=_("Predefined threshold function used by the client data policy."),
+    )
+    threshold_value = models.DecimalField(
+        _("threshold value"),
         max_digits=18,
         decimal_places=2,
         null=True,
         blank=True,
-        help_text=_("Amount in the base currency above which a client document is required."),
+    )
+    threshold_currency = models.CharField(
+        _("threshold currency"),
+        max_length=8,
+        blank=True,
+        help_text=_("Currency of the threshold when the threshold type requires one."),
     )
     permission_code = models.CharField(
         _("required permission"),
@@ -82,6 +98,21 @@ class OperationType(TimeStampedModel):
 
     def __str__(self):
         return self.name
+
+    @property
+    def requires_client(self) -> bool:
+        """Whether the type asks for client data (always or above a threshold)."""
+        return self.client_data_policy != ClientDataPolicy.NEVER
+
+    def clean(self):
+        super().clean()
+        self.threshold_currency = (self.threshold_currency or "").strip().upper()
+        raise_threshold_errors(
+            self.client_data_policy,
+            self.threshold_type,
+            self.threshold_value,
+            self.threshold_currency,
+        )
 
     def localized_name(self, language: str | None = None) -> str:
         """Return the name in ``language`` (the active one when omitted).
@@ -127,6 +158,43 @@ class OperationTypeTranslation(TimeStampedModel):
 
     def __str__(self):
         return f"{self.operation_type.code} [{self.language}]"
+
+
+class OperationTypeSettingsChange(TimeStampedModel):
+    """An audit entry of a change to the configurable settings of a type.
+
+    Only settings managed by an administrator are recorded: the client-data
+    policy, the threshold configuration and the activity flag. ``changes`` keeps
+    the before/after values of the changed fields. The user is stored by a stable
+    id plus an email snapshot so the history stays readable after the account is
+    gone (``operations`` must not reference ``core`` tables).
+    """
+
+    operation_type = models.ForeignKey(
+        OperationType,
+        on_delete=models.CASCADE,
+        related_name="settings_changes",
+        verbose_name=_("operation type"),
+    )
+    changed_at = models.DateTimeField(_("changed at"), auto_now_add=True)
+    changed_by_id = models.PositiveBigIntegerField(_("changed by"), null=True, blank=True)
+    changed_by_email = models.CharField(_("changed by (email)"), max_length=254, blank=True)
+    changes = models.JSONField(_("changes"), default=dict)
+
+    class Meta:
+        verbose_name = _("operation type settings change")
+        verbose_name_plural = _("operation type settings changes")
+        db_table = qualified_table("operations", "operations_operationtypesettingschange")
+        ordering = ("-changed_at", "-id")
+        indexes = (
+            models.Index(
+                fields=("operation_type", "-changed_at"),
+                name="operations_type_history_idx",
+            ),
+        )
+
+    def __str__(self):
+        return f"{self.operation_type.code} @ {self.changed_at}"
 
 
 class SlotDef(TimeStampedModel):
@@ -378,51 +446,6 @@ class OperationNumberSequence(models.Model):
         return f"{self.cash_desk_id}: {self.last_number}"
 
 
-class OperationsSettings(TimeStampedModel):
-    """Bank-wide operation settings (a singleton row).
-
-    Holds the editable defaults the engine and the administration read: the base
-    currency and the client data policy. The row is created on first access from
-    the environment defaults declared in ``module.yaml``.
-    """
-
-    base_currency = models.CharField(_("base currency"), max_length=8, default="BYN")
-    client_id_threshold = models.DecimalField(
-        _("client document threshold"),
-        max_digits=18,
-        decimal_places=2,
-        default=Decimal("0"),
-    )
-    require_client = models.BooleanField(_("require client data"), default=False)
-
-    class Meta:
-        verbose_name = _("operations settings")
-        verbose_name_plural = _("operations settings")
-        db_table = qualified_table("operations", "operations_operationssettings")
-
-    def save(self, *args, **kwargs):
-        self.pk = 1
-        return super().save(*args, **kwargs)
-
-    @classmethod
-    def load(cls) -> OperationsSettings:
-        """Return the singleton, creating it from environment defaults if needed."""
-        settings, _ = cls.objects.get_or_create(
-            pk=1,
-            defaults={
-                "base_currency": os.environ.get("BCO_OPERATIONS_BASE_CURRENCY", "BYN"),
-                "client_id_threshold": Decimal(
-                    os.environ.get("BCO_OPERATIONS_CLIENT_ID_THRESHOLD", "0")
-                ),
-                "require_client": _env_flag("BCO_OPERATIONS_REQUIRE_CLIENT"),
-            },
-        )
-        return settings
-
-    def __str__(self):
-        return _("Operations settings")
-
-
 class CashDeskOperation(TimeStampedModel):
     """An operation type enabled on a specific cash desk (an explicit override).
 
@@ -498,8 +521,8 @@ __all__ = [
     "OperationLine",
     "OperationNumberSequence",
     "OperationTemplate",
-    "OperationsSettings",
     "OperationType",
+    "OperationTypeSettingsChange",
     "OperationTypeTranslation",
     "RegisterCode",
     "SlotDef",

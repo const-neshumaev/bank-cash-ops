@@ -2,7 +2,8 @@
   "title": "Кассовые операции",
   "nav": {
     "workplace": "Касса",
-    "config": "Операции касс"
+    "config": "Операции касс",
+    "operationTypes": "Типы операций"
   },
   "common": {
     "error": "Ошибка",
@@ -52,6 +53,59 @@
       "amounts": "Суммы",
       "time": "Время",
       "status": "Статус"
+    }
+  },
+  "operationTypes": {
+    "title": "Типы операций",
+    "tabs": {
+      "settings": "Параметры",
+      "history": "История изменений"
+    },
+    "empty": "Типы операций не найдены",
+    "active": "активен",
+    "inactive": "отключён",
+    "saved": "Настройки типа операции сохранены",
+    "editTitle": "Параметры типа операции",
+    "historyFor": "История изменений",
+    "historyType": "Тип операции",
+    "historyTypePlaceholder": "Выберите тип операции",
+    "historyEmpty": "Изменений пока нет",
+    "columns": {
+      "name": "Операция",
+      "kind": "Вид",
+      "clientData": "Данные клиента",
+      "threshold": "Порог",
+      "status": "Статус",
+      "changedAt": "Дата и время",
+      "changedBy": "Пользователь",
+      "changes": "Изменения"
+    },
+    "kind": {
+      "income": "Приход",
+      "expense": "Расход",
+      "exchange": "Обмен",
+      "internal": "Внутренняя"
+    },
+    "policy": {
+      "never": "не запрашивать",
+      "always": "запрашивать всегда",
+      "threshold": "при превышении порога"
+    },
+    "fields": {
+      "client_data_policy": "Политика данных клиента",
+      "threshold_type": "Тип порога",
+      "threshold_value": "Значение порога",
+      "threshold_currency": "Валюта порога",
+      "is_active": "Активность"
+    },
+    "form": {
+      "clientDataPolicy": "Данные клиента",
+      "thresholdType": "Способ задания порога",
+      "thresholdValue": "Порог",
+      "thresholdValueHintBaseValue": "Количество базовых величин; действующая величина определяется на дату операции.",
+      "thresholdValueHintCurrency": "Сумма в выбранной валюте.",
+      "thresholdCurrency": "Валюта порога",
+      "active": "Тип операции активен"
     }
   },
   "config": {

@@ -15,25 +15,46 @@ from modules.operations.backend.models import (
     SlotDefTranslation,
 )
 from modules.operations.backend.registry import operation_type_registry
+from modules.operations.backend.thresholds import ClientDataPolicy
 from modules.operations.contracts.dto import OperationTypeSpec
+
+#: Fields owned by the declaring module: synchronisation always refreshes them.
+DECLARATIVE_FIELDS = ("name", "kind", "is_external", "permission_code", "template")
 
 
 def sync_operation_types() -> int:
-    """Create or update the declared operation types; return how many were synced."""
+    """Create or update the declared operation types; return how many were synced.
+
+    Declarative metadata is refreshed on every run. The administrator-managed
+    settings (client-data policy, threshold, activity) are seeded only when the
+    type is created and are never overwritten afterwards.
+    """
     synced = 0
     for spec in operation_type_registry.types():
-        operation_type, _ = OperationType.objects.update_or_create(
-            code=spec.code,
-            defaults={
-                "name": spec.name,
-                "kind": spec.kind,
-                "is_external": spec.is_external,
-                "requires_client": spec.requires_client,
-                "client_id_threshold": spec.client_id_threshold,
-                "permission_code": spec.permission_code,
-                "template": spec.template,
-            },
-        )
+        defaults = {
+            "name": spec.name,
+            "kind": spec.kind,
+            "is_external": spec.is_external,
+            "permission_code": spec.permission_code,
+            "template": spec.template,
+        }
+        operation_type = OperationType.objects.filter(code=spec.code).first()
+        if operation_type is None:
+            operation_type = OperationType(
+                code=spec.code,
+                client_data_policy=spec.client_data_policy
+                or (ClientDataPolicy.ALWAYS if spec.requires_client else ClientDataPolicy.NEVER),
+                threshold_type=spec.threshold_type,
+                threshold_value=spec.threshold_value,
+                threshold_currency=spec.threshold_currency,
+                **defaults,
+            )
+            operation_type.clean()
+            operation_type.save()
+        else:
+            for field, value in defaults.items():
+                setattr(operation_type, field, value)
+            operation_type.save(update_fields=[*DECLARATIVE_FIELDS, "updated_at"])
         _sync_translations(
             OperationTypeTranslation, operation_type, "operation_type", spec.translations
         )

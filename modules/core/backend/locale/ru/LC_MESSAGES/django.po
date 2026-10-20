@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: BankCashOps core\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-16 09:53+0300\n"
+"POT-Creation-Date: 2026-10-20 11:41+0300\n"
 "PO-Revision-Date: 2026-10-16 09:51+0300\n"
 "Last-Translator: BankCashOps\n"
 "Language-Team: Russian\n"
@@ -13,465 +13,534 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=4; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
-"n%10<=4 && (n%100<12 || n%100>14) ? 1 : n%10==0 || (n%10>=5 && n%10<=9) || "
-"(n%100>=11 && n%100<=14)? 2 : 3);\n"
+"Plural-Forms: nplurals=4; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<12 || n%100>14) ? 1 : n%10==0 || (n%10>=5 && n%10<=9) || (n%100>=11 && n%100<=14)? 2 : 3);\n"
 
-#: admin.py:29 models.py:83
+#: modules/core/backend/admin.py:32 modules/core/backend/models.py:86
 msgid "users"
 msgstr "пользователи"
 
-#: admin.py:56
+#: modules/core/backend/admin.py:59
 msgid "Personal information"
 msgstr "Личная информация"
 
-#: admin.py:59
+#: modules/core/backend/admin.py:62
 msgid "Roles"
 msgstr "Роли"
 
-#: admin.py:61
+#: modules/core/backend/admin.py:64
 msgid "Permissions"
 msgstr "Права"
 
-#: admin.py:64
+#: modules/core/backend/admin.py:67
 msgid "Important dates"
 msgstr "Важные даты"
 
-#: admin.py:83
+#: modules/core/backend/admin.py:86
 msgid "full name"
 msgstr "полное имя"
 
-#: apps.py:11
+#: modules/core/backend/admin.py:195 modules/core/backend/admin.py:200
+#: modules/core/backend/models.py:542 modules/core/backend/views.py:197
+msgid "An effective base value cannot be deleted."
+msgstr "Действующую базовую величину нельзя удалить."
+
+#: modules/core/backend/apps.py:11
 msgid "Core"
 msgstr "Ядро"
 
-#: currency_config.py:97
+#: modules/core/backend/currency_config.py:106
 #, python-format
 msgid "Unknown currencies: %(codes)s."
 msgstr "Неизвестные валюты: %(codes)s."
 
-#: serializers.py:511
-msgid "Unknown currency."
-msgstr "Неизвестная валюта."
-
-#: models.py:16
+#: modules/core/backend/models.py:19
 msgid "Enter a MAC address in the form AA:BB:CC:DD:EE:FF."
 msgstr "Введите MAC-адрес в формате AA:BB:CC:DD:EE:FF."
 
-#: models.py:29 models.py:125 models.py:230 models.py:337
+#: modules/core/backend/models.py:32 modules/core/backend/models.py:128
+#: modules/core/backend/models.py:233
 msgid "code"
 msgstr "код"
 
-#: models.py:30 models.py:126 models.py:231 models.py:338
+#: modules/core/backend/models.py:33 modules/core/backend/models.py:129
+#: modules/core/backend/models.py:234
 msgid "name"
 msgstr "название"
 
-#: models.py:31
+#: modules/core/backend/models.py:34
 msgid "description"
 msgstr "описание"
 
-#: models.py:32
+#: modules/core/backend/models.py:35
 msgid "permissions"
 msgstr "права"
 
-#: models.py:34
+#: modules/core/backend/models.py:37
 msgid "system role"
 msgstr "системная роль"
 
-#: models.py:36
+#: modules/core/backend/models.py:39
 msgid "System roles are shipped with the product and cannot be deleted."
 msgstr "Системные роли поставляются с продуктом и не могут быть удалены."
 
-#: models.py:40
+#: modules/core/backend/models.py:43
 msgid "role"
 msgstr "роль"
 
-#: models.py:41 models.py:73
+#: modules/core/backend/models.py:44 modules/core/backend/models.py:76
 msgid "roles"
 msgstr "роли"
 
-#: models.py:58
+#: modules/core/backend/models.py:61
 msgid "email address"
 msgstr "адрес электронной почты"
 
-#: models.py:59
+#: modules/core/backend/models.py:62
 msgid "first name"
 msgstr "имя"
 
-#: models.py:60
+#: modules/core/backend/models.py:63
 msgid "last name"
 msgstr "фамилия"
 
-#: models.py:61
+#: modules/core/backend/models.py:64
 msgid "middle name"
 msgstr "отчество"
 
-#: models.py:62 models.py:128
+#: modules/core/backend/models.py:65 modules/core/backend/models.py:131
 msgid "phone number"
 msgstr "номер телефона"
 
-#: models.py:64
+#: modules/core/backend/models.py:67
 msgid "language"
 msgstr "язык"
 
-#: models.py:67
+#: modules/core/backend/models.py:70
 msgid "Empty means the bank-wide default language."
 msgstr "Пусто — язык по умолчанию для всего банка."
 
-#: models.py:82 models.py:191
+#: modules/core/backend/models.py:85 modules/core/backend/models.py:194
 msgid "user"
 msgstr "пользователь"
 
-#: models.py:123
+#: modules/core/backend/models.py:126
 msgid "parent branch"
 msgstr "родительское отделение"
 
-#: models.py:127
+#: modules/core/backend/models.py:130
 msgid "address"
 msgstr "адрес"
 
-#: models.py:129
+#: modules/core/backend/models.py:132
 msgid "head office"
 msgstr "головной офис"
 
-#: models.py:130 models.py:242 models.py:341
+#: modules/core/backend/models.py:133 modules/core/backend/models.py:245
 msgid "active"
 msgstr "активно"
 
-#: models.py:133 models.py:197 models.py:228 models.py:409
+#: modules/core/backend/models.py:136 modules/core/backend/models.py:200
+#: modules/core/backend/models.py:231 modules/core/backend/models.py:380
 msgid "branch"
 msgstr "отделение"
 
-#: models.py:134
+#: modules/core/backend/models.py:137
 msgid "branches"
 msgstr "отделения"
 
-#: models.py:166 serializers.py:343
+#: modules/core/backend/models.py:169 modules/core/backend/serializers.py:425
 msgid "The head office cannot have a parent."
 msgstr "У головного офиса не может быть родительского отделения."
 
-#: models.py:168 serializers.py:347
+#: modules/core/backend/models.py:171 modules/core/backend/serializers.py:429
 msgid "Only the head office can have no parent."
 msgstr "Только головной офис может не иметь родительского отделения."
 
-#: models.py:171 serializers.py:354
+#: modules/core/backend/models.py:174 modules/core/backend/serializers.py:436
 msgid "A branch cannot be its own ancestor."
 msgstr "Отделение не может быть своим предком."
 
-#: models.py:200
+#: modules/core/backend/models.py:203
 msgid "include child branches"
 msgstr "включая дочерние отделения"
 
-#: models.py:202
+#: modules/core/backend/models.py:205
 msgid "Also grant access to every child branch of this branch."
 msgstr "Также предоставить доступ ко всем дочерним отделениям этого отделения."
 
-#: models.py:206 models.py:207
+#: modules/core/backend/models.py:209 modules/core/backend/models.py:210
 msgid "branch access"
 msgstr "доступ к отделениям"
 
-#: models.py:233
+#: modules/core/backend/models.py:236
 msgid "MAC address"
 msgstr "MAC-адрес"
 
-#: models.py:239
+#: modules/core/backend/models.py:242
 msgid "Network address of the workstation, e.g. AA:BB:CC:DD:EE:FF."
 msgstr "Сетевой адрес рабочего места, например AA:BB:CC:DD:EE:FF."
 
-#: models.py:241
+#: modules/core/backend/models.py:244
 msgid "hostname"
 msgstr "имя хоста"
 
-#: models.py:245 models.py:283 models.py:369 models.py:466
+#: modules/core/backend/models.py:248 modules/core/backend/models.py:286
+#: modules/core/backend/models.py:345 modules/core/backend/models.py:450
 msgid "cash desk"
 msgstr "касса"
 
-#: models.py:246
+#: modules/core/backend/models.py:249
 msgid "cash desks"
 msgstr "кассы"
 
-#: models.py:276
+#: modules/core/backend/models.py:279
 msgid "Open"
 msgstr "Открыта"
 
-#: models.py:277
+#: modules/core/backend/models.py:280
 msgid "Closed"
 msgstr "Закрыта"
 
-#: models.py:289
+#: modules/core/backend/models.py:292
 msgid "cashier"
 msgstr "кассир"
 
-#: models.py:292
+#: modules/core/backend/models.py:295
 msgid "status"
 msgstr "статус"
 
-#: models.py:297
+#: modules/core/backend/models.py:300
 msgid "opened at"
 msgstr "время открытия"
 
-#: models.py:298
+#: modules/core/backend/models.py:301
 msgid "closed at"
 msgstr "время закрытия"
 
-#: models.py:305
+#: modules/core/backend/models.py:308
 msgid "closed by"
 msgstr "закрыл"
 
-#: models.py:309
+#: modules/core/backend/models.py:312
 msgid "shift"
 msgstr "смена"
 
-#: models.py:310
+#: modules/core/backend/models.py:313
 msgid "shifts"
 msgstr "смены"
 
-#: models.py:339
-msgid "symbol"
-msgstr "символ"
-
-#: models.py:340
-msgid "minor units"
-msgstr "число дробных разрядов"
-
-#: models.py:344 models.py:375 models.py:452
+#: modules/core/backend/models.py:347 modules/core/backend/models.py:414
+#: modules/core/backend/models.py:442 modules/core/backend/models.py:497
 msgid "currency"
 msgstr "валюта"
 
-#: models.py:345 models.py:416
-msgid "currencies"
-msgstr "валюты"
-
-#: models.py:379
+#: modules/core/backend/models.py:350
 msgid "cash desk currency"
 msgstr "валюта кассы"
 
-#: models.py:380
+#: modules/core/backend/models.py:351
 msgid "cash desk currencies"
 msgstr "валюты касс"
 
-#: models.py:410
+#: modules/core/backend/models.py:381
 msgid "Empty for the bank-wide template."
 msgstr "Пусто для банковского шаблона."
 
-#: models.py:420
+#: modules/core/backend/models.py:385
 msgid "currency template"
 msgstr "шаблон валют"
 
-#: models.py:421
+#: modules/core/backend/models.py:386
 msgid "currency templates"
 msgstr "шаблоны валют"
 
-#: models.py:432
+#: modules/core/backend/models.py:397
 msgid "Bank template"
 msgstr "Банковский шаблон"
 
-#: models.py:444
-msgid "Buy"
-msgstr "Покупка"
+#: modules/core/backend/models.py:412
+#, fuzzy
+#| msgid "Bank template"
+msgid "template"
+msgstr "Банковский шаблон"
 
-#: models.py:445
-msgid "Sell"
-msgstr "Продажа"
+#: modules/core/backend/models.py:417
+#, fuzzy
+#| msgid "currency template"
+msgid "currency template item"
+msgstr "шаблон валют"
 
-#: models.py:446
-msgid "Central"
-msgstr "Учётный"
+#: modules/core/backend/models.py:418
+#, fuzzy
+#| msgid "currency templates"
+msgid "currency template items"
+msgstr "шаблоны валют"
 
-#: models.py:458
+#: modules/core/backend/models.py:443 modules/core/backend/models.py:557
 msgid "base currency"
 msgstr "базовая валюта"
 
-#: models.py:469
+#: modules/core/backend/models.py:453
 msgid "rate type"
 msgstr "тип курса"
 
-#: models.py:474
+#: modules/core/backend/models.py:457
 msgid "value"
 msgstr "значение"
 
-#: models.py:475
+#: modules/core/backend/models.py:458 modules/core/backend/models.py:495
 msgid "effective from"
 msgstr "действует с"
 
-#: models.py:478
+#: modules/core/backend/models.py:461
 msgid "currency rate"
 msgstr "курс валюты"
 
-#: models.py:479
+#: modules/core/backend/models.py:462
 msgid "currency rates"
 msgstr "курсы валют"
 
-#: models.py:497 serializers.py:517
+#: modules/core/backend/models.py:480 modules/core/backend/serializers.py:602
 msgid "The base currency must differ from the currency."
 msgstr "Базовая валюта должна отличаться от валюты."
 
-#: models.py:510
+#: modules/core/backend/models.py:496
+msgid "amount"
+msgstr "сумма"
+
+#: modules/core/backend/models.py:500
+msgid "base value"
+msgstr "базовая величина"
+
+#: modules/core/backend/models.py:501
+msgid "base values"
+msgstr "базовые величины"
+
+#: modules/core/backend/models.py:511 modules/core/backend/serializers.py:173
+msgid "The amount must be greater than zero."
+msgstr "Сумма должна быть больше нуля."
+
+#: modules/core/backend/models.py:517 modules/core/backend/models.py:594
+#: modules/core/backend/serializers.py:116
+#: modules/core/backend/serializers.py:594
+msgid "Unknown currency."
+msgstr "Неизвестная валюта."
+
+#: modules/core/backend/models.py:530 modules/core/backend/serializers.py:186
+msgid "An effective base value cannot be changed."
+msgstr "Действующую базовую величину нельзя изменить."
+
+#: modules/core/backend/models.py:555
 msgid "default language"
 msgstr "язык по умолчанию"
 
-#: models.py:511
+#: modules/core/backend/models.py:556
 msgid "enabled languages"
 msgstr "доступные языки"
 
-#: models.py:514 models.py:515
+#: modules/core/backend/models.py:560 modules/core/backend/models.py:561
 msgid "bank settings"
 msgstr "настройки банка"
 
-#: models.py:530
+#: modules/core/backend/models.py:576
 #, python-format
 msgid "Unsupported languages: %(codes)s."
 msgstr "Неподдерживаемые языки: %(codes)s."
 
-#: models.py:538
+#: modules/core/backend/models.py:584
 msgid "The default language must be one of the enabled languages."
 msgstr "Язык по умолчанию должен входить в число доступных языков."
 
-#: models.py:556
+#: modules/core/backend/models.py:591 modules/core/backend/serializers.py:114
+msgid "The base currency is required."
+msgstr "Укажите базовую валюту."
+
+#: modules/core/backend/models.py:609 modules/core/backend/serializers.py:128
+msgid "The base currency cannot be changed while currency rates with another base currency exist."
+msgstr "Базовую валюту нельзя изменить, пока существуют курсы с другой базовой валютой."
+
+#: modules/core/backend/models.py:618 modules/core/backend/serializers.py:137
+msgid "The base currency cannot be changed while base values in another currency exist."
+msgstr "Базовую валюту нельзя изменить, пока существуют базовые величины в другой валюте."
+
+#: modules/core/backend/models.py:638
 msgid "Bank settings"
 msgstr "Настройки банка"
 
-#: permission_codes.py:47
+#: modules/core/backend/permission_codes.py:51
 msgid "View users"
 msgstr "Просмотр пользователей"
 
-#: permission_codes.py:48
+#: modules/core/backend/permission_codes.py:52
 msgid "Manage users"
 msgstr "Управление пользователями"
 
-#: permission_codes.py:49
+#: modules/core/backend/permission_codes.py:53
 msgid "View roles"
 msgstr "Просмотр ролей"
 
-#: permission_codes.py:50
+#: modules/core/backend/permission_codes.py:54
 msgid "Manage roles"
 msgstr "Управление ролями"
 
-#: permission_codes.py:51
+#: modules/core/backend/permission_codes.py:55
 msgid "View bank structure"
 msgstr "Просмотр структуры банка"
 
-#: permission_codes.py:52
+#: modules/core/backend/permission_codes.py:56
 msgid "Manage bank structure"
 msgstr "Управление структурой банка"
 
-#: permission_codes.py:53
+#: modules/core/backend/permission_codes.py:57
 msgid "Configure cash desk currencies"
 msgstr "Настройка валют касс"
 
-#: permission_codes.py:56
+#: modules/core/backend/permission_codes.py:60
 msgid "Configure cash desk currencies of own branch"
 msgstr "Настройка валют касс своего отделения"
 
-#: permission_codes.py:58
+#: modules/core/backend/permission_codes.py:62
+msgid "Manage bank settings"
+msgstr "Управление настройками банка"
+
+#: modules/core/backend/permission_codes.py:63
+msgid "View base values"
+msgstr "Просмотр базовых величин"
+
+#: modules/core/backend/permission_codes.py:64
+msgid "Manage base values"
+msgstr "Управление базовыми величинами"
+
+#: modules/core/backend/permission_codes.py:65
 msgid "View cash shifts"
 msgstr "Просмотр кассовых смен"
 
-#: permission_codes.py:59
+#: modules/core/backend/permission_codes.py:66
 msgid "Open a cash shift"
 msgstr "Открытие кассовой смены"
 
-#: permission_codes.py:60
+#: modules/core/backend/permission_codes.py:67
 msgid "Close own shift"
 msgstr "Закрытие своей смены"
 
-#: permission_codes.py:61
+#: modules/core/backend/permission_codes.py:68
 msgid "Manage cash shifts"
 msgstr "Управление кассовыми сменами"
 
-#: serializers.py:85
+#: modules/core/backend/serializers.py:87
 #, python-format
 msgid "Unknown permission codes: %(codes)s."
 msgstr "Неизвестные коды прав: %(codes)s."
 
-#: serializers.py:97
+#: modules/core/backend/serializers.py:99
 msgid "Unsupported language."
 msgstr "Неподдерживаемый язык."
 
-#: serializers.py:181 serializers.py:259
+#: modules/core/backend/serializers.py:263
+#: modules/core/backend/serializers.py:341
 msgid "Passwords do not match."
 msgstr "Пароли не совпадают."
 
-#: serializers.py:253
+#: modules/core/backend/serializers.py:335
 msgid "The current password is incorrect."
 msgstr "Текущий пароль неверен."
 
-#: serializers.py:335
+#: modules/core/backend/serializers.py:417
 msgid "A branch with this code already exists."
 msgstr "Отделение с таким кодом уже существует."
 
-#: serializers.py:407
+#: modules/core/backend/serializers.py:489
 msgid "A cash desk with this code already exists."
 msgstr "Касса с таким кодом уже существует."
 
-#: shifts.py:43
+#: modules/core/backend/shifts.py:43
 msgid "The cash desk is not active."
 msgstr "Касса неактивна."
 
-#: shifts.py:45
+#: modules/core/backend/shifts.py:45
 msgid "The branch is not active."
 msgstr "Отделение неактивно."
 
-#: shifts.py:47
+#: modules/core/backend/shifts.py:47
 msgid "The cash desk is not available to you."
 msgstr "Касса недоступна для вас."
 
-#: shifts.py:49
+#: modules/core/backend/shifts.py:49
 msgid "You already have an open shift."
 msgstr "У вас уже есть открытая смена."
 
-#: shifts.py:51
+#: modules/core/backend/shifts.py:51
 msgid "The cash desk already has an open shift."
 msgstr "На кассе уже есть открытая смена."
 
-#: shifts.py:68
+#: modules/core/backend/shifts.py:68
 msgid "The shift is already closed."
 msgstr "Смена уже закрыта."
 
-#: views.py:79
+#: modules/core/backend/views.py:92
 msgid "This field is required."
 msgstr "Это поле обязательно."
 
-#: views.py:116
+#: modules/core/backend/views.py:129
 msgid "Password has been changed."
 msgstr "Пароль изменён."
 
-#: views.py:195
+#: modules/core/backend/views.py:254
 msgid "You cannot delete your own account."
 msgstr "Нельзя удалить собственную учётную запись."
 
-#: views.py:217
+#: modules/core/backend/views.py:276
 msgid "You cannot deactivate your own account."
 msgstr "Нельзя деактивировать собственную учётную запись."
 
-#: views.py:246
+#: modules/core/backend/views.py:305
 msgid "A system role cannot be deleted."
 msgstr "Системную роль нельзя удалить."
 
-#: views.py:250
+#: modules/core/backend/views.py:309
 msgid "The role is assigned to users."
 msgstr "Роль назначена пользователям."
 
-#: views.py:327
+#: modules/core/backend/views.py:386
 msgid "The branch has nested branches or cash desks."
 msgstr "У отделения есть вложенные отделения или кассы."
 
-#: views.py:375
+#: modules/core/backend/views.py:434
 msgid "A valid integer is required."
 msgstr "Требуется корректное целое число."
 
-#: views.py:394 views.py:608 views.py:618 views.py:640 views.py:651
+#: modules/core/backend/views.py:453 modules/core/backend/views.py:637
+#: modules/core/backend/views.py:647 modules/core/backend/views.py:667
+#: modules/core/backend/views.py:678
 msgid "You do not have permission to perform this action."
 msgstr "У вас нет прав на выполнение этого действия."
 
-#: views.py:407
+#: modules/core/backend/views.py:466
 msgid "The cash desk has shifts."
 msgstr "У кассы есть смены."
 
-#: views.py:524
+#: modules/core/backend/views.py:554
 msgid "You can only close your own shift."
 msgstr "Вы можете закрыть только свою смену."
 
-#: views.py:557 views.py:562
+#: modules/core/backend/views.py:586 modules/core/backend/views.py:591
 msgid "No branch matches the given query."
 msgstr "Нет отделения, соответствующего запросу."
+
+#~ msgid "symbol"
+#~ msgstr "символ"
+
+#~ msgid "minor units"
+#~ msgstr "число дробных разрядов"
+
+#~ msgid "currencies"
+#~ msgstr "валюты"
+
+#~ msgid "Buy"
+#~ msgstr "Покупка"
+
+#~ msgid "Sell"
+#~ msgstr "Продажа"
+
+#~ msgid "Central"
+#~ msgstr "Учётный"

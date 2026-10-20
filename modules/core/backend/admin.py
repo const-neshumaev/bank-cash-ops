@@ -1,9 +1,11 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from modules.core.backend.models import (
     BankSettings,
+    BaseValue,
     Branch,
     BranchAccess,
     CashDesk,
@@ -170,10 +172,32 @@ class ShiftAdmin(admin.ModelAdmin):
 
 @admin.register(BankSettings)
 class BankSettingsAdmin(admin.ModelAdmin):
-    """Administer the bank-wide settings (offered languages and the default)."""
+    """Administer the bank-wide settings (base currency and languages)."""
 
     def has_add_permission(self, request):
         return not BankSettings.objects.exists()
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(BaseValue)
+class BaseValueAdmin(admin.ModelAdmin):
+    """Administer the effective-dated base values."""
+
+    list_display = ("effective_from", "amount", "currency_code", "updated_at")
+    ordering = ("-effective_from",)
+    readonly_fields = ("currency_code", "created_at", "updated_at")
+
+    def delete_model(self, request, obj):
+        if obj.effective_from <= timezone.localdate():
+            messages.error(request, _("An effective base value cannot be deleted."))
+            return
+        return super().delete_model(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        effective = queryset.filter(effective_from__lte=timezone.localdate())
+        if effective.exists():
+            messages.error(request, _("An effective base value cannot be deleted."))
+            queryset = queryset.exclude(pk__in=effective)
+        return super().delete_queryset(request, queryset)

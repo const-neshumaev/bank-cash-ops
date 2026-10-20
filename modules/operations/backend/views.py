@@ -7,6 +7,7 @@ contract. Reads are narrowed to the cash desks the caller may access.
 
 from __future__ import annotations
 
+from django.db import transaction
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.types import OpenApiTypes
@@ -21,16 +22,17 @@ from modules.common.backend.permissions import PermissionRequired
 from modules.common.contracts import registry
 from modules.core.contracts import CASH_DESK_CONFIG, ORG_DIRECTORY
 from modules.operations.backend import config, serializers
+from modules.operations.backend import history as history_service
 from modules.operations.backend.engine import post_operation, reverse_operation
 from modules.operations.backend.filters import CashBalanceFilter, OperationFilter
 from modules.operations.backend.models import (
     CashBalance,
     Operation,
-    OperationsSettings,
     OperationTemplate,
     OperationType,
 )
 from modules.operations.backend.permission_codes import PermissionCode
+from modules.operations.backend.thresholds import THRESHOLD_TYPES
 from modules.operations.contracts import SlotValue
 from modules.references.contracts import REFERENCE_DIRECTORY
 
@@ -114,18 +116,83 @@ def _current_shift(user):
     return shift
 
 
-class OperationTypeViewSet(viewsets.ReadOnlyModelViewSet):
-    """Read-only catalogue of operation types (for pickers and configuration)."""
+class OperationTypeViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    viewsets.GenericViewSet,
+):
+    """Catalogue of operation types and their administrator-managed settings.
 
-    queryset = OperationType.objects.prefetch_related("slots").all()
+    Reading and the settings history require ``operations.view``; changing the
+    client-data policy, threshold or activity requires
+    ``operations.types.manage``. The declarative metadata is read-only.
+    """
+
+    queryset = OperationType.objects.prefetch_related("slots", "translations").all()
     serializer_class = serializers.OperationTypeSerializer
     permission_classes = [PermissionRequired]
     required_permission = PermissionCode.VIEW
+    permission_map = {
+        "list": PermissionCode.VIEW,
+        "retrieve": PermissionCode.VIEW,
+        "update": PermissionCode.TYPES_MANAGE,
+        "partial_update": PermissionCode.TYPES_MANAGE,
+        "history": PermissionCode.VIEW,
+    }
     lookup_field = "code"
-    filterset_fields = ("kind", "is_external", "requires_client", "is_active")
+    filterset_fields = ("kind", "is_external", "client_data_policy", "is_active")
     search_fields = ("code", "name")
     ordering_fields = ("name", "code")
     ordering = ("name",)
+
+    def get_serializer_class(self):
+        if self.action == "history":
+            return serializers.OperationTypeHistorySerializer
+        return super().get_serializer_class()
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        before = history_service.snapshot(instance)
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        with transaction.atomic():
+            self.perform_update(serializer)
+            history_service.record_settings_change(
+                instance, before=before, user=request.user
+            )
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["get"])
+    def history(self, request, code=None):
+        """Return the settings change history of one operation type."""
+        operation_type = self.get_object()
+        queryset = operation_type.settings_changes.all()
+        page = self.paginate_queryset(queryset)
+        serializer = self.get_serializer(page if page is not None else queryset, many=True)
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
+
+
+class ThresholdTypeListView(APIView):
+    """List the predefined threshold functions for the administration UI."""
+
+    permission_classes = [PermissionRequired]
+    required_permission = PermissionCode.VIEW
+
+    def get(self, request):
+        return Response(
+            [
+                {
+                    "code": item.code,
+                    "name": str(item.name),
+                    "requires_currency": item.requires_currency,
+                }
+                for item in THRESHOLD_TYPES
+            ]
+        )
 
 
 class CashBalanceViewSet(viewsets.ReadOnlyModelViewSet):
@@ -249,32 +316,6 @@ class OperationViewSet(
             serializers.OperationSerializer(reversal).data,
             status=status.HTTP_201_CREATED,
         )
-
-
-class OperationsSettingsView(APIView):
-    """Read and update the bank-wide operations settings (a singleton)."""
-
-    @extend_schema(responses=serializers.OperationsSettingsSerializer)
-    def get(self, request):
-        if not request.user.has_permission(PermissionCode.VIEW):
-            raise PermissionDenied(_("You do not have permission to perform this action."))
-        settings = OperationsSettings.load()
-        return Response(serializers.OperationsSettingsSerializer(settings).data)
-
-    @extend_schema(
-        request=serializers.OperationsSettingsSerializer,
-        responses=serializers.OperationsSettingsSerializer,
-    )
-    def patch(self, request):
-        if not request.user.has_permission(PermissionCode.CONFIG_MANAGE):
-            raise PermissionDenied(_("You do not have permission to perform this action."))
-        settings = OperationsSettings.load()
-        serializer = serializers.OperationsSettingsSerializer(
-            settings, data=request.data, partial=True
-        )
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
 
 
 class CashDeskOperationsView(APIView):

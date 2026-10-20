@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: BankCashOps operations\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-16 09:53+0300\n"
+"POT-Creation-Date: 2026-10-20 11:41+0300\n"
 "PO-Revision-Date: 2026-10-16 09:51+0300\n"
 "Last-Translator: BankCashOps\n"
 "Language-Team: Russian\n"
@@ -13,381 +13,520 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=4; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
-"n%10<=4 && (n%100<12 || n%100>14) ? 1 : n%10==0 || (n%10>=5 && n%10<=9) || "
-"(n%100>=11 && n%100<=14)? 2 : 3);\n"
+"Plural-Forms: nplurals=4; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<12 || n%100>14) ? 1 : n%10==0 || (n%10>=5 && n%10<=9) || (n%100>=11 && n%100<=14)? 2 : 3);\n"
 
-#: apps.py:11
+#: modules/operations/backend/apps.py:11
 msgid "Operations"
 msgstr "Кассовые операции"
 
-#: config.py:124
+#: modules/operations/backend/config.py:124
 #, python-format
 msgid "Unknown operation types: %(codes)s."
 msgstr "Неизвестные типы операций: %(codes)s."
 
-#: engine.py:60 serializers.py:137
+#: modules/operations/backend/engine.py:60
+#: modules/operations/backend/serializers.py:216
 msgid "The operation type is not active."
 msgstr "Тип операции неактивен."
 
-#: engine.py:81
+#: modules/operations/backend/engine.py:81
 msgid "The operation produced no postings."
 msgstr "Операция не сформировала проводок."
 
-#: engine.py:124
+#: modules/operations/backend/engine.py:124
 msgid "A reversal operation cannot be reversed."
 msgstr "Сторнирующую операцию нельзя сторнировать."
 
-#: engine.py:126
+#: modules/operations/backend/engine.py:126
 msgid "Only a posted operation can be reversed."
 msgstr "Сторнировать можно только проведённую операцию."
 
-#: engine.py:128
+#: modules/operations/backend/engine.py:128
 msgid "The operation has already been reversed."
 msgstr "Операция уже сторнирована."
 
-#: engine.py:185
+#: modules/operations/backend/engine.py:185
 #, python-format
 msgid "The slot '%(slot)s' is filled more than once."
 msgstr "Слот «%(slot)s» заполнен более одного раза."
 
-#: engine.py:190
+#: modules/operations/backend/engine.py:190
 #, python-format
 msgid "Unknown slot '%(slot)s'."
 msgstr "Неизвестный слот «%(slot)s»."
 
-#: engine.py:193
+#: modules/operations/backend/engine.py:193
 #, python-format
 msgid "The slot '%(slot)s' only accepts %(currency)s."
 msgstr "Слот «%(slot)s» принимает только %(currency)s."
 
-#: engine.py:200
+#: modules/operations/backend/engine.py:200
 #, python-format
 msgid "Missing required slots: %(slots)s."
 msgstr "Не заполнены обязательные слоты: %(slots)s."
 
-#: engine.py:212
+#: modules/operations/backend/engine.py:212
 #, python-format
 msgid "The operation type '%(code)s' has no handler and no template."
 msgstr "У типа операции «%(code)s» нет ни обработчика, ни шаблона."
 
-#: engine.py:231
+#: modules/operations/backend/engine.py:231
 #, python-format
 msgid "The template references an unfilled slot '%(slot)s'."
 msgstr "Шаблон ссылается на незаполненный слот «%(slot)s»."
 
-#: engine.py:337
+#: modules/operations/backend/engine.py:337
 #, python-format
 msgid "Insufficient cash: %(currency)s balance at the cash desk is %(amount)s."
 msgstr "Недостаточно наличных: остаток %(currency)s на кассе — %(amount)s."
 
-#: models.py:40
+#: modules/operations/backend/models.py:40
 msgid "Income"
 msgstr "Приход"
 
-#: models.py:41
+#: modules/operations/backend/models.py:41
 msgid "Expense"
 msgstr "Расход"
 
-#: models.py:42
+#: modules/operations/backend/models.py:42
 msgid "Exchange"
 msgstr "Обмен"
 
-#: models.py:43
+#: modules/operations/backend/models.py:43
 msgid "Internal"
 msgstr "Внутренняя"
 
-#: models.py:45 models.py:95
+#: modules/operations/backend/models.py:45
+#: modules/operations/backend/models.py:208
 msgid "code"
 msgstr "код"
 
-#: models.py:46 models.py:96
+#: modules/operations/backend/models.py:46
+#: modules/operations/backend/models.py:144
+#: modules/operations/backend/models.py:209
+#: modules/operations/backend/models.py:262
 msgid "name"
 msgstr "название"
 
-#: models.py:47
+#: modules/operations/backend/models.py:47
 msgid "kind"
 msgstr "вид"
 
-#: models.py:49
+#: modules/operations/backend/models.py:49
 msgid "external operation"
 msgstr "внешняя операция"
 
-#: models.py:51
+#: modules/operations/backend/models.py:51
 msgid "The operation calls a bank subsystem over REST."
 msgstr "Операция обращается к подсистеме банка по REST."
 
-#: models.py:53
-msgid "requires client data"
-msgstr "требуются данные клиента"
+#: modules/operations/backend/models.py:54
+msgid "client data policy"
+msgstr "политика данных клиента"
 
-#: models.py:55 models.py:300
-msgid "client document threshold"
-msgstr "порог для документа клиента"
+#: modules/operations/backend/models.py:58
+msgid "When the operation asks for the client's data."
+msgstr "Когда операция запрашивает данные клиента."
 
-#: models.py:60
-msgid "Amount in the base currency above which a client document is required."
-msgstr "Сумма в базовой валюте, выше которой требуется документ клиента."
+#: modules/operations/backend/models.py:61
+msgid "threshold type"
+msgstr "тип порога"
 
-#: models.py:63
+#: modules/operations/backend/models.py:64
+msgid "Predefined threshold function used by the client data policy."
+msgstr "Предопределённая функция порога, используемая политикой данных клиента."
+
+#: modules/operations/backend/models.py:67
+msgid "threshold value"
+msgstr "значение порога"
+
+#: modules/operations/backend/models.py:74
+msgid "threshold currency"
+msgstr "валюта порога"
+
+#: modules/operations/backend/models.py:77
+msgid "Currency of the threshold when the threshold type requires one."
+msgstr "Валюта порога, если тип порога её требует."
+
+#: modules/operations/backend/models.py:80
 msgid "required permission"
 msgstr "требуемое право"
 
-#: models.py:66
+#: modules/operations/backend/models.py:83
 msgid "Permission code a user needs to perform the operation."
 msgstr "Код права, необходимый пользователю для выполнения операции."
 
-#: models.py:69
+#: modules/operations/backend/models.py:86
 msgid "posting template"
 msgstr "шаблон проводок"
 
-#: models.py:72
+#: modules/operations/backend/models.py:89
 msgid "Declarative postings for operations without a handler."
 msgstr "Декларативные проводки для операций без обработчика."
 
-#: models.py:74
+#: modules/operations/backend/models.py:91
 msgid "active"
 msgstr "активно"
 
-#: models.py:77 models.py:93 models.py:137 models.py:228 models.py:348
+#: modules/operations/backend/models.py:94
+#: modules/operations/backend/models.py:141
+#: modules/operations/backend/models.py:176
+#: modules/operations/backend/models.py:206
+#: modules/operations/backend/models.py:295
+#: modules/operations/backend/models.py:386
+#: modules/operations/backend/models.py:461
 msgid "operation type"
 msgstr "тип операции"
 
-#: models.py:78 models.py:382
+#: modules/operations/backend/models.py:95
+#: modules/operations/backend/models.py:495
 msgid "operation types"
 msgstr "типы операций"
 
-#: models.py:97
+#: modules/operations/backend/models.py:143
+#: modules/operations/backend/models.py:261
+msgid "language"
+msgstr ""
+
+#: modules/operations/backend/models.py:147
+#, fuzzy
+#| msgid "operation types"
+msgid "operation type translation"
+msgstr "типы операций"
+
+#: modules/operations/backend/models.py:148
+#, fuzzy
+#| msgid "operation types"
+msgid "operation type translations"
+msgstr "типы операций"
+
+#: modules/operations/backend/models.py:178
+msgid "changed at"
+msgstr "дата изменения"
+
+#: modules/operations/backend/models.py:179
+msgid "changed by"
+msgstr "кто изменил"
+
+#: modules/operations/backend/models.py:180
+msgid "changed by (email)"
+msgstr "кто изменил (email)"
+
+#: modules/operations/backend/models.py:181
+msgid "changes"
+msgstr "изменения"
+
+#: modules/operations/backend/models.py:184
+msgid "operation type settings change"
+msgstr "изменение настроек типа операции"
+
+#: modules/operations/backend/models.py:185
+msgid "operation type settings changes"
+msgstr "изменения настроек типа операции"
+
+#: modules/operations/backend/models.py:210
 msgid "required"
 msgstr "обязательный"
 
-#: models.py:99 models.py:202 models.py:227 models.py:252
+#: modules/operations/backend/models.py:212
+#: modules/operations/backend/models.py:360
+#: modules/operations/backend/models.py:385
+#: modules/operations/backend/models.py:410
 msgid "currency"
 msgstr "валюта"
 
-#: models.py:102
+#: modules/operations/backend/models.py:215
 msgid "When set, the slot only accepts this currency."
 msgstr "Если задано, слот принимает только эту валюту."
 
-#: models.py:104
+#: modules/operations/backend/models.py:217
 msgid "order"
 msgstr "порядок"
 
-#: models.py:107 models.py:201
+#: modules/operations/backend/models.py:220
+#: modules/operations/backend/models.py:259
+#: modules/operations/backend/models.py:359
 msgid "slot"
 msgstr "слот"
 
-#: models.py:108
+#: modules/operations/backend/models.py:221
 msgid "slots"
 msgstr "слоты"
 
-#: models.py:130
+#: modules/operations/backend/models.py:265
+msgid "slot translation"
+msgstr ""
+
+#: modules/operations/backend/models.py:266
+msgid "slot translations"
+msgstr ""
+
+#: modules/operations/backend/models.py:288
 msgid "Posted"
 msgstr "Проведена"
 
-#: models.py:131
+#: modules/operations/backend/models.py:289
 msgid "Reversed"
 msgstr "Сторнирована"
 
-#: models.py:140
+#: modules/operations/backend/models.py:298
 msgid "number"
 msgstr "номер"
 
-#: models.py:141
+#: modules/operations/backend/models.py:299
 msgid "Running number within the cash desk."
 msgstr "Порядковый номер в пределах кассы."
 
-#: models.py:143 models.py:226 models.py:251 models.py:278 models.py:343
+#: modules/operations/backend/models.py:301
+#: modules/operations/backend/models.py:384
+#: modules/operations/backend/models.py:409
+#: modules/operations/backend/models.py:436
+#: modules/operations/backend/models.py:456
 msgid "cash desk"
 msgstr "касса"
 
-#: models.py:144
+#: modules/operations/backend/models.py:302
 msgid "shift"
 msgstr "смена"
 
-#: models.py:145
+#: modules/operations/backend/models.py:303
 msgid "cashier"
 msgstr "кассир"
 
-#: models.py:147
+#: modules/operations/backend/models.py:305
 msgid "status"
 msgstr "статус"
 
-#: models.py:152
+#: modules/operations/backend/models.py:310
 msgid "idempotency key"
 msgstr "ключ идемпотентности"
 
-#: models.py:153
+#: modules/operations/backend/models.py:311
 msgid "client name"
 msgstr "имя клиента"
 
-#: models.py:154
+#: modules/operations/backend/models.py:312
 msgid "client document"
 msgstr "документ клиента"
 
-#: models.py:155
+#: modules/operations/backend/models.py:313
 msgid "comment"
 msgstr "комментарий"
 
-#: models.py:156
+#: modules/operations/backend/models.py:314
 msgid "posted at"
 msgstr "время проведения"
 
-#: models.py:163
+#: modules/operations/backend/models.py:321
 msgid "reversal of"
 msgstr "сторно операции"
 
-#: models.py:167 models.py:199 models.py:223
+#: modules/operations/backend/models.py:325
+#: modules/operations/backend/models.py:357
+#: modules/operations/backend/models.py:381
 msgid "operation"
 msgstr "операция"
 
-#: models.py:168
+#: modules/operations/backend/models.py:326
 msgid "operations"
 msgstr "операции"
 
-#: models.py:203 models.py:229 models.py:253
+#: modules/operations/backend/models.py:361
+#: modules/operations/backend/models.py:387
+#: modules/operations/backend/models.py:411
 msgid "amount"
 msgstr "сумма"
 
-#: models.py:204
+#: modules/operations/backend/models.py:362
 msgid "rate"
 msgstr "курс"
 
-#: models.py:207
+#: modules/operations/backend/models.py:365
 msgid "operation line"
 msgstr "строка операции"
 
-#: models.py:208
+#: modules/operations/backend/models.py:366
 msgid "operation lines"
 msgstr "строки операции"
 
-#: models.py:225
+#: modules/operations/backend/models.py:383
 msgid "register"
 msgstr "регистр"
 
-#: models.py:232
+#: modules/operations/backend/models.py:390
 msgid "movement"
 msgstr "движение"
 
-#: models.py:233
+#: modules/operations/backend/models.py:391
 msgid "movements"
 msgstr "движения"
 
-#: models.py:256
+#: modules/operations/backend/models.py:414
 msgid "cash balance"
 msgstr "остаток наличных"
 
-#: models.py:257
+#: modules/operations/backend/models.py:415
 msgid "cash balances"
 msgstr "остатки наличных"
 
-#: models.py:279
+#: modules/operations/backend/models.py:437
 msgid "last number"
 msgstr "последний номер"
 
-#: models.py:282
+#: modules/operations/backend/models.py:440
 msgid "operation number sequence"
 msgstr "последовательность номеров операций"
 
-#: models.py:283
+#: modules/operations/backend/models.py:441
 msgid "operation number sequences"
 msgstr "последовательности номеров операций"
 
-#: models.py:298
-msgid "base currency"
-msgstr "базовая валюта"
-
-#: models.py:305
-msgid "require client data"
-msgstr "требовать данные клиента"
-
-#: models.py:308 models.py:309
-msgid "operations settings"
-msgstr "настройки операций"
-
-#: models.py:332
-msgid "Operations settings"
-msgstr "Настройки операций"
-
-#: models.py:352
+#: modules/operations/backend/models.py:465
 msgid "cash desk operation"
 msgstr "операция кассы"
 
-#: models.py:353
+#: modules/operations/backend/models.py:466
 msgid "cash desk operations"
 msgstr "операции касс"
 
-#: models.py:377
+#: modules/operations/backend/models.py:490
 msgid "branch"
 msgstr "отделение"
 
-#: models.py:386
+#: modules/operations/backend/models.py:499
 msgid "operation template"
 msgstr "шаблон операций"
 
-#: models.py:387
+#: modules/operations/backend/models.py:500
 msgid "operation templates"
 msgstr "шаблоны операций"
 
-#: models.py:398
+#: modules/operations/backend/models.py:511
 msgid "Bank template"
 msgstr "Банковский шаблон"
 
-#: permission_codes.py:37
+#: modules/operations/backend/permission_codes.py:37
 msgid "View cash operations"
 msgstr "Просмотр кассовых операций"
 
-#: permission_codes.py:38
+#: modules/operations/backend/permission_codes.py:38
 msgid "Perform cash operations"
 msgstr "Выполнение кассовых операций"
 
-#: permission_codes.py:39
+#: modules/operations/backend/permission_codes.py:39
 msgid "Reverse operations"
 msgstr "Сторнирование операций"
 
-#: permission_codes.py:40
+#: modules/operations/backend/permission_codes.py:40
 msgid "Manage operation types"
 msgstr "Управление типами операций"
 
-#: permission_codes.py:41
+#: modules/operations/backend/permission_codes.py:41
 msgid "Configure cash desk operations"
 msgstr "Настройка операций касс"
 
-#: permission_codes.py:44
+#: modules/operations/backend/permission_codes.py:44
 msgid "Configure cash desk operations of own branch"
 msgstr "Настройка операций касс своего отделения"
 
-#: views.py:72
+#: modules/operations/backend/thresholds.py:32
+msgid "Never"
+msgstr "Никогда"
+
+#: modules/operations/backend/thresholds.py:33
+msgid "Always"
+msgstr "Всегда"
+
+#: modules/operations/backend/thresholds.py:34
+msgid "Above threshold"
+msgstr "При превышении порога"
+
+#: modules/operations/backend/thresholds.py:60
+msgid "Base values"
+msgstr "Базовые величины"
+
+#: modules/operations/backend/thresholds.py:64
+msgid "Amount in a currency"
+msgstr "Сумма в валюте"
+
+#: modules/operations/backend/thresholds.py:92
+msgid "Unknown client data policy."
+msgstr "Неизвестная политика данных клиента."
+
+#: modules/operations/backend/thresholds.py:98
+msgid "The threshold type is required."
+msgstr "Укажите тип порога."
+
+#: modules/operations/backend/thresholds.py:101
+msgid "The threshold value is required."
+msgstr "Укажите значение порога."
+
+#: modules/operations/backend/thresholds.py:103
+msgid "The threshold value must be greater than zero."
+msgstr "Значение порога должно быть больше нуля."
+
+#: modules/operations/backend/thresholds.py:108
+msgid "The threshold currency is required."
+msgstr "Укажите валюту порога."
+
+#: modules/operations/backend/thresholds.py:112
+msgid "Unknown currency."
+msgstr "Неизвестная валюта."
+
+#: modules/operations/backend/thresholds.py:115
+msgid "The threshold currency is only allowed for the currency threshold type."
+msgstr "Валюта порога допустима только для порога в конкретной валюте."
+
+#: modules/operations/backend/views.py:79
 msgid "No such branch."
 msgstr "Отделение не найдено."
 
-#: views.py:108
+#: modules/operations/backend/views.py:115
 msgid "You have no open shift."
 msgstr "У вас нет открытой смены."
 
-#: views.py:190
+#: modules/operations/backend/views.py:262
 msgid "You are not allowed to perform this operation."
 msgstr "Вам не разрешено выполнять эту операцию."
 
-#: views.py:195
+#: modules/operations/backend/views.py:267
 msgid "The operation is not available at this cash desk."
 msgstr "Операция недоступна на этой кассе."
 
-#: views.py:211
+#: modules/operations/backend/views.py:283
 #, python-format
 msgid "The currency %(currency)s is not available at this cash desk."
 msgstr "Валюта %(currency)s недоступна на этой кассе."
 
-#: views.py:255 views.py:265 views.py:285 views.py:299 views.py:312
-#: views.py:333 views.py:342 views.py:351 views.py:362 views.py:372
-#: views.py:381 views.py:392
+#: modules/operations/backend/views.py:331
+#: modules/operations/backend/views.py:345
+#: modules/operations/backend/views.py:358
+#: modules/operations/backend/views.py:379
+#: modules/operations/backend/views.py:388
+#: modules/operations/backend/views.py:397
+#: modules/operations/backend/views.py:408
+#: modules/operations/backend/views.py:418
+#: modules/operations/backend/views.py:427
+#: modules/operations/backend/views.py:438
 msgid "You do not have permission to perform this action."
 msgstr "У вас нет прав на выполнение этого действия."
 
-#: views.py:287
+#: modules/operations/backend/views.py:333
 msgid "The cash desk is not available to you."
 msgstr "Касса недоступна для вас."
 
-#: views.py:297
+#: modules/operations/backend/views.py:343
 msgid "No cash desk matches the given query."
 msgstr "Нет кассы, соответствующей запросу."
+
+#~ msgid "requires client data"
+#~ msgstr "требуются данные клиента"
+
+#~ msgid "Amount in the base currency above which a client document is required."
+#~ msgstr "Сумма в базовой валюте, выше которой требуется документ клиента."
+
+#~ msgid "require client data"
+#~ msgstr "требовать данные клиента"
+
+#~ msgid "Operations settings"
+#~ msgstr "Настройки операций"
