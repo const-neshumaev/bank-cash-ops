@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.db.models import ProtectedError, Q
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
@@ -19,6 +20,7 @@ from modules.core.backend import currency_config, scoping, serializers, shifts
 from modules.core.backend.filters import ShiftFilter
 from modules.core.backend.models import (
     BankSettings,
+    BaseValue,
     Branch,
     CashDesk,
     CurrencyRate,
@@ -139,16 +141,62 @@ class PermissionCatalogView(APIView):
 
 
 class BankSettingsView(APIView):
-    """Read the bank-wide settings: the offered languages and the default one.
+    """Read the bank-wide settings and let an administrator update them.
 
-    Public on purpose: the SPA reads it before authentication to render the login
-    screen in the bank's default language (see ADR 0015).
+    Reading is public on purpose: the SPA reads the settings before
+    authentication to render the login screen in the bank's default language (see
+    ADR 0015). Updating requires ``core.bank_settings.manage``.
     """
 
     permission_classes = [AllowAny]
+    required_permission = PermissionCode.BANK_SETTINGS_MANAGE
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [AllowAny()]
+        return [PermissionRequired()]
 
     def get(self, request):
         return Response(serializers.BankSettingsSerializer(BankSettings.load()).data)
+
+    def patch(self, request):
+        settings_obj = BankSettings.load()
+        serializer = serializers.BankSettingsSerializer(
+            settings_obj, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializers.BankSettingsSerializer(settings_obj).data)
+
+
+class BaseValueViewSet(viewsets.ModelViewSet):
+    """CRUD administration of the effective-dated base values.
+
+    Any authenticated user with ``core.base_values.view`` may read the catalogue;
+    changes require ``core.base_values.manage``. A row that is already in force is
+    immutable, so only future rows can be edited or deleted.
+    """
+
+    queryset = BaseValue.objects.all()
+    serializer_class = serializers.BaseValueSerializer
+    permission_classes = [PermissionRequired]
+    permission_map = {
+        "list": PermissionCode.BASE_VALUES_VIEW,
+        "retrieve": PermissionCode.BASE_VALUES_VIEW,
+        "create": PermissionCode.BASE_VALUES_MANAGE,
+        "update": PermissionCode.BASE_VALUES_MANAGE,
+        "partial_update": PermissionCode.BASE_VALUES_MANAGE,
+        "destroy": PermissionCode.BASE_VALUES_MANAGE,
+    }
+    ordering_fields = ("effective_from", "amount")
+    ordering = ("-effective_from",)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.effective_from <= timezone.localdate():
+            raise ValidationError(_("An effective base value cannot be deleted."))
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class UserViewSet(viewsets.ModelViewSet):

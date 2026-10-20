@@ -1,5 +1,6 @@
 from django.contrib import admin
 
+from modules.operations.backend import history as history_service
 from modules.operations.backend.models import (
     CashBalance,
     CashDeskOperation,
@@ -7,9 +8,9 @@ from modules.operations.backend.models import (
     Operation,
     OperationLine,
     OperationNumberSequence,
-    OperationsSettings,
     OperationTemplate,
     OperationType,
+    OperationTypeSettingsChange,
     OperationTypeTranslation,
     SlotDef,
     SlotDefTranslation,
@@ -41,11 +42,18 @@ class SlotDefTranslationInline(admin.TabularInline):
 class OperationTypeAdmin(admin.ModelAdmin):
     """Administration of the operation type catalogue."""
 
-    list_display = ("name", "code", "kind", "is_external", "requires_client", "is_active")
-    list_filter = ("kind", "is_external", "requires_client", "is_active")
+    list_display = ("name", "code", "kind", "client_data_policy", "is_active")
+    list_filter = ("kind", "is_external", "client_data_policy", "is_active")
     search_fields = ("name", "code")
     readonly_fields = ("created_at", "updated_at")
     inlines = (SlotDefInline, OperationTypeTranslationInline)
+
+    def save_model(self, request, obj, form, change):
+        before = history_service.snapshot(type(obj).objects.get(pk=obj.pk)) if change else None
+        super().save_model(request, obj, form, change)
+        history_service.record_settings_change(
+            obj, before=before, user=request.user
+        )
 
 
 @admin.register(SlotDef)
@@ -141,6 +149,28 @@ class OperationNumberSequenceAdmin(admin.ModelAdmin):
     search_fields = ("cash_desk_id",)
 
 
+@admin.register(OperationTypeSettingsChange)
+class OperationTypeSettingsChangeAdmin(admin.ModelAdmin):
+    """Read-only audit trail of the administrator-managed type settings."""
+
+    list_display = ("operation_type", "changed_at", "changed_by_email")
+    list_filter = ("operation_type",)
+    search_fields = ("operation_type__code", "operation_type__name", "changed_by_email")
+    readonly_fields = (
+        "operation_type",
+        "changed_at",
+        "changed_by_id",
+        "changed_by_email",
+        "changes",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(CashDeskOperation)
 class CashDeskOperationAdmin(admin.ModelAdmin):
     """Administration of the per-cash-desk operation configuration."""
@@ -159,14 +189,3 @@ class OperationTemplateAdmin(admin.ModelAdmin):
     list_display = ("__str__", "branch_id")
     list_filter = ("branch_id",)
     filter_horizontal = ("operation_types",)
-
-
-@admin.register(OperationsSettings)
-class OperationsSettingsAdmin(admin.ModelAdmin):
-    """Administer the bank-wide operation settings."""
-
-    def has_add_permission(self, request):
-        return not OperationsSettings.objects.exists()
-
-    def has_delete_permission(self, request, obj=None):
-        return False

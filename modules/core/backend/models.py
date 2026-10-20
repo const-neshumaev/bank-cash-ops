@@ -3,14 +3,16 @@ from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
+from django.utils import timezone
 from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
 
 from modules.common.backend.models import TimeStampedModel
 from modules.common.backend.schemas import qualified_table
+from modules.common.contracts import registry
 from modules.core.backend.managers import UserManager
 from modules.core.backend.permission_codes import PermissionCode
-from modules.references.contracts import CurrencyRatePrinciple
+from modules.references.contracts import REFERENCE_DIRECTORY, CurrencyRatePrinciple
 
 mac_address_validator = RegexValidator(
     regex=r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$",
@@ -479,13 +481,75 @@ class CurrencyRate(TimeStampedModel):
             )
 
 
+class BaseValue(TimeStampedModel):
+    """A bank-wide base value effective from a date.
+
+    Base values are effective-dated: the value in force on a date is the row with
+    the greatest ``effective_from`` not after that date. Historical rows are
+    append-only — once a row has taken effect it cannot be changed or removed, so
+    operations that referred to it stay explainable. The amount is expressed in
+    the national (base) currency; the currency code is stored as a snapshot so a
+    later change of the bank's base currency does not reinterpret history.
+    """
+
+    effective_from = models.DateField(_("effective from"), unique=True)
+    amount = models.DecimalField(_("amount"), max_digits=18, decimal_places=2)
+    currency_code = models.CharField(_("currency"), max_length=8, blank=True)
+
+    class Meta:
+        verbose_name = _("base value")
+        verbose_name_plural = _("base values")
+        db_table = qualified_table("core", "core_basevalue")
+        ordering = ("-effective_from",)
+
+    def __str__(self):
+        return f"{self.effective_from}: {self.amount} {self.currency_code}"
+
+    def clean(self):
+        super().clean()
+        if self.amount is not None and self.amount <= 0:
+            raise ValidationError({"amount": _("The amount must be greater than zero.")})
+
+        code = (self.currency_code or "").strip().upper()
+        if code:
+            directory = registry.get(REFERENCE_DIRECTORY)
+            if directory.get_currency(code) is None:
+                raise ValidationError({"currency_code": _("Unknown currency.")})
+            self.currency_code = code
+
+        if self.pk:
+            existing = type(self).objects.filter(pk=self.pk).first()
+            if existing is not None and existing.effective_from <= timezone.localdate():
+                changed = (
+                    existing.effective_from != self.effective_from
+                    or existing.amount != self.amount
+                    or existing.currency_code != self.currency_code
+                )
+                if changed:
+                    raise ValidationError(
+                        _("An effective base value cannot be changed.")
+                    )
+
+    def save(self, *args, **kwargs):
+        if not self.currency_code:
+            self.currency_code = BankSettings.load().base_currency
+        self.currency_code = (self.currency_code or "").strip().upper()
+        self.clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if self.effective_from <= timezone.localdate():
+            raise ValidationError(_("An effective base value cannot be deleted."))
+        return super().delete(*args, **kwargs)
+
+
 class BankSettings(TimeStampedModel):
     """Bank-wide settings (a singleton row).
 
-    Holds the languages the application offers and the bank-wide default, which is
-    the fallback when neither the request nor the user picks a language. The row is
-    created on first access from the ``settings`` defaults (``LANGUAGES`` and
-    ``LANGUAGE_CODE``); see ``docs/adr/0015-application-language-layers.md``.
+    Holds the languages the application offers, the bank-wide language default
+    and the national (base) currency. The row is created on first access from the
+    ``settings`` defaults (``LANGUAGES`` and ``LANGUAGE_CODE``); see
+    ``docs/adr/0015-application-language-layers.md``.
     """
 
     default_language = models.CharField(_("default language"), max_length=8, default="ru")
@@ -521,6 +585,41 @@ class BankSettings(TimeStampedModel):
                     )
                 }
             )
+
+        code = (self.base_currency or "").strip().upper()
+        if not code:
+            raise ValidationError({"base_currency": _("The base currency is required.")})
+        directory = registry.get(REFERENCE_DIRECTORY)
+        if directory.get_currency(code) is None:
+            raise ValidationError({"base_currency": _("Unknown currency.")})
+        self.base_currency = code
+
+        if self.pk:
+            previous = (
+                type(self)
+                .objects.filter(pk=self.pk)
+                .values_list("base_currency", flat=True)
+                .first()
+            )
+            if previous and previous != code:
+                if CurrencyRate.objects.exclude(base_currency=code).exists():
+                    raise ValidationError(
+                        {
+                            "base_currency": _(
+                                "The base currency cannot be changed while currency "
+                                "rates with another base currency exist."
+                            )
+                        }
+                    )
+                if BaseValue.objects.exclude(currency_code=code).exists():
+                    raise ValidationError(
+                        {
+                            "base_currency": _(
+                                "The base currency cannot be changed while base values "
+                                "in another currency exist."
+                            )
+                        }
+                    )
 
     @classmethod
     def load(cls) -> "BankSettings":

@@ -15,14 +15,3 @@ provides:
   contracts: modules.operations.contracts
   api_base: /api/operations/
   frontend_routes: true
-
-config:
-  - name: BCO_OPERATIONS_BASE_CURRENCY
-    description: Базовая валюта банка для порогов и отчётности.
-    default: "BYN"
-  - name: BCO_OPERATIONS_CLIENT_ID_THRESHOLD
-    description: Порог суммы в базовой валюте, выше которого требуется документ клиента.
-    default: "0"
-  - name: BCO_OPERATIONS_REQUIRE_CLIENT
-    description: Требовать данные клиента по умолчанию для операций без явной настройки.
-    default: "false"

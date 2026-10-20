@@ -35,7 +35,7 @@
    и нет `Accept-Language` (страница входа, Django admin, интеграции, фоновые
    задачи и письма). Задаётся переменной окружения `BCO_DEFAULT_LANGUAGE`
    (bootstrap); в перспективе — редактируемый синглтон глобальных настроек банка в
-   `core` (по образцу `OperationsSettings`, см. ADR 0008).
+   `core` (`BankSettings`).
 
 **Приоритет:** язык пользователя → `Accept-Language` → дефолт банка.
 

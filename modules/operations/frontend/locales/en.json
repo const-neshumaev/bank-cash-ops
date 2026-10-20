@@ -2,7 +2,8 @@
   "title": "Cash operations",
   "nav": {
     "workplace": "Cash desk",
-    "config": "Cash desk operations"
+    "config": "Cash desk operations",
+    "operationTypes": "Operation types"
   },
   "common": {
     "error": "Error",
@@ -52,6 +53,59 @@
       "amounts": "Amounts",
       "time": "Time",
       "status": "Status"
+    }
+  },
+  "operationTypes": {
+    "title": "Operation types",
+    "tabs": {
+      "settings": "Settings",
+      "history": "Change history"
+    },
+    "empty": "No operation types found",
+    "active": "active",
+    "inactive": "inactive",
+    "saved": "Operation type settings saved",
+    "editTitle": "Operation type settings",
+    "historyFor": "Change history",
+    "historyType": "Operation type",
+    "historyTypePlaceholder": "Select an operation type",
+    "historyEmpty": "No changes yet",
+    "columns": {
+      "name": "Operation",
+      "kind": "Kind",
+      "clientData": "Client data",
+      "threshold": "Threshold",
+      "status": "Status",
+      "changedAt": "Date and time",
+      "changedBy": "User",
+      "changes": "Changes"
+    },
+    "kind": {
+      "income": "Income",
+      "expense": "Expense",
+      "exchange": "Exchange",
+      "internal": "Internal"
+    },
+    "policy": {
+      "never": "never",
+      "always": "always",
+      "threshold": "above threshold"
+    },
+    "fields": {
+      "client_data_policy": "Client data policy",
+      "threshold_type": "Threshold type",
+      "threshold_value": "Threshold value",
+      "threshold_currency": "Threshold currency",
+      "is_active": "Activity"
+    },
+    "form": {
+      "clientDataPolicy": "Client data",
+      "thresholdType": "Threshold method",
+      "thresholdValue": "Threshold",
+      "thresholdValueHintBaseValue": "A number of base values; the value in force is resolved on the operation date.",
+      "thresholdValueHintCurrency": "An amount in the selected currency.",
+      "thresholdCurrency": "Threshold currency",
+      "active": "Operation type is active"
     }
   },
   "config": {

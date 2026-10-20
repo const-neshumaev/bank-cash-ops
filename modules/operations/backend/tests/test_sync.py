@@ -1,5 +1,7 @@
 """Syncing declared operation types into the operations tables."""
 
+from decimal import Decimal
+
 import pytest
 
 from modules.operations.backend.models import OperationType, SlotDef
@@ -43,3 +45,23 @@ def test_sync_is_idempotent(declared_type):
 
     assert OperationType.objects.filter(code=CODE).count() == 1
     assert SlotDef.objects.filter(operation_type__code=CODE).count() == 1
+
+
+def test_sync_does_not_overwrite_administrator_settings(declared_type):
+    sync_operation_types()
+    operation_type = OperationType.objects.get(code=CODE)
+    operation_type.client_data_policy = "threshold"
+    operation_type.threshold_type = "currency"
+    operation_type.threshold_value = Decimal("1000")
+    operation_type.threshold_currency = "BYN"
+    operation_type.is_active = False
+    operation_type.save()
+
+    sync_operation_types()
+
+    operation_type.refresh_from_db()
+    assert operation_type.client_data_policy == "threshold"
+    assert operation_type.threshold_type == "currency"
+    assert operation_type.threshold_value == Decimal("1000")
+    assert operation_type.threshold_currency == "BYN"
+    assert operation_type.is_active is False

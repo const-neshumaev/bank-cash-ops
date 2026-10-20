@@ -4,6 +4,7 @@ from rest_framework.routers import SimpleRouter
 from modules.core.backend.views import (
     BankCurrencyTemplateView,
     BankSettingsView,
+    BaseValueViewSet,
     BranchCurrencyTemplateView,
     BranchViewSet,
     CashDeskViewSet,
@@ -20,6 +21,7 @@ router.register("users", UserViewSet, basename="user")
 router.register("roles", RoleViewSet, basename="role")
 router.register("branches", BranchViewSet, basename="branch")
 router.register("cash-desks", CashDeskViewSet, basename="cash-desk")
+router.register("base-values", BaseValueViewSet, basename="base-value")
 router.register("currency-rates", CurrencyRateViewSet, basename="currency-rate")
 router.register("shifts", ShiftViewSet, basename="shift")
 

@@ -13,8 +13,8 @@ export interface WorkplaceOperation {
   code: string
   name: string
   kind: string
+  client_data_policy: 'never' | 'always' | 'threshold'
   requires_client: boolean
-  client_id_threshold: string | null
   slots: SlotDef[]
 }
 

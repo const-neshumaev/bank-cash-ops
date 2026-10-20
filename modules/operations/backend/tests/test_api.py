@@ -8,7 +8,6 @@ from django.contrib.auth import get_user_model
 from modules.operations.backend.models import (
     CashBalance,
     Operation,
-    OperationsSettings,
     OperationTemplate,
 )
 from modules.operations.backend.permission_codes import PermissionCode
@@ -20,7 +19,6 @@ pytestmark = pytest.mark.django_db
 TYPES_URL = "/api/operations/types/"
 BALANCES_URL = "/api/operations/balances/"
 OPERATIONS_URL = "/api/operations/operations/"
-SETTINGS_URL = "/api/operations/settings/"
 
 CASH_DESK = 7
 OTHER_CASH_DESK = 99
@@ -90,14 +88,99 @@ def test_balances_are_narrowed_to_the_callers_cash_desks(auth_client, contracts)
     assert cash_desks == [CASH_DESK]
 
 
-def test_settings_can_be_read_and_updated(auth_client):
-    assert auth_client.get(SETTINGS_URL).status_code == 200
+def test_type_settings_can_be_updated_and_are_recorded_in_history(auth_client, income_type):
+    response = auth_client.patch(
+        f"{TYPES_URL}{income_type.code}/",
+        {
+            "client_data_policy": "threshold",
+            "threshold_type": "currency",
+            "threshold_value": "1000.00",
+            "threshold_currency": "BYN",
+        },
+        format="json",
+    )
 
-    response = auth_client.patch(SETTINGS_URL, {"base_currency": "USD"}, format="json")
+    assert response.status_code == 200, response.content
+    income_type.refresh_from_db()
+    assert income_type.client_data_policy == "threshold"
+    assert income_type.threshold_value == Decimal("1000.00")
+
+    history = auth_client.get(f"{TYPES_URL}{income_type.code}/history/")
+
+    assert history.status_code == 200, history.content
+    entry = history.data["results"][0]
+    assert entry["changed_by_email"] == "cashier@example.com"
+    assert entry["changes"]["client_data_policy"] == {
+        "before": "never",
+        "after": "threshold",
+    }
+    assert entry["changes"]["threshold_value"] == {"before": None, "after": "1000.00"}
+
+
+def test_threshold_types_are_predefined_by_the_backend(auth_client):
+    response = auth_client.get("/api/operations/threshold-types/")
 
     assert response.status_code == 200
-    assert response.data["base_currency"] == "USD"
-    assert OperationsSettings.load().base_currency == "USD"
+    assert {row["code"] for row in response.data} == {"base_value", "currency"}
+
+
+def test_a_view_only_user_may_read_history_but_not_change_settings(
+    client, contracts, income_type, monkeypatch
+):
+    viewer = User.objects.create_user(email="viewer@example.com", password="secret-pass-123")
+    monkeypatch.setattr(
+        viewer,
+        "has_permission",
+        lambda code: code == PermissionCode.VIEW,
+        raising=False,
+    )
+    client.force_authenticate(viewer)
+
+    history = client.get(f"{TYPES_URL}{income_type.code}/history/")
+    update = client.patch(
+        f"{TYPES_URL}{income_type.code}/",
+        {"is_active": False},
+        format="json",
+    )
+
+    assert history.status_code == 200
+    assert update.status_code == 403
+
+
+def test_a_threshold_requires_a_type_and_a_value(auth_client, income_type):
+    response = auth_client.patch(
+        f"{TYPES_URL}{income_type.code}/",
+        {"client_data_policy": "threshold"},
+        format="json",
+    )
+
+    assert response.status_code == 400
+    assert "threshold_type" in response.data
+    assert "threshold_value" in response.data
+
+
+def test_switching_away_from_a_threshold_clears_its_configuration(auth_client, income_type):
+    auth_client.patch(
+        f"{TYPES_URL}{income_type.code}/",
+        {
+            "client_data_policy": "threshold",
+            "threshold_type": "base_value",
+            "threshold_value": "100.00",
+        },
+        format="json",
+    )
+
+    response = auth_client.patch(
+        f"{TYPES_URL}{income_type.code}/",
+        {"client_data_policy": "never"},
+        format="json",
+    )
+
+    assert response.status_code == 200, response.content
+    income_type.refresh_from_db()
+    assert income_type.threshold_type == ""
+    assert income_type.threshold_value is None
+    assert income_type.threshold_currency == ""
 
 
 def test_a_user_without_permissions_is_rejected(client, contracts, income_type):

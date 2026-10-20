@@ -11,10 +11,10 @@ from modules.operations.backend.views import (
     BranchOperationTemplateView,
     CashBalanceViewSet,
     CashDeskOperationsView,
-    OperationsSettingsView,
     OperationTemplateListView,
     OperationTypeViewSet,
     OperationViewSet,
+    ThresholdTypeListView,
     WorkplaceView,
 )
 
@@ -24,8 +24,12 @@ router.register("balances", CashBalanceViewSet, basename="cash-balance")
 router.register("operations", OperationViewSet, basename="operation")
 
 urlpatterns = [
-    path("settings/", OperationsSettingsView.as_view(), name="operations-settings"),
     path("workplace/", WorkplaceView.as_view(), name="operations-workplace"),
+    path(
+        "threshold-types/",
+        ThresholdTypeListView.as_view(),
+        name="threshold-type-list",
+    ),
     path(
         "operation-templates/",
         OperationTemplateListView.as_view(),
