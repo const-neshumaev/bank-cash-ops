@@ -9,7 +9,8 @@
     "logout": "Sign out"
   },
   "sections": {
-    "admin": "Administration"
+    "admin": "Administration",
+    "rates": "Currency rates"
   },
   "language": {
     "label": "Interface language",

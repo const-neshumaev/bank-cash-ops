@@ -55,4 +55,6 @@ class ReferenceDirectoryService:
             name=rate_type.localized_name(),
             principle=rate_type.principle,
             is_active=rate_type.is_active,
+            validity=rate_type.validity,
+            daily_required=rate_type.daily_required,
         )

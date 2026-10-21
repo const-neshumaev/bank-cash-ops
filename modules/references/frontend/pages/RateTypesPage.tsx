@@ -98,6 +98,8 @@ export function RateTypesPage() {
             <Table.Th>{t('rateTypes.columns.name')}</Table.Th>
             <Table.Th>{t('rateTypes.columns.code')}</Table.Th>
             <Table.Th>{t('rateTypes.columns.principle')}</Table.Th>
+            <Table.Th>{t('rateTypes.columns.validity')}</Table.Th>
+            <Table.Th>{t('rateTypes.columns.dailyRequired')}</Table.Th>
             <Table.Th>{t('rateTypes.columns.status')}</Table.Th>
             <Table.Th />
           </Table.Tr>
@@ -105,7 +107,7 @@ export function RateTypesPage() {
         <Table.Tbody>
           {loading ? (
             <Table.Tr>
-              <Table.Td colSpan={5}>
+              <Table.Td colSpan={7}>
                 <Center py="md">
                   <Loader size="sm" />
                 </Center>
@@ -113,7 +115,7 @@ export function RateTypesPage() {
             </Table.Tr>
           ) : rateTypes.length === 0 ? (
             <Table.Tr>
-              <Table.Td colSpan={5}>
+              <Table.Td colSpan={7}>
                 <Center py="md">
                   <Text c="dimmed">{t('rateTypes.empty')}</Text>
                 </Center>
@@ -138,6 +140,15 @@ export function RateTypesPage() {
                     {t(`rateTypes.principle.${rateType.principle}`)}
                   </Badge>
                 </Table.Td>
+                <Table.Td>
+                  <Badge
+                    color={rateType.validity === 'calendar_day' ? 'blue' : 'gray'}
+                    variant="light"
+                  >
+                    {t(`rateTypes.validity.${rateType.validity}`)}
+                  </Badge>
+                </Table.Td>
+                <Table.Td>{rateType.daily_required ? t('common.yes') : t('common.no')}</Table.Td>
                 <Table.Td>
                   <Badge color={rateType.is_active ? 'teal' : 'gray'} variant="light">
                     {rateType.is_active ? t('rateTypes.active') : t('rateTypes.inactive')}

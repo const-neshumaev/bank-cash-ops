@@ -159,9 +159,7 @@ class OperationTypeViewSet(
         serializer.is_valid(raise_exception=True)
         with transaction.atomic():
             self.perform_update(serializer)
-            history_service.record_settings_change(
-                instance, before=before, user=request.user
-            )
+            history_service.record_settings_change(instance, before=before, user=request.user)
         return Response(serializer.data)
 
     @action(detail=True, methods=["get"])
@@ -477,7 +475,9 @@ class WorkplaceView(APIView):
                         "currency": rate.currency_code,
                         "base_currency": rate.base_currency_code,
                         "rate_type": rate.rate_type,
+                        "units": rate.units,
                         "value": str(rate.value),
+                        "value_per_unit": str(rate.value_per_unit),
                         "effective_from": rate.effective_from.isoformat(),
                     }
                     for rate in rates

@@ -41,6 +41,7 @@ class TestBankSettings:
         assert settings_obj.pk == 1
         assert settings_obj.default_language == "ru"
         assert settings_obj.enabled_languages == ["ru", "en"]
+        assert settings_obj.conversion_mode == BankSettings.ConversionMode.VIA_BASE
 
         # A second call returns the same row, never a duplicate.
         assert BankSettings.load().pk == 1
@@ -52,6 +53,7 @@ class TestBankSettings:
         assert response.status_code == 200
         assert response.data["default_language"] == "ru"
         assert response.data["enabled_languages"] == ["ru", "en"]
+        assert response.data["conversion_mode"] == "via_base"
 
     def test_clean_rejects_unsupported_language(self):
         settings_obj = BankSettings(default_language="ru", enabled_languages=["ru", "de"])

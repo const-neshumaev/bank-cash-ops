@@ -29,6 +29,12 @@ class PermissionCode:
     CURRENCIES_CONFIG_MANAGE = "core.currencies.config.manage"
     CURRENCIES_CONFIG_MANAGE_BRANCH = "core.currencies.config.manage.branch"
 
+    CURRENCY_RATES_VIEW = "core.currency_rates.view"
+    CURRENCY_RATES_MANAGE = "core.currency_rates.manage"
+    CURRENCY_RATES_MANAGE_BRANCH = "core.currency_rates.manage.branch"
+    CURRENCY_RATES_MANAGE_CASH_DESK = "core.currency_rates.manage.cash_desk"
+    CURRENCY_RATES_MANAGE_OFFICIAL = "core.currency_rates.manage.official"
+
     BANK_SETTINGS_MANAGE = "core.bank_settings.manage"
     BASE_VALUES_VIEW = "core.base_values.view"
     BASE_VALUES_MANAGE = "core.base_values.manage"
@@ -58,6 +64,20 @@ CATALOG: tuple[Permission, ...] = (
     Permission(
         PermissionCode.CURRENCIES_CONFIG_MANAGE_BRANCH,
         _("Configure cash desk currencies of own branch"),
+    ),
+    Permission(PermissionCode.CURRENCY_RATES_VIEW, _("View currency rates")),
+    Permission(PermissionCode.CURRENCY_RATES_MANAGE, _("Manage bank currency rates")),
+    Permission(
+        PermissionCode.CURRENCY_RATES_MANAGE_BRANCH,
+        _("Manage currency rates of own branch"),
+    ),
+    Permission(
+        PermissionCode.CURRENCY_RATES_MANAGE_CASH_DESK,
+        _("Manage currency rates of own cash desk"),
+    ),
+    Permission(
+        PermissionCode.CURRENCY_RATES_MANAGE_OFFICIAL,
+        _("Manage the national bank rate"),
     ),
     Permission(PermissionCode.BANK_SETTINGS_MANAGE, _("Manage bank settings")),
     Permission(PermissionCode.BASE_VALUES_VIEW, _("View base values")),

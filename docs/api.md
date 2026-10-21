@@ -23,15 +23,23 @@ Authorization: Bearer <access_token>
 
 | Метод | Путь | Доступ | Описание |
 | --- | --- | --- | --- |
-| GET | `/api/settings/` | публичный | Языки банка и национальная валюта: `{ "default_language", "enabled_languages", "base_currency" }` |
-| PATCH | `/api/settings/` | `core.bank_settings.manage` | Изменить настройки, например `{ "base_currency": "BYN" }` |
+| GET | `/api/settings/` | публичный | Языки, национальная валюта и тип конверсии: `{ "default_language", "enabled_languages", "base_currency", "conversion_mode" }` |
+| PATCH | `/api/settings/` | `core.bank_settings.manage` | Изменить настройки, например `{ "base_currency": "BYN", "conversion_mode": "direct" }` |
 
 Публичный GET: SPA читает его до входа, чтобы показать экран входа на языке
 по умолчанию банка. `language` в профиле валидируется по `enabled_languages`, а
 `base_currency` — по активным валютам справочника `references`.
 
+`conversion_mode` задаёт способ пересчёта между валютами:
+
+- `via_base` (по умолчанию) — курсы конверсии задаются к национальной валюте,
+  пересчёт идёт через неё;
+- `direct` — можно задавать прямые пары, например `EUR/USD`.
+
 Смена `base_currency` запрещена, пока в системе есть курсы или базовые величины
-в другой валюте: это защищает исторические данные от переинтерпретации.
+в другой валюте: это защищает исторические данные от переинтерпретации. Режим
+`conversion_mode` можно менять; прямые курсы остаются в журнале, но в режиме
+`via_base` не участвуют в разрешении и не показываются в текущих курсах.
 
 ## Базовые величины (`/api/base-values/`)
 
@@ -348,39 +356,141 @@ Content-Type: application/json
 | Метод | Путь | Описание |
 | --- | --- | --- |
 | GET | `/api/references/rate-types/` | Список типов (фильтры `is_active`, `principle`) |
-| POST | `/api/references/rate-types/` | Добавить тип: `code`, `name`, `principle`, `is_active?`, `order?` |
+| POST | `/api/references/rate-types/` | Добавить тип: `code`, `name`, `principle`, `validity?`, `daily_required?`, `is_active?`, `order?` |
 | GET | `/api/references/rate-types/{id}/` | Карточка типа |
 | PATCH | `/api/references/rate-types/{id}/` | Изменение типа |
 | DELETE | `/api/references/rate-types/{id}/` | Удаление (системный тип удалить нельзя) |
 
 `principle` — один из фиксированных принципов `official` (курс Нацбанка), `buy`,
-`sell`, `conversion`; на него опирается логика операций. Системные типы (по одному
-на принцип) поставляются и не удаляются; банк может добавлять свои типы с любым
-принципом.
+`sell`, `conversion`; на него опирается логика операций. Системные типы
+поставляются и не удаляются; банк может добавлять свои типы с любым принципом.
+
+Системные типы: `official`, `buy`, `sell`, `conversion`, а также две стороны
+прямой конверсии — `conversion_buy` и `conversion_sell` (см. «Прямые курсы
+конверсии»). Последние два имеют принцип `conversion`.
+
+`validity` — как хранится курс: `calendar_day` («На календарный день», один
+действующий курс на дату и область) или `since_set` («С момента установки»,
+действует с указанных даты и времени). `daily_required` — требуется ли курс на
+дату выполнения операции. По умолчанию для принципа `official`:
+`calendar_day` + `daily_required = true`; для остальных: `since_set` +
+`daily_required = false`. После появления курсов этого типа `validity` изменить
+нельзя (будет `400`); `daily_required` менять можно.
 
 ## Курсы валют (`/api/currency-rates/`)
 
-Курсы валют банка и отдельных касс. Требуется право `core.structure.view` для
-чтения и `core.structure.manage` для изменения.
+Курсы валют банка, отделений и касс. Чтение — `core.currency_rates.view`.
+Установка — одно из прав: `core.currency_rates.manage` (банк),
+`core.currency_rates.manage.branch` (доступные отделения и их кассы),
+`core.currency_rates.manage.cash_desk` (касса открытой смены),
+`core.currency_rates.manage.official` (курс Нацбанка, только банк).
 
 | Метод | Путь | Описание |
 | --- | --- | --- |
-| GET | `/api/currency-rates/` | Список курсов (фильтры `currency`, `base_currency`, `rate_type`, `cash_desk`) |
-| POST | `/api/currency-rates/` | Добавить курс |
-| GET | `/api/currency-rates/{id}/` | Карточка курса |
-| PATCH | `/api/currency-rates/{id}/` | Изменение курса |
-| DELETE | `/api/currency-rates/{id}/` | Удаление курса |
+| GET | `/api/currency-rates/` | **Журнал**: все курсы, включая заменённые версии |
+| POST | `/api/currency-rates/` | Установить один курс |
+| GET | `/api/currency-rates/{id}/` | Карточка записи журнала |
+| POST | `/api/currency-rates/bulk/` | Установить несколько курсов одного типа и области |
+| POST | `/api/currency-rates/conversion-bulk/` | Установить прямые пары конверсии (покупка и продажа) |
+| GET | `/api/currency-rates/current/` | Действующие курсы на момент просмотра (или `?at=`) |
+| GET | `/api/currency-rates/resolve/` | Курс, который применила бы операция |
 
-Поля: `currency` и `base_currency` — коды из справочника
-`/api/references/currencies/`; `rate_type` — код типа курса из
-`/api/references/rate-types/` (например `official`, `buy`); `value`;
-`effective_from` (ISO 8601); `cash_desk` (необязательно; пусто — курс банка).
-Базовая валюта должна отличаться от валюты. Базовая валюта банка задаётся в
-настройках банка (`base_currency`).
+### Поля курса
 
-Курсы **действуют по времени**: применяется запись с наибольшим
-`effective_from` не в будущем. Курс кассы **перекрывает** курс банка. Разрешение
-курса доступно модулям через контракт `core.cash_desk_config`.
+- `currency`, `base_currency` — коды из `/api/references/currencies/`; для
+  неконверсионных курсов и конверсии через базовую валюту `base_currency` должна
+  совпадать с национальной валютой банка; для прямых кросс-курсов допускается
+  любая пара; валюта котировки должна отличаться от валюты;
+- `rate_type` — код типа курса из `/api/references/rate-types/`;
+- `units` — количество единиц валюты, за которое задан курс (по умолчанию `1`,
+  например `100` для курса RUB за 100 единиц);
+- `value` — значение курса больше нуля (за `units` единиц);
+- `branch`, `cash_desk` — область: оба пусты — банк, задан `branch` — отделение,
+  задан `cash_desk` — касса; одновременно задавать нельзя;
+- `effective_date` — дата для `calendar_day`;
+- `effective_from` — дата и время для `since_set`;
+- `scope` — вычисляемое `bank` / `branch` / `cash_desk`;
+- `is_current`, `superseded_at` — признак действующей версии;
+- `created_by`, `created_by_email`, `created_at` — кто и когда установил;
+- `branch_name`, `cash_desk_name` — названия области для журнала.
+
+Курс Нацбанка (`principle = official`) задаётся только для банка. Для
+`calendar_day` в записи хранится `effective_date`, а `effective_from`
+нормализуется на начало локального дня. Для `since_set` используется только
+`effective_from`.
+
+### Версии и замена
+
+Для `calendar_day` действует ровно один курс на дату и область. Одиночный
+`POST` на занятую дату возвращает `400`. `POST /bulk/` работает как upsert:
+повторная установка создаёт новую версию, прежняя помечается `superseded_at` и
+остаётся в журнале. Для `since_set` дубликат времени (`effective_from`) с той же
+областью возвращает `400`.
+
+### Прямые курсы конверсии
+
+При `conversion_mode = direct` пара задаётся напрямую: `currency = EUR`,
+`base_currency = USD` (то есть `1 EUR = X USD`). Пара хранится двумя
+независимыми котировками — системные типы `conversion_buy` («Покупка
+(конверсия)») и `conversion_sell` («Продажа (конверсия)»), по одной записи на
+каждую сторону. Обе котировки разрешаются через `/api/currency-rates/resolve/`
+с `target_currency = USD` и участвуют в журнале и текущих курсах как обычные
+записи с валютой котировки USD. При `conversion_mode = via_base` такие пары
+отклоняются (`400`).
+
+`POST /api/currency-rates/conversion-bulk/` принимает `branch?`, `cash_desk?`,
+`effective_date?`/`effective_from?` и `pairs: [{ currency, base_currency,
+units?, buy, sell }]`. Запрос атомарен: для каждой пары создаются две записи
+(`conversion_buy` со значением `buy` и `conversion_sell` со значением `sell`).
+Оба системных типа имеют `validity = since_set`, поэтому `effective_from`
+обязателен, а `effective_date` не принимается. Валюты пары должны различаться,
+`buy` и `sell` — больше нуля, повтор пары в одном запросе — `400`. Установка
+доступна тем же правам, что и `/bulk/`, и только при включённом прямом режиме
+конверсии.
+
+### Области и разрешение курса
+
+Порядок разрешения для неофициальных курсов: касса → её отделение → родительские
+отделения → банк. Признак `uses_individual_rates` у кассы отключает курсы
+отделения и банка, у отделения — курсы банка и вышестоящих отделений. При этом
+собственный курс кассы имеет приоритет, а курс родительского отделения
+наследуется дочерними отделениями, пока более близкое отделение не задаст свой.
+Курс Нацбанка всегда действует на уровне банка и не зависит от этих признаков.
+
+Если у типа `daily_required = true`, разрешается только курс на дату операции
+(для `calendar_day`) или установленный в эту дату (для `since_set`); при
+`daily_required = false` берётся последнее значение на момент операции.
+
+### Параметры журнала и текущих курсов
+
+`currency`, `base_currency`, `rate_type`, `scope` (`bank` / `branch` /
+`cash_desk`), `branch`, `cash_desk`, `effective_date_from`,
+`effective_date_to`, `effective_from_from`, `effective_from_to`, `created_from`,
+`created_to`, `created_by`, `is_current`, `search`, `page`. Журнал
+дополнительно поддерживает `ordering`.
+Для `current` дополнительно `at` (ISO 8601) — момент, на который строится
+список.
+
+Видимость: банковские курсы доступны всем с правом просмотра, курсы отделений и
+касс — только в пределах доступных пользователю отделений.
+
+### Установка нескольких курсов
+
+`POST /api/currency-rates/bulk/` принимает `rate_type`, `base_currency?`,
+`branch?`, `cash_desk?`, `effective_date?`/`effective_from?` и
+`items: [{ currency, units?, value }]`. Операция атомарна: при ошибке не
+сохраняется ни одна строка.
+
+### Разрешение одного курса
+
+`GET /api/currency-rates/resolve/?currency=EUR&target_currency=USD&rate_type=conversion&cash_desk=1&at=...`
+возвращает действующую запись либо `404` с `code = rate_not_set`. Без
+`cash_desk` разрешается только курс банка. Для обычных курсов и конверсии через
+базовую валюту используется национальная валюта банка
+(`BankSettings.base_currency`). В режиме `conversion_mode = direct` параметр
+`target_currency` задаёт валюту котировки прямой пары. `value` в ответе задан за
+`units` единиц; `value_per_unit` в контракте нормализует его к одной единице.
+Контракт `core.cash_desk_config` использует тот же алгоритм.
 
 ## Кассовые смены (`/api/shifts/`)
 
@@ -555,7 +665,7 @@ Content-Type: application/json
   "cash_desk_id": 7,
   "currencies": [ { "code": "USD", "name": "Доллар США", "symbol": "$", "minor_units": 2 } ],
   "rates": [
-    { "currency": "USD", "base_currency": "BYN", "rate_type": "buy", "value": "3.250000", "effective_from": "..." }
+    { "currency": "USD", "base_currency": "BYN", "rate_type": "buy", "units": 1, "value": "3.250000", "value_per_unit": "3.250000", "effective_from": "..." }
   ],
   "balances": [
     { "cash_desk_id": 7, "currency": "USD", "amount": "500.00", "updated_at": "..." }

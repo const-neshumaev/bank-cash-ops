@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
@@ -17,7 +18,12 @@ from modules.core.backend.models import (
     Role,
     Shift,
 )
-from modules.references.contracts import REFERENCE_DIRECTORY
+from modules.references.contracts import (
+    REFERENCE_DIRECTORY,
+    CurrencyRatePrinciple,
+    RateTypeValidity,
+    SystemRateTypeCode,
+)
 
 User = get_user_model()
 
@@ -105,7 +111,13 @@ class BankSettingsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = BankSettings
-        fields = ("default_language", "enabled_languages", "base_currency", "updated_at")
+        fields = (
+            "default_language",
+            "enabled_languages",
+            "base_currency",
+            "conversion_mode",
+            "updated_at",
+        )
         read_only_fields = ("updated_at",)
 
     def validate_base_currency(self, value):
@@ -144,7 +156,12 @@ class BankSettingsSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         for field, value in validated_data.items():
             setattr(instance, field, value)
-        instance.clean()
+        try:
+            instance.clean()
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(
+                exc.message_dict if hasattr(exc, "message_dict") else exc.messages
+            ) from None
         instance.save()
         return instance
 
@@ -182,9 +199,7 @@ class BaseValueSerializer(serializers.ModelSerializer):
                 for field in ("effective_from", "amount")
             )
             if changed:
-                raise serializers.ValidationError(
-                    _("An effective base value cannot be changed.")
-                )
+                raise serializers.ValidationError(_("An effective base value cannot be changed."))
         return attrs
 
 
@@ -395,6 +410,7 @@ class BranchSerializer(serializers.ModelSerializer):
             "phone",
             "is_head_office",
             "is_active",
+            "uses_individual_rates",
             "children_count",
             "created_at",
             "updated_at",
@@ -468,6 +484,7 @@ class CashDeskSerializer(serializers.ModelSerializer):
             "mac_address",
             "hostname",
             "is_active",
+            "uses_individual_rates",
             "created_at",
             "updated_at",
         )
@@ -554,17 +571,97 @@ class CashDeskCurrenciesSerializer(serializers.Serializer):
     currencies = serializers.ListField(child=serializers.CharField(max_length=8), allow_empty=True)
 
 
+def _checked_currency(value):
+    """Normalise a currency code and ensure it belongs to the catalogue."""
+    code = (value or "").strip().upper()
+    if registry.get(REFERENCE_DIRECTORY).get_currency(code) is None:
+        raise serializers.ValidationError(_("Unknown currency."))
+    return code
+
+
+def _checked_rate_type(value):
+    """Return the rate type DTO or raise a field error."""
+    rate_type = registry.get(REFERENCE_DIRECTORY).get_rate_type((value or "").strip())
+    if rate_type is None:
+        raise serializers.ValidationError(_("Unknown rate type."))
+    if not rate_type.is_active:
+        raise serializers.ValidationError(_("The rate type is inactive."))
+    return rate_type
+
+
+def _validate_scope(rate_type, branch, cash_desk):
+    """Validate the scope of a rate and the bank-only national bank rate."""
+    if branch is not None and cash_desk is not None:
+        raise serializers.ValidationError(
+            _("A rate belongs to one scope: bank, branch or cash desk.")
+        )
+    if rate_type.principle == CurrencyRatePrinciple.OFFICIAL and (
+        branch is not None or cash_desk is not None
+    ):
+        raise serializers.ValidationError(
+            {"rate_type": _("The national bank rate is set for the whole bank.")}
+        )
+
+
+def _resolve_effective_fields(attrs, rate_type, instance=None):
+    """Normalise the pair of effective fields according to the rate type."""
+    if rate_type.validity == RateTypeValidity.CALENDAR_DAY:
+        effective_date = attrs.get("effective_date")
+        if effective_date is None and attrs.get("effective_from") is not None:
+            effective_date = timezone.localtime(attrs["effective_from"]).date()
+        if effective_date is None and instance is not None:
+            effective_date = (
+                instance.effective_date or timezone.localtime(instance.effective_from).date()
+            )
+        if effective_date is None:
+            raise serializers.ValidationError(
+                {"effective_date": _("A calendar-day rate requires a date.")}
+            )
+        attrs["effective_date"] = effective_date
+        attrs.pop("effective_from", None)
+    else:
+        if attrs.get("effective_date") is not None:
+            raise serializers.ValidationError(
+                {"effective_date": _("Only a calendar-day rate has a date.")}
+            )
+        effective_from = attrs.get("effective_from")
+        if effective_from is None and instance is not None:
+            effective_from = instance.effective_from
+        if effective_from is None:
+            raise serializers.ValidationError(
+                {"effective_from": _("A since-set rate requires a date and time.")}
+            )
+        attrs["effective_from"] = effective_from
+
+
 class CurrencyRateSerializer(serializers.ModelSerializer):
     """Read and write representation of a currency rate.
 
-    The currencies and the rate type are plain codes; the currency codes are
-    validated against the ``references`` catalogue, and ``rate_type`` against the
-    bank rate types (upper-case code comparison is unnecessary for the latter).
+    The currencies and the rate type are plain codes. The effective fields depend
+    on the rate type: ``calendar_day`` uses ``effective_date``, ``since_set`` uses
+    ``effective_from``. A rate belongs to exactly one of the bank, a branch or a
+    cash desk.
     """
 
+    rate_type = serializers.CharField(max_length=64)
+    base_currency = serializers.CharField(max_length=8, required=False, allow_blank=True)
+    units = serializers.IntegerField(min_value=1, required=False, default=1)
+    effective_date = serializers.DateField(required=False, allow_null=True, default=None)
+    effective_from = serializers.DateTimeField(required=False, allow_null=True, default=None)
+    branch = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.all(), required=False, allow_null=True, default=None
+    )
     cash_desk = serializers.PrimaryKeyRelatedField(
         queryset=CashDesk.objects.all(), required=False, allow_null=True, default=None
     )
+    created_by = serializers.PrimaryKeyRelatedField(read_only=True)
+    created_by_email = serializers.CharField(
+        source="created_by.email", read_only=True, default=None
+    )
+    branch_name = serializers.CharField(source="branch.name", read_only=True, default=None)
+    cash_desk_name = serializers.CharField(source="cash_desk.name", read_only=True, default=None)
+    scope = serializers.CharField(read_only=True)
+    is_current = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = CurrencyRate
@@ -573,32 +670,279 @@ class CurrencyRateSerializer(serializers.ModelSerializer):
             "currency",
             "base_currency",
             "rate_type",
+            "units",
             "value",
+            "branch",
+            "branch_name",
             "cash_desk",
+            "cash_desk_name",
+            "scope",
+            "effective_date",
             "effective_from",
+            "is_current",
+            "superseded_at",
+            "created_by",
+            "created_by_email",
             "created_at",
             "updated_at",
         )
-        read_only_fields = ("created_at", "updated_at")
+        read_only_fields = (
+            "id",
+            "scope",
+            "is_current",
+            "superseded_at",
+            "created_by",
+            "created_by_email",
+            "created_at",
+            "updated_at",
+        )
 
     def validate_currency(self, value):
-        return self._checked_currency(value)
+        return _checked_currency(value)
 
     def validate_base_currency(self, value):
-        return self._checked_currency(value)
+        return _checked_currency(value) if value else value
 
-    @staticmethod
-    def _checked_currency(value):
-        code = (value or "").strip().upper()
-        if registry.get(REFERENCE_DIRECTORY).get_currency(code) is None:
-            raise serializers.ValidationError(_("Unknown currency."))
-        return code
+    def validate_rate_type(self, value):
+        return _checked_rate_type(value).code
 
     def validate(self, attrs):
-        currency = attrs.get("currency", getattr(self.instance, "currency", None))
-        base_currency = attrs.get("base_currency", getattr(self.instance, "base_currency", None))
+        instance = self.instance
+        rate_type_code = attrs.get("rate_type", getattr(instance, "rate_type", None))
+        rate_type = _checked_rate_type(rate_type_code)
+
+        branch = attrs.get("branch", getattr(instance, "branch", None))
+        cash_desk = attrs.get("cash_desk", getattr(instance, "cash_desk", None))
+        _validate_scope(rate_type, branch, cash_desk)
+
+        bank_settings = BankSettings.load()
+        currency = attrs.get("currency", getattr(instance, "currency", None))
+        base_currency = attrs.get(
+            "base_currency",
+            getattr(instance, "base_currency", None) or bank_settings.base_currency,
+        )
         if currency is not None and currency == base_currency:
             raise serializers.ValidationError(
                 {"base_currency": _("The base currency must differ from the currency.")}
             )
+        if not attrs.get("base_currency") and instance is None:
+            attrs["base_currency"] = base_currency
+
+        if rate_type.principle == CurrencyRatePrinciple.CONVERSION:
+            if (
+                bank_settings.conversion_mode == BankSettings.ConversionMode.VIA_BASE
+                and base_currency != bank_settings.base_currency
+            ):
+                raise serializers.ValidationError(
+                    {
+                        "base_currency": _(
+                            "Conversion through the base currency requires the bank's "
+                            "base currency as the quote currency."
+                        )
+                    }
+                )
+        elif base_currency != bank_settings.base_currency:
+            raise serializers.ValidationError(
+                {
+                    "base_currency": _(
+                        "Only the bank's base currency can be used as the quote currency "
+                        "for this rate type."
+                    )
+                }
+            )
+
+        units = attrs.get("units", getattr(instance, "units", 1))
+        if units is None or units < 1:
+            raise serializers.ValidationError(
+                {"units": _("The number of units must be at least one.")}
+            )
+
+        value = attrs.get("value", getattr(instance, "value", None))
+        if value is not None and value <= 0:
+            raise serializers.ValidationError(
+                {"value": _("The rate value must be greater than zero.")}
+            )
+
+        _resolve_effective_fields(attrs, rate_type, instance)
         return attrs
+
+
+class CurrencyRateBulkItemSerializer(serializers.Serializer):
+    """A single currency value in a bulk rate-setting request."""
+
+    currency = serializers.CharField(max_length=8)
+    units = serializers.IntegerField(min_value=1, required=False, default=1)
+    value = serializers.DecimalField(max_digits=18, decimal_places=6)
+
+
+class CurrencyRateBulkSerializer(serializers.Serializer):
+    """Set many rates of one type and scope in a single request."""
+
+    rate_type = serializers.CharField(max_length=64)
+    base_currency = serializers.CharField(max_length=8, required=False, allow_blank=True)
+    branch = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.all(), required=False, allow_null=True, default=None
+    )
+    cash_desk = serializers.PrimaryKeyRelatedField(
+        queryset=CashDesk.objects.all(), required=False, allow_null=True, default=None
+    )
+    effective_date = serializers.DateField(required=False, allow_null=True)
+    effective_from = serializers.DateTimeField(required=False, allow_null=True)
+    items = CurrencyRateBulkItemSerializer(many=True)
+
+    def validate(self, attrs):
+        rate_type = _checked_rate_type(attrs["rate_type"])
+        branch = attrs.get("branch")
+        cash_desk = attrs.get("cash_desk")
+        _validate_scope(rate_type, branch, cash_desk)
+
+        bank_settings = BankSettings.load()
+        base_currency = _checked_currency(attrs.get("base_currency") or bank_settings.base_currency)
+        attrs["base_currency"] = base_currency
+
+        if rate_type.principle == CurrencyRatePrinciple.CONVERSION:
+            if (
+                bank_settings.conversion_mode == BankSettings.ConversionMode.VIA_BASE
+                and base_currency != bank_settings.base_currency
+            ):
+                raise serializers.ValidationError(
+                    {
+                        "base_currency": _(
+                            "Conversion through the base currency requires the bank's "
+                            "base currency as the quote currency."
+                        )
+                    }
+                )
+        elif base_currency != bank_settings.base_currency:
+            raise serializers.ValidationError(
+                {
+                    "base_currency": _(
+                        "Only the bank's base currency can be used as the quote currency "
+                        "for this rate type."
+                    )
+                }
+            )
+
+        items = attrs.get("items") or []
+        if not items:
+            raise serializers.ValidationError({"items": _("At least one rate is required.")})
+        seen: set[str] = set()
+        checked_items = []
+        for item in items:
+            currency = _checked_currency(item["currency"])
+            if currency == base_currency:
+                raise serializers.ValidationError(
+                    {"items": _("The base currency must differ from the currency.")}
+                )
+            if currency in seen:
+                raise serializers.ValidationError(
+                    {"items": _("Each currency can appear only once.")}
+                )
+            if item["value"] <= 0:
+                raise serializers.ValidationError(
+                    {"items": _("The rate value must be greater than zero.")}
+                )
+            seen.add(currency)
+            checked_items.append(
+                {
+                    "currency": currency,
+                    "units": item.get("units", 1),
+                    "value": item["value"],
+                }
+            )
+        attrs["items"] = checked_items
+
+        _resolve_effective_fields(attrs, rate_type)
+        return attrs
+
+
+class ConversionPairSerializer(serializers.Serializer):
+    """One direct conversion pair with its buy and sell quotes."""
+
+    currency = serializers.CharField(max_length=8)
+    base_currency = serializers.CharField(max_length=8)
+    units = serializers.IntegerField(min_value=1, required=False, default=1)
+    buy = serializers.DecimalField(max_digits=18, decimal_places=6)
+    sell = serializers.DecimalField(max_digits=18, decimal_places=6)
+
+
+class ConversionBulkSerializer(serializers.Serializer):
+    """Set direct conversion pairs (buy and sell) in one atomic request."""
+
+    branch = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.all(), required=False, allow_null=True, default=None
+    )
+    cash_desk = serializers.PrimaryKeyRelatedField(
+        queryset=CashDesk.objects.all(), required=False, allow_null=True, default=None
+    )
+    effective_date = serializers.DateField(required=False, allow_null=True)
+    effective_from = serializers.DateTimeField(required=False, allow_null=True)
+    pairs = ConversionPairSerializer(many=True)
+
+    def validate(self, attrs):
+        bank_settings = BankSettings.load()
+        if bank_settings.conversion_mode != BankSettings.ConversionMode.DIRECT:
+            raise serializers.ValidationError(
+                _("Direct conversion is not enabled for the bank.")
+            )
+
+        pairs = attrs.get("pairs") or []
+        if not pairs:
+            raise serializers.ValidationError(
+                {"pairs": _("At least one conversion pair is required.")}
+            )
+
+        seen: set[tuple[str, str]] = set()
+        checked: list[dict] = []
+        for pair in pairs:
+            source = _checked_currency(pair["currency"])
+            target = _checked_currency(pair["base_currency"])
+            if source == target:
+                raise serializers.ValidationError(
+                    {"pairs": _("The conversion pair currencies must differ.")}
+                )
+            if (source, target) in seen:
+                raise serializers.ValidationError(
+                    {"pairs": _("Each conversion pair can appear only once.")}
+                )
+            if pair["buy"] <= 0 or pair["sell"] <= 0:
+                raise serializers.ValidationError(
+                    {"pairs": _("The rate value must be greater than zero.")}
+                )
+            seen.add((source, target))
+            checked.append(
+                {
+                    "currency": source,
+                    "base_currency": target,
+                    "units": pair.get("units", 1),
+                    "buy": pair["buy"],
+                    "sell": pair["sell"],
+                }
+            )
+        attrs["pairs"] = checked
+
+        buy_type = _checked_rate_type(SystemRateTypeCode.CONVERSION_BUY)
+        _validate_scope(buy_type, attrs.get("branch"), attrs.get("cash_desk"))
+        _resolve_effective_fields(attrs, buy_type)
+        return attrs
+
+
+class RateResolveQuerySerializer(serializers.Serializer):
+    """Query parameters of the single-rate resolution endpoint."""
+
+    currency = serializers.CharField(max_length=8)
+    target_currency = serializers.CharField(max_length=8, required=False, allow_blank=True)
+    rate_type = serializers.CharField(max_length=64)
+    cash_desk = serializers.PrimaryKeyRelatedField(
+        queryset=CashDesk.objects.all(), required=False, allow_null=True, default=None
+    )
+    at = serializers.DateTimeField(required=False, allow_null=True)
+
+    def validate_currency(self, value):
+        return _checked_currency(value)
+
+    def validate_target_currency(self, value):
+        return _checked_currency(value) if value else value
+
+    def validate_rate_type(self, value):
+        return _checked_rate_type(value).code

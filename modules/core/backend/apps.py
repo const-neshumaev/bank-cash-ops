@@ -18,6 +18,7 @@ class CoreConfig(AppConfig):
         from modules.core.backend.services import (
             CashDeskConfigService,
             OrgDirectoryService,
+            RateTypeUsageGuardService,
             UserDirectoryService,
         )
         from modules.core.contracts import (
@@ -25,8 +26,10 @@ class CoreConfig(AppConfig):
             ORG_DIRECTORY,
             USER_DIRECTORY,
         )
+        from modules.references.contracts import RATE_TYPE_USAGE_GUARD
 
         permissions_catalog.register(CATALOG)
         registry.register(USER_DIRECTORY, UserDirectoryService())
         registry.register(ORG_DIRECTORY, OrgDirectoryService())
         registry.register(CASH_DESK_CONFIG, CashDeskConfigService())
+        registry.register(RATE_TYPE_USAGE_GUARD, RateTypeUsageGuardService())

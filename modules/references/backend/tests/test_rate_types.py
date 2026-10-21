@@ -6,7 +6,7 @@ from django.utils import translation
 from rest_framework.test import APIClient
 
 from modules.references.backend.models import CurrencyRateType
-from modules.references.contracts import CurrencyRatePrinciple
+from modules.references.contracts import CurrencyRatePrinciple, RateTypeValidity
 
 User = get_user_model()
 
@@ -39,13 +39,63 @@ def test_the_system_rate_types_are_seeded_one_per_principle():
     assert principles == set(CurrencyRatePrinciple.VALUES)
 
 
+def test_the_seeded_rate_types_have_principle_defaults():
+    official = CurrencyRateType.objects.get(code="official")
+    buy = CurrencyRateType.objects.get(code="buy")
+
+    assert official.validity == RateTypeValidity.CALENDAR_DAY
+    assert official.daily_required is True
+    assert buy.validity == RateTypeValidity.SINCE_SET
+    assert buy.daily_required is False
+
+
+def test_a_new_rate_type_gets_the_principle_defaults(auth_client):
+    response = auth_client.post(
+        RATE_TYPES_URL,
+        {"code": "buy_extra", "name": "Курс покупки (доп.)", "principle": "buy"},
+        format="json",
+    )
+
+    assert response.status_code == 201, response.content
+    assert response.data["validity"] == RateTypeValidity.SINCE_SET
+    assert response.data["daily_required"] is False
+
+
+def test_a_new_official_rate_type_is_daily_by_default(auth_client):
+    response = auth_client.post(
+        RATE_TYPES_URL,
+        {"code": "official_extra", "name": "Курс Нацбанка (доп.)", "principle": "official"},
+        format="json",
+    )
+
+    assert response.status_code == 201, response.content
+    assert response.data["validity"] == RateTypeValidity.CALENDAR_DAY
+    assert response.data["daily_required"] is True
+
+
 def test_the_api_lists_the_rate_types(auth_client):
     response = auth_client.get(RATE_TYPES_URL)
 
     assert response.status_code == 200
-    assert {"official", "buy", "sell", "conversion"} <= {
-        row["code"] for row in response.data["results"]
-    }
+    assert {
+        "official",
+        "buy",
+        "sell",
+        "conversion",
+        "conversion_buy",
+        "conversion_sell",
+    } <= {row["code"] for row in response.data["results"]}
+
+
+def test_the_conversion_side_rate_types_are_seeded():
+    buy = CurrencyRateType.objects.get(code="conversion_buy")
+    sell = CurrencyRateType.objects.get(code="conversion_sell")
+
+    for rate_type in (buy, sell):
+        assert rate_type.is_system is True
+        assert rate_type.principle == CurrencyRatePrinciple.CONVERSION
+        assert rate_type.validity == RateTypeValidity.SINCE_SET
+        assert rate_type.daily_required is False
 
 
 def test_the_api_localizes_a_rate_type_name(auth_client):

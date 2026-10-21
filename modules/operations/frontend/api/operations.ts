@@ -36,7 +36,9 @@ export interface WorkplaceRate {
   currency: string
   base_currency: string
   rate_type: string
+  units: number
   value: string
+  value_per_unit: string
   effective_from: string
 }
 

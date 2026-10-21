@@ -8,7 +8,7 @@ dependencies:
     version: ">=0.1,<1"
     access: inprocess        # inprocess | http
   - name: references
-    version: "0.1.0"
+    version: "0.3.0"
     access: inprocess
 
 provides:

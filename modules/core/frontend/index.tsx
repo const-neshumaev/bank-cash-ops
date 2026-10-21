@@ -1,9 +1,12 @@
 import {
+  IconArrowsExchange,
   IconBuildingBank,
   IconCashBanknote,
   IconClock,
   IconCoin,
   IconDeviceDesktop,
+  IconHistory,
+  IconListDetails,
   IconRuler2,
   IconSettings,
   IconShieldLock,
@@ -19,15 +22,25 @@ import { BaseValuesPage } from './pages/BaseValuesPage'
 import { BranchesPage } from './pages/BranchesPage'
 import { CashDeskCurrenciesPage } from './pages/CashDeskCurrenciesPage'
 import { CashDesksPage } from './pages/CashDesksPage'
+import { CurrentRatesPage } from './pages/CurrentRatesPage'
+import { RatesEntryPage } from './pages/RatesEntryPage'
+import { RatesJournalPage } from './pages/RatesJournalPage'
 import { RolesPage } from './pages/RolesPage'
 import { ShiftsPage } from './pages/ShiftsPage'
 import { UsersPage } from './pages/UsersPage'
 import { WorkplacePage } from './pages/WorkplacePage'
 
 const ADMIN_SECTION = 'admin'
+const RATES_SECTION = 'rates'
 const CURRENCIES_PERMISSIONS = [
   'core.currencies.config.manage',
   'core.currencies.config.manage.branch',
+]
+const RATE_MANAGE_PERMISSIONS = [
+  'core.currency_rates.manage',
+  'core.currency_rates.manage.branch',
+  'core.currency_rates.manage.cash_desk',
+  'core.currency_rates.manage.official',
 ]
 
 /** Frontend contract of the `core` module (administration and cash shifts). */
@@ -43,6 +56,21 @@ export const coreFrontend: FrontendModule = {
       path: 'cash-desk-currencies',
       element: <CashDeskCurrenciesPage />,
       permission: CURRENCIES_PERMISSIONS,
+    },
+    {
+      path: 'rates/entry',
+      element: <RatesEntryPage />,
+      permission: RATE_MANAGE_PERMISSIONS,
+    },
+    {
+      path: 'rates/journal',
+      element: <RatesJournalPage />,
+      permission: 'core.currency_rates.view',
+    },
+    {
+      path: 'rates/current',
+      element: <CurrentRatesPage />,
+      permission: 'core.currency_rates.view',
     },
     {
       path: 'bank-settings',
@@ -92,6 +120,27 @@ export const coreFrontend: FrontendModule = {
       icon: <IconCoin size={18} />,
       permission: CURRENCIES_PERMISSIONS,
       section: ADMIN_SECTION,
+    },
+    {
+      labelKey: 'nav.ratesEntry',
+      to: '/rates/entry',
+      icon: <IconArrowsExchange size={18} />,
+      permission: RATE_MANAGE_PERMISSIONS,
+      section: RATES_SECTION,
+    },
+    {
+      labelKey: 'nav.ratesJournal',
+      to: '/rates/journal',
+      icon: <IconHistory size={18} />,
+      permission: 'core.currency_rates.view',
+      section: RATES_SECTION,
+    },
+    {
+      labelKey: 'nav.currentRates',
+      to: '/rates/current',
+      icon: <IconListDetails size={18} />,
+      permission: 'core.currency_rates.view',
+      section: RATES_SECTION,
     },
     {
       labelKey: 'nav.bankSettings',

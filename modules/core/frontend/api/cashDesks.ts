@@ -43,6 +43,26 @@ export async function listSelectableCashDesks(
   return data.results
 }
 
+/**
+ * Cash desk options for rate screens. Users with structure access get every
+ * cash desk; a cashier falls back to the selectable cash desks of a branch.
+ */
+export async function listRateCashDeskOptions(
+  branchId?: number,
+): Promise<CashDeskOption[]> {
+  try {
+    const rows = await listAllCashDesks()
+    return rows.map((desk) => ({
+      id: desk.id,
+      name: desk.name,
+      code: desk.code,
+      branch: desk.branch,
+    }))
+  } catch {
+    return branchId ? listSelectableCashDesks(branchId) : []
+  }
+}
+
 export interface CashDeskPayload {
   branch: number
   code: string | null
@@ -50,6 +70,7 @@ export interface CashDeskPayload {
   mac_address?: string | null
   hostname?: string
   is_active: boolean
+  uses_individual_rates: boolean
 }
 
 export async function createCashDesk(payload: CashDeskPayload): Promise<CashDesk> {

@@ -7,12 +7,14 @@ import { useTranslation } from 'react-i18next'
 import { extractErrorMessage } from '@app/api/errors'
 
 import * as bankSettingsApi from '../api/bankSettings'
+import type { ConversionMode } from '../api/bankSettings'
 import { listActiveCurrencies } from '../api/currencyConfig'
 import type { CurrencyOption } from '../api/currencyConfig'
 
 export function BankSettingsPage() {
   const { t } = useTranslation('core')
   const [baseCurrency, setBaseCurrency] = useState<string | null>(null)
+  const [conversionMode, setConversionMode] = useState<ConversionMode>('via_base')
   const [currencies, setCurrencies] = useState<CurrencyOption[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -25,6 +27,7 @@ export function BankSettingsPage() {
         listActiveCurrencies(),
       ])
       setBaseCurrency(settings.base_currency)
+      setConversionMode(settings.conversion_mode)
       setCurrencies(currencyRows)
     } catch (error) {
       notifications.show({
@@ -50,11 +53,19 @@ export function BankSettingsPage() {
     [currencies],
   )
 
+  const conversionOptions: { value: ConversionMode; label: string }[] = [
+    { value: 'via_base', label: t('bankSettings.conversionModes.via_base') },
+    { value: 'direct', label: t('bankSettings.conversionModes.direct') },
+  ]
+
   const save = async () => {
     if (!baseCurrency) return
     setSaving(true)
     try {
-      await bankSettingsApi.updateBankSettings({ base_currency: baseCurrency })
+      await bankSettingsApi.updateBankSettings({
+        base_currency: baseCurrency,
+        conversion_mode: conversionMode,
+      })
       notifications.show({ color: 'green', message: t('bankSettings.saved') })
       await load()
     } catch (error) {
@@ -93,6 +104,19 @@ export function BankSettingsPage() {
             />
             <Text size="xs" c="dimmed">
               {t('bankSettings.baseCurrencyReadonlyHint')}
+            </Text>
+            <Select
+              label={t('bankSettings.conversionMode')}
+              description={t('bankSettings.conversionModeHint')}
+              data={conversionOptions}
+              value={conversionMode}
+              onChange={(value) => setConversionMode((value as ConversionMode) ?? 'via_base')}
+              allowDeselect={false}
+            />
+            <Text size="xs" c="dimmed">
+              {conversionMode === 'direct'
+                ? t('bankSettings.conversionModeDirectHint')
+                : t('bankSettings.conversionModeViaBaseHint')}
             </Text>
             <Group justify="flex-end">
               <Button

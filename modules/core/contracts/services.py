@@ -72,10 +72,19 @@ class CashDeskConfigDirectory(Protocol):
         currency_code: str,
         rate_type: str,
         *,
+        target_currency: str | None = None,
         cash_desk_id: int | None = None,
         at: datetime | None = None,
     ) -> Decimal | None:
-        """Effective rate of ``currency_code``; a cash desk rate overrides the bank one."""
+        """Effective rate of one unit of ``currency_code``.
+
+        The scope is resolved from the cash desk upwards (cash desk, its branch,
+        parent branches, bank), with ``uses_individual_rates`` cutting off the
+        levels above. The national bank rate is always bank-wide. Rates are
+        looked up against the bank's base currency; a ``conversion`` rate with
+        the bank's direct conversion mode uses ``target_currency`` as the quote
+        currency. The quoted value is normalized to one unit.
+        """
         ...
 
     def cash_desk_rates(self, cash_desk_id: int) -> tuple[CurrencyRateDTO, ...]:

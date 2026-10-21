@@ -47,6 +47,20 @@ export async function listSelectableBranches(search = ''): Promise<BranchOption[
   return data.results
 }
 
+/**
+ * Branch options for rate screens. Users with structure access get every
+ * branch; a cashier falls back to the selectable branches of the workplace
+ * picker (which is open to any authenticated user).
+ */
+export async function listRateBranchOptions(): Promise<BranchOption[]> {
+  try {
+    const rows = await listAllBranches()
+    return rows.map((branch) => ({ id: branch.id, name: branch.name, code: branch.code }))
+  } catch {
+    return listSelectableBranches()
+  }
+}
+
 export interface BranchPayload {
   parent: number | null
   code: string | null
@@ -55,6 +69,7 @@ export interface BranchPayload {
   phone?: string
   is_head_office: boolean
   is_active: boolean
+  uses_individual_rates: boolean
 }
 
 export async function createBranch(payload: BranchPayload): Promise<Branch> {
