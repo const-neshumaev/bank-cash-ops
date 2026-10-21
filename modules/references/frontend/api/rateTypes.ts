@@ -4,12 +4,17 @@ import type { Paginated } from '@app/api/types'
 /** The fixed principle a bank rate type is based on. */
 export type RatePrinciple = 'official' | 'buy' | 'sell' | 'conversion'
 
+/** How a rate of this type is stored and applied. */
+export type RateValidity = 'calendar_day' | 'since_set'
+
 /** A bank-managed kind of exchange rate. */
 export interface RateType {
   id: number
   code: string
   name: string
   principle: RatePrinciple
+  validity: RateValidity
+  daily_required: boolean
   is_system: boolean
   is_active: boolean
   order: number
@@ -26,6 +31,8 @@ export interface RateTypePayload {
   code: string
   name: string
   principle: RatePrinciple
+  validity: RateValidity
+  daily_required: boolean
   is_active: boolean
   order: number
 }

@@ -62,6 +62,11 @@
 Смена `base_currency` запрещена, пока существуют курсы или базовые величины в
 другой валюте: исторические суммы нельзя молча переинтерпретировать.
 
+`conversion_mode` задаёт способ пересчёта между валютами: `via_base` — через
+национальную валюту, `direct` — прямыми парами (например, `EUR/USD`). Режим
+можно переключать; прямые курсы остаются в журнале, но в `via_base` не
+участвуют в разрешении и не показываются в текущих курсах.
+
 ```mermaid
 erDiagram
     BANK_SETTINGS {
@@ -69,6 +74,7 @@ erDiagram
         string default_language
         json enabled_languages
         string base_currency
+        string conversion_mode
     }
     BASE_VALUE {
         bigint id PK
@@ -87,7 +93,8 @@ erDiagram
 - `core.org` (`OrgDirectory`) — открытая смена кассира, доступные кассы и
   отделения, проверка доступа к кассе, путь по дереву отделений (`branch_ancestor_ids`);
 - `core.cash_desk_config` (`CashDeskConfigDirectory`) — **действующие** валюты
-  кассы и действующие курсы (в том числе кассовые).
+  кассы и действующие курсы с учётом банка, отделений, касс и флагов
+  индивидуальных курсов.
 
 `core.users` и `core.org` нужны модулю `operations`; `core.cash_desk_config` — для
 проверки доступных кассе валют при проведении (возвращает эффективный набор,
@@ -161,6 +168,7 @@ erDiagram
         string phone
         bool is_head_office
         bool is_active
+        bool uses_individual_rates
     }
     CASH_DESK {
         bigint id PK
@@ -170,6 +178,7 @@ erDiagram
         string mac_address UK
         string hostname
         bool is_active
+        bool uses_individual_rates
     }
     BRANCH ||--o{ BRANCH : parent
     BRANCH ||--o{ CASH_DESK : has
@@ -181,6 +190,10 @@ erDiagram
 - **Касса — это компьютер** (одна касса на один ПК). MAC-адрес хранится как
   учётный атрибут рабочего места (`unique`); автоматическое определение кассы по
   MAC отложено, кассир выбирает кассу вручную при открытии смены.
+- **Индивидуальные курсы.** Флаг `uses_individual_rates` у отделения или кассы
+  отключает для них курсы вышестоящих уровней. У кассы — только её курсы; у
+  отделения — его курсы и курсы нижестоящих подразделений, без курсов банка и
+  родительских отделений.
 
 ### Валюты и курсы
 
@@ -200,11 +213,39 @@ erDiagram
 все валюты. Правило и обоснование — в
 `docs/adr/0014-cash-desk-configuration-templates.md`.
 
-Курсы действуют **по времени** (применяется запись с наибольшим `effective_from`
-не в будущем), задаются как для банка, так и для отдельной кассы; курс кассы
-**перекрывает** курс банка. Базовая валюта банка хранится в настройках банка
-(`BankSettings.base_currency`). Разрешение курса доступно модулям через контракт
-`core.cash_desk_config` (`rate`, `cash_desk_rates`).
+Курсы задаются **на трёх уровнях**: банк, отделение, касса. Уровень определяют
+поля `branch` и `cash_desk` (ровно одно из них или ни одного). Курс нижнего
+уровня **перекрывает** курс верхнего; порядок разрешения — касса → её отделение →
+родительские отделения → банк. Флаги `uses_individual_rates` отсекают
+вышестоящие уровни.
+
+Курс задаётся за количество **единиц** валюты (`units`, по умолчанию 1), например
+за 100 RUB. В записи хранится котировка за `units` единиц; контракт
+`core.cash_desk_config.rate` возвращает значение, нормализованное к одной
+единице. Обычные курсы и конверсия через базовую валюту котируются к
+национальной валюте. В режиме `direct` конверсия задаётся прямой парой
+(`currency = EUR`, `base_currency = USD`, то есть `1 EUR = X USD`).
+
+Пара хранится двумя независимыми котировками — системные типы
+`conversion_buy` («Покупка (конверсия)») и `conversion_sell` («Продажа
+(конверсия)»); обе разрешаются через `resolve` с `target_currency` и
+устанавливаются одним запросом `POST /api/currency-rates/conversion-bulk/`
+(сервис `rates.bulk_set_conversion_pairs`). Разделение на два типа сохраняет
+симметрию с обычными курсами покупки и продажи и позволяет операциям выбирать
+нужную сторону пары.
+
+Тип курса задаёт форму хранения: для `calendar_day` действует один курс на
+календарный день и область (в записи хранится `effective_date`, а
+`effective_from` нормализуется на начало локального дня); для `since_set`
+применяется запись с наибольшим `effective_from` не в будущем. Для
+`calendar_day` исправление создаёт новую версию и помечает прежнюю
+`superseded_at`; журнал сохраняет все версии. Курс Нацбанка задаётся только на
+уровне банка.
+
+Базовая валюта банка хранится в настройках банка (`BankSettings.base_currency`).
+Разрешение курса доступно модулям через контракт `core.cash_desk_config`
+(`rate`, `cash_desk_rates`). `rate` принимает `target_currency` для прямых
+кросс-курсов и возвращает значение за одну единицу.
 
 ```mermaid
 erDiagram
@@ -227,13 +268,19 @@ erDiagram
         string currency
         string base_currency
         string rate_type
+        bigint branch_id FK
         bigint cash_desk_id FK
+        int units
         decimal value
         datetime effective_from
+        date effective_date
+        datetime superseded_at
+        bigint created_by_id FK
     }
     CASH_DESK ||--o{ CASH_DESK_CURRENCY : allows
     BRANCH ||--o| CURRENCY_TEMPLATE : "default for"
     CURRENCY_TEMPLATE ||--o{ CURRENCY_TEMPLATE_ITEM : contains
+    BRANCH ||--o{ CURRENCY_RATE : "scoped to"
     CASH_DESK ||--o{ CURRENCY_RATE : "scoped to"
 ```
 
@@ -242,6 +289,11 @@ erDiagram
 Поставляется полный список действующих кодов ISO 4217 (команда
 `seed_iso_currencies`); перевод названий — в модуле `references`
 (`docs/adr/0016-translatable-reference-data.md`).
+
+Права на курсы: `core.currency_rates.view` — просмотр журнала и текущих курсов;
+`core.currency_rates.manage` — курсы банка; `.manage.branch` — курсы доступных
+отделений и их касс; `.manage.cash_desk` — касса открытой смены; `.manage.official`
+— курс Нацбанка (только банк). Правила и API — в `docs/api.md`.
 
 ### Кассовые смены
 

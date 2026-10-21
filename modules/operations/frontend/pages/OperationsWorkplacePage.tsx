@@ -196,7 +196,7 @@ export function OperationsWorkplacePage() {
             <Group gap="xl">
               {context.rates.map((rate) => (
                 <Text key={`${rate.currency}-${rate.base_currency}-${rate.rate_type}`} size="sm">
-                  1 {rate.currency} = <b>{rate.value}</b> {rate.base_currency} (
+                  {rate.units} {rate.currency} = <b>{rate.value}</b> {rate.base_currency} (
                   {rateTypeLabel(rate.rate_type)})
                 </Text>
               ))}

@@ -9,13 +9,19 @@ store a currency or rate type by its stable code (never as an ORM relation). See
 
 from __future__ import annotations
 
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from modules.common.backend.i18n import pick_translation
 from modules.common.backend.models import TimeStampedModel
 from modules.common.backend.schemas import qualified_table
-from modules.references.contracts import CurrencyRatePrinciple
+from modules.common.contracts import registry
+from modules.references.contracts import (
+    RATE_TYPE_USAGE_GUARD,
+    CurrencyRatePrinciple,
+    RateTypeValidity,
+)
 
 
 class Currency(TimeStampedModel):
@@ -107,6 +113,10 @@ class CurrencyRateType(TimeStampedModel):
         SELL = CurrencyRatePrinciple.SELL, _("Sell")
         CONVERSION = CurrencyRatePrinciple.CONVERSION, _("Conversion")
 
+    class Validity(models.TextChoices):
+        CALENDAR_DAY = RateTypeValidity.CALENDAR_DAY, _("Calendar day")
+        SINCE_SET = RateTypeValidity.SINCE_SET, _("Since set")
+
     code = models.SlugField(_("code"), max_length=64, unique=True)
     name = models.CharField(_("name"), max_length=150)
     principle = models.CharField(
@@ -114,6 +124,21 @@ class CurrencyRateType(TimeStampedModel):
         max_length=16,
         choices=Principle.choices,
         default=Principle.OFFICIAL,
+    )
+    validity = models.CharField(
+        _("rate validity"),
+        max_length=16,
+        choices=Validity.choices,
+        default=Validity.SINCE_SET,
+        help_text=_(
+            "Calendar day keeps one active rate per date; since set applies a rate "
+            "from an explicit date and time."
+        ),
+    )
+    daily_required = models.BooleanField(
+        _("daily required"),
+        default=False,
+        help_text=_("A rate of this type must exist for the date of the operation."),
     )
     is_system = models.BooleanField(
         _("system rate type"),
@@ -132,6 +157,18 @@ class CurrencyRateType(TimeStampedModel):
     def __str__(self):
         return self.name
 
+    @classmethod
+    def default_validity(cls, principle: str) -> str:
+        """Return the default validity for a principle: official rates are daily."""
+        if principle == CurrencyRatePrinciple.OFFICIAL:
+            return RateTypeValidity.CALENDAR_DAY
+        return RateTypeValidity.SINCE_SET
+
+    @classmethod
+    def default_daily_required(cls, principle: str) -> bool:
+        """Return the default daily requirement: only the official rate is daily."""
+        return principle == CurrencyRatePrinciple.OFFICIAL
+
     def localized_name(self, language: str | None = None) -> str:
         """Return the name in ``language`` (the active one when omitted)."""
         return pick_translation(
@@ -139,6 +176,31 @@ class CurrencyRateType(TimeStampedModel):
             ((t.language, t.name) for t in self.translations.all()),
             language,
         )
+
+    def clean(self):
+        """Keep the storage semantics stable once rates of this type exist."""
+        super().clean()
+        if self.pk is None:
+            return
+        previous = type(self).objects.filter(pk=self.pk).values_list("validity", flat=True).first()
+        if previous is None or previous == self.validity:
+            return
+        try:
+            guard = registry.get(RATE_TYPE_USAGE_GUARD)
+        except LookupError:
+            return
+        if guard.is_rate_type_used(self.code):
+            raise ValidationError(
+                {
+                    "validity": _(
+                        "The rate validity cannot be changed while rates of this type exist."
+                    )
+                }
+            )
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        return super().save(*args, **kwargs)
 
 
 class CurrencyRateTypeTranslation(TimeStampedModel):

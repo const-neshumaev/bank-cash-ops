@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 
@@ -46,3 +46,12 @@ class CurrencyRateDTO:
     value: Decimal
     effective_from: datetime
     cash_desk_id: int | None
+    branch_id: int | None = None
+    scope: str = "bank"
+    effective_date: date | None = None
+    units: int = 1
+
+    @property
+    def value_per_unit(self) -> Decimal:
+        """The quoted value normalized to one currency unit."""
+        return self.value / self.units if self.units else self.value

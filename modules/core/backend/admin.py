@@ -101,8 +101,15 @@ class BranchAccessAdmin(admin.ModelAdmin):
 class BranchAdmin(admin.ModelAdmin):
     """Administration of the bank branch hierarchy."""
 
-    list_display = ("name", "code", "parent", "is_head_office", "is_active")
-    list_filter = ("is_head_office", "is_active")
+    list_display = (
+        "name",
+        "code",
+        "parent",
+        "is_head_office",
+        "uses_individual_rates",
+        "is_active",
+    )
+    list_filter = ("is_head_office", "uses_individual_rates", "is_active")
     search_fields = ("name", "code", "address")
     readonly_fields = ("created_at", "updated_at")
 
@@ -118,8 +125,15 @@ class CashDeskCurrencyInline(admin.TabularInline):
 class CashDeskAdmin(admin.ModelAdmin):
     """Administration of the cashier workstations."""
 
-    list_display = ("name", "code", "branch", "mac_address", "is_active")
-    list_filter = ("is_active", "branch")
+    list_display = (
+        "name",
+        "code",
+        "branch",
+        "mac_address",
+        "uses_individual_rates",
+        "is_active",
+    )
+    list_filter = ("is_active", "uses_individual_rates", "branch")
     search_fields = ("name", "code", "mac_address", "hostname")
     readonly_fields = ("created_at", "updated_at")
     inlines = (CashDeskCurrencyInline,)
@@ -150,11 +164,23 @@ class CurrencyRateAdmin(admin.ModelAdmin):
         "currency",
         "base_currency",
         "rate_type",
+        "units",
         "value",
+        "branch",
         "cash_desk",
+        "effective_date",
         "effective_from",
+        "superseded_at",
+        "created_by",
     )
-    list_filter = ("rate_type", "cash_desk", "currency", "base_currency")
+    list_filter = (
+        "rate_type",
+        "branch",
+        "cash_desk",
+        "currency",
+        "base_currency",
+        "created_by",
+    )
     search_fields = ("currency", "base_currency")
     autocomplete_fields = ("cash_desk",)
     readonly_fields = ("created_at", "updated_at")
@@ -172,7 +198,7 @@ class ShiftAdmin(admin.ModelAdmin):
 
 @admin.register(BankSettings)
 class BankSettingsAdmin(admin.ModelAdmin):
-    """Administer the bank-wide settings (base currency and languages)."""
+    """Administer the bank-wide settings (languages, base currency, conversion)."""
 
     def has_add_permission(self, request):
         return not BankSettings.objects.exists()

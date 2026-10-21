@@ -24,6 +24,7 @@ interface FormValues {
   phone: string
   is_head_office: boolean
   is_active: boolean
+  uses_individual_rates: boolean
 }
 
 const EMPTY_VALUES: FormValues = {
@@ -34,6 +35,7 @@ const EMPTY_VALUES: FormValues = {
   phone: '',
   is_head_office: false,
   is_active: true,
+  uses_individual_rates: false,
 }
 
 export function BranchFormModal({ opened, branch, onClose, onSaved }: BranchFormModalProps) {
@@ -70,6 +72,7 @@ export function BranchFormModal({ opened, branch, onClose, onSaved }: BranchForm
         phone: branch.phone,
         is_head_office: branch.is_head_office,
         is_active: branch.is_active,
+        uses_individual_rates: branch.uses_individual_rates,
       })
     } else {
       form.setValues(EMPTY_VALUES)
@@ -97,6 +100,7 @@ export function BranchFormModal({ opened, branch, onClose, onSaved }: BranchForm
         phone: values.phone.trim(),
         is_head_office: values.is_head_office,
         is_active: values.is_active,
+        uses_individual_rates: values.uses_individual_rates,
       }
       if (branch) {
         await branchesApi.updateBranch(branch.id, payload)
@@ -148,7 +152,15 @@ export function BranchFormModal({ opened, branch, onClose, onSaved }: BranchForm
             <TextInput label={t('branches.form.address')} {...form.getInputProps('address')} />
             <TextInput label={t('branches.form.phone')} {...form.getInputProps('phone')} />
           </Group>
-          <Switch label={t('branches.form.active')} {...form.getInputProps('is_active', { type: 'checkbox' })} />
+          <Switch
+            label={t('branches.form.individualRates')}
+            description={t('branches.form.individualRatesHint')}
+            {...form.getInputProps('uses_individual_rates', { type: 'checkbox' })}
+          />
+          <Switch
+            label={t('branches.form.active')}
+            {...form.getInputProps('is_active', { type: 'checkbox' })}
+          />
           <Group justify="flex-end">
             <Button variant="default" onClick={onClose}>
               {t('common.cancel')}

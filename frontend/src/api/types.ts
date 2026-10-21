@@ -51,6 +51,7 @@ export interface Branch {
   phone: string
   is_head_office: boolean
   is_active: boolean
+  uses_individual_rates: boolean
   children_count: number
   created_at: string
   updated_at: string
@@ -72,6 +73,7 @@ export interface CashDesk {
   mac_address: string | null
   hostname: string
   is_active: boolean
+  uses_individual_rates: boolean
   created_at: string
   updated_at: string
 }

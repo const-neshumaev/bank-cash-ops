@@ -1,11 +1,12 @@
 from django.contrib.auth import get_user_model
 from django.db.models import ProtectedError, Q
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.utils.translation import gettext_lazy as _
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, BasePermission, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
@@ -16,8 +17,8 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from modules.common.backend import permissions_catalog
 from modules.common.backend.permissions import PermissionRequired
 from modules.common.contracts import registry
-from modules.core.backend import currency_config, scoping, serializers, shifts
-from modules.core.backend.filters import ShiftFilter
+from modules.core.backend import currency_config, rates, scoping, serializers, shifts
+from modules.core.backend.filters import CurrencyRateFilter, ShiftFilter
 from modules.core.backend.models import (
     BankSettings,
     BaseValue,
@@ -29,7 +30,11 @@ from modules.core.backend.models import (
     Shift,
 )
 from modules.core.backend.permission_codes import PermissionCode
-from modules.references.contracts import REFERENCE_DIRECTORY
+from modules.references.contracts import (
+    REFERENCE_DIRECTORY,
+    CurrencyRatePrinciple,
+    RateTypeValidity,
+)
 
 User = get_user_model()
 
@@ -467,23 +472,186 @@ class CashDeskViewSet(viewsets.ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class CurrencyRateViewSet(viewsets.ModelViewSet):
-    """CRUD administration of the currency rates."""
+class CurrencyRatePermission(BasePermission):
+    """View the rate journal or set rates at an allowed scope."""
 
-    queryset = CurrencyRate.objects.select_related("cash_desk").all()
+    message = "You do not have permission to perform this action."
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not (user and user.is_authenticated):
+            return False
+        action = getattr(view, "action", None)
+        if action in {"list", "retrieve", "current", "resolve"}:
+            return user.has_permission(PermissionCode.CURRENCY_RATES_VIEW)
+        if action in {"create", "bulk", "conversion_bulk"}:
+            return any(user.has_permission(code) for code in rates.MANAGE_PERMISSIONS)
+        return False
+
+
+class CurrencyRateViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.CreateModelMixin,
+    viewsets.GenericViewSet,
+):
+    """The rate journal, manual setting, current rates and single-rate resolution.
+
+    The list is the journal of every rate ever set (including superseded
+    versions); ``current`` returns the rates in force at a moment; ``resolve``
+    returns the rate an operation would use for a currency and rate type.
+    """
+
+    queryset = CurrencyRate.objects.select_related("branch", "cash_desk", "created_by")
     serializer_class = serializers.CurrencyRateSerializer
-    permission_classes = [PermissionRequired]
-    permission_map = {
-        "list": PermissionCode.STRUCTURE_VIEW,
-        "retrieve": PermissionCode.STRUCTURE_VIEW,
-        "create": PermissionCode.STRUCTURE_MANAGE,
-        "update": PermissionCode.STRUCTURE_MANAGE,
-        "partial_update": PermissionCode.STRUCTURE_MANAGE,
-        "destroy": PermissionCode.STRUCTURE_MANAGE,
-    }
-    filterset_fields = ["currency", "base_currency", "rate_type", "cash_desk"]
-    ordering_fields = ["currency", "rate_type", "effective_from"]
-    ordering = ["currency", "rate_type", "-effective_from"]
+    permission_classes = [CurrencyRatePermission]
+    filterset_class = CurrencyRateFilter
+    search_fields = ["currency", "base_currency", "rate_type"]
+    ordering_fields = [
+        "currency",
+        "rate_type",
+        "value",
+        "effective_from",
+        "effective_date",
+        "created_at",
+    ]
+    ordering = ["-created_at"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self.action in {"list", "retrieve"}:
+            return rates.visible_rates(queryset, self.request.user)
+        return queryset
+
+    def get_serializer_class(self):
+        if self.action == "bulk":
+            return serializers.CurrencyRateBulkSerializer
+        return super().get_serializer_class()
+
+    def create(self, request, *args, **kwargs):
+        """Create one rate; a duplicate calendar-day rate for the date is refused."""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        row = rates.create_rate(request.user, **serializer.validated_data)
+        return Response(self.get_serializer(row).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["post"])
+    def bulk(self, request):
+        """Set many rates of one type and scope atomically (grid editor)."""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        rows = rates.bulk_set_rates(request.user, **serializer.validated_data)
+        output = serializers.CurrencyRateSerializer(
+            rows, many=True, context=self.get_serializer_context()
+        )
+        return Response(output.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["post"], url_path="conversion-bulk")
+    def conversion_bulk(self, request):
+        """Set direct conversion pairs (buy and sell) atomically."""
+        serializer = serializers.ConversionBulkSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        rows = rates.bulk_set_conversion_pairs(request.user, **serializer.validated_data)
+        output = serializers.CurrencyRateSerializer(
+            rows, many=True, context=self.get_serializer_context()
+        )
+        return Response(output.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["get"])
+    def current(self, request):
+        """List the active rates in force at the moment (or at ``?at=``)."""
+        moment = self._moment(request)
+        rate_types = registry.get(REFERENCE_DIRECTORY).rate_types()
+        today = timezone.localdate(moment)
+        day_start = rates.local_day_start(moment)
+        bank_settings = BankSettings.load()
+        via_base = bank_settings.conversion_mode == BankSettings.ConversionMode.VIA_BASE
+        effective = Q(pk__in=[])
+        for item in rate_types:
+            if item.validity == RateTypeValidity.CALENDAR_DAY:
+                if item.daily_required:
+                    timing = Q(effective_date=today)
+                else:
+                    timing = Q(effective_date__lte=today)
+            elif item.daily_required:
+                timing = Q(
+                    effective_date__isnull=True,
+                    effective_from__gte=day_start,
+                    effective_from__lte=moment,
+                )
+            else:
+                timing = Q(effective_date__isnull=True, effective_from__lte=moment)
+
+            base_filter = Q()
+            if item.principle != CurrencyRatePrinciple.CONVERSION or via_base:
+                base_filter = Q(base_currency=bank_settings.base_currency)
+            effective |= Q(rate_type=item.code) & timing & base_filter
+        queryset = self.get_queryset().filter(superseded_at__isnull=True).filter(effective)
+
+        queryset = rates.visible_rates(queryset, request.user)
+        queryset = self.filter_queryset(queryset)
+
+        best: dict[tuple, CurrencyRate] = {}
+        for row in queryset.order_by("-effective_from", "-id"):
+            key = (row.currency, row.base_currency, row.rate_type, row.branch_id, row.cash_desk_id)
+            best.setdefault(key, row)
+        rows = sorted(
+            best.values(),
+            key=lambda row: (
+                row.rate_type,
+                row.currency,
+                row.scope,
+                row.branch_id or 0,
+                row.cash_desk_id or 0,
+            ),
+        )
+        page = self.paginate_queryset(rows)
+        serializer = self.get_serializer(page, many=True)
+        return self.get_paginated_response(serializer.data)
+
+    @action(detail=False, methods=["get"])
+    def resolve(self, request):
+        """Resolve the rate an operation would use for a currency and rate type."""
+        query = serializers.RateResolveQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        data = query.validated_data
+        cash_desk = data.get("cash_desk")
+        if cash_desk is not None and not self._can_see_cash_desk(request.user, cash_desk):
+            raise PermissionDenied(_("The cash desk is not available to you."))
+        row = rates.resolve_rate(
+            data["currency"],
+            data["rate_type"],
+            target_currency=data.get("target_currency") or None,
+            cash_desk_id=cash_desk.id if cash_desk is not None else None,
+            at=data.get("at"),
+        )
+        if row is None:
+            raise NotFound(
+                {
+                    "detail": _("No rate is set for the requested date."),
+                    "code": "rate_not_set",
+                }
+            )
+        return Response(self.get_serializer(row).data)
+
+    @staticmethod
+    def _moment(request):
+        raw = request.query_params.get("at")
+        if not raw:
+            return timezone.now()
+        moment = parse_datetime(raw)
+        if moment is None:
+            raise ValidationError({"at": _("Enter a valid date and time.")})
+        if timezone.is_naive(moment):
+            moment = timezone.make_aware(moment, timezone.get_current_timezone())
+        return moment
+
+    @staticmethod
+    def _can_see_cash_desk(user, cash_desk):
+        if user.is_superuser or user.has_permission(PermissionCode.CURRENCY_RATES_MANAGE):
+            return True
+        branch_ids = scoping.accessible_branch_ids(user)
+        return branch_ids is None or cash_desk.branch_id in branch_ids
 
 
 class ShiftViewSet(

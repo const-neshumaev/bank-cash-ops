@@ -10,7 +10,9 @@
     "save": "Save",
     "cancel": "Cancel",
     "edit": "Edit",
-    "delete": "Delete"
+    "delete": "Delete",
+    "yes": "Yes",
+    "no": "No"
   },
   "validation": {
     "code": "Enter a code",
@@ -57,6 +59,8 @@
       "name": "Name",
       "code": "Code",
       "principle": "Principle",
+      "validity": "Rate validity",
+      "dailyRequired": "Daily required",
       "status": "Status"
     },
     "created": "Rate type created",
@@ -70,10 +74,18 @@
       "sell": "Sell rate",
       "conversion": "Conversion rate"
     },
+    "validity": {
+      "calendar_day": "Calendar day",
+      "since_set": "Since set"
+    },
     "form": {
       "code": "Code",
       "name": "Name",
       "principle": "Principle",
+      "validity": "Rate validity",
+      "validityHint": "The national bank rate defaults to a calendar day; other rates default to since set. Once rates exist, the validity cannot be changed.",
+      "dailyRequired": "Daily required",
+      "dailyRequiredHint": "A rate must exist for the date of the operation.",
       "order": "Order",
       "active": "Active"
     }

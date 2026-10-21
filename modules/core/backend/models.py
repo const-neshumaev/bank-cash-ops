@@ -1,3 +1,5 @@
+from datetime import datetime, time
+
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
@@ -12,7 +14,11 @@ from modules.common.backend.schemas import qualified_table
 from modules.common.contracts import registry
 from modules.core.backend.managers import UserManager
 from modules.core.backend.permission_codes import PermissionCode
-from modules.references.contracts import REFERENCE_DIRECTORY, CurrencyRatePrinciple
+from modules.references.contracts import (
+    REFERENCE_DIRECTORY,
+    CurrencyRatePrinciple,
+    RateTypeValidity,
+)
 
 mac_address_validator = RegexValidator(
     regex=r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$",
@@ -131,6 +137,14 @@ class Branch(TimeStampedModel):
     phone = models.CharField(_("phone number"), max_length=32, blank=True)
     is_head_office = models.BooleanField(_("head office"), default=False)
     is_active = models.BooleanField(_("active"), default=True)
+    uses_individual_rates = models.BooleanField(
+        _("uses individual rates"),
+        default=False,
+        help_text=_(
+            "The branch uses only its own and lower-level rates; bank and parent rates "
+            "do not apply."
+        ),
+    )
 
     class Meta:
         verbose_name = _("branch")
@@ -243,6 +257,11 @@ class CashDesk(TimeStampedModel):
     )
     hostname = models.CharField(_("hostname"), max_length=255, blank=True)
     is_active = models.BooleanField(_("active"), default=True)
+    uses_individual_rates = models.BooleanField(
+        _("uses individual rates"),
+        default=False,
+        help_text=_("The cash desk uses only its own rates; branch and bank rates do not apply."),
+    )
 
     class Meta:
         verbose_name = _("cash desk")
@@ -432,15 +451,35 @@ class CurrencyTemplateItem(TimeStampedModel):
 class CurrencyRate(TimeStampedModel):
     """An exchange rate of a currency against a base currency.
 
-    Rates are dated: the effective rate is the row with the greatest
-    ``effective_from`` not in the future. A rate scoped to a cash desk overrides
-    the bank-wide one (``cash_desk`` is null). The currencies and the rate type
-    are referenced by their codes (see ``docs/adr/0017-references-module.md``);
-    ``rate_type`` is the code of a bank rate type owned by ``references``.
+    A rate is scoped to exactly one level: the bank (``branch`` and ``cash_desk``
+    are null), a branch (``branch`` is set) or a cash desk (``cash_desk`` is set).
+    A lower-level rate overrides a higher-level one; the ``uses_individual_rates``
+    flags of a branch or cash desk cut off the levels above it.
+
+    The bank rate type decides how the rate is stored. With ``calendar_day`` the
+    rate is effective for the whole local date and there is at most one active
+    rate per date and scope; with ``since_set`` the rate takes effect at
+    ``effective_from`` and the latest rate not in the future wins.
+
+    Rates are versioned: a correction of an already active ``calendar_day`` rate
+    keeps the old row and marks it ``superseded_at``, so the journal remains
+    complete. Only rows with ``superseded_at`` null participate in resolution.
+
+    The currencies and the rate type are referenced by their codes (see
+    ``docs/adr/0017-references-module.md``); ``rate_type`` is the code of a bank
+    rate type owned by ``references``.
     """
 
     currency = models.CharField(_("currency"), max_length=8)
     base_currency = models.CharField(_("base currency"), max_length=8)
+    branch = models.ForeignKey(
+        Branch,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="currency_rates",
+        verbose_name=_("branch"),
+    )
     cash_desk = models.ForeignKey(
         CashDesk,
         null=True,
@@ -451,21 +490,70 @@ class CurrencyRate(TimeStampedModel):
     )
     rate_type = models.CharField(
         _("rate type"),
-        max_length=32,
+        max_length=64,
         default=CurrencyRatePrinciple.OFFICIAL,
+    )
+    units = models.PositiveIntegerField(
+        _("units"),
+        default=1,
+        help_text=_("The quoted value is set for this number of currency units."),
     )
     value = models.DecimalField(_("value"), max_digits=18, decimal_places=6)
     effective_from = models.DateTimeField(_("effective from"))
+    effective_date = models.DateField(_("effective date"), null=True, blank=True)
+    superseded_at = models.DateTimeField(
+        _("superseded at"),
+        null=True,
+        blank=True,
+        help_text=_("When the rate was replaced by a corrected version."),
+    )
+    created_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="currency_rates_set",
+        verbose_name=_("created by"),
+    )
 
     class Meta:
         verbose_name = _("currency rate")
         verbose_name_plural = _("currency rates")
         db_table = qualified_table("core", "core_currencyrate")
-        ordering = ("currency", "rate_type", "-effective_from")
+        ordering = ("currency", "rate_type", "-effective_from", "-id")
         constraints = (
+            models.CheckConstraint(
+                condition=~(models.Q(branch__isnull=False) & models.Q(cash_desk__isnull=False)),
+                name="core_currency_rate_single_scope",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(units__gte=1),
+                name="core_currency_rate_units_positive",
+            ),
             models.UniqueConstraint(
-                fields=["currency", "base_currency", "cash_desk", "rate_type", "effective_from"],
-                name="core_unique_currency_rate",
+                fields=[
+                    "currency",
+                    "base_currency",
+                    "branch",
+                    "cash_desk",
+                    "rate_type",
+                    "effective_date",
+                ],
+                condition=models.Q(superseded_at__isnull=True, effective_date__isnull=False),
+                name="core_unique_calendar_day_rate",
+                nulls_distinct=False,
+            ),
+            models.UniqueConstraint(
+                fields=[
+                    "currency",
+                    "base_currency",
+                    "branch",
+                    "cash_desk",
+                    "rate_type",
+                    "effective_from",
+                ],
+                condition=models.Q(superseded_at__isnull=True, effective_date__isnull=True),
+                name="core_unique_since_set_rate",
                 nulls_distinct=False,
             ),
         )
@@ -473,12 +561,101 @@ class CurrencyRate(TimeStampedModel):
     def __str__(self):
         return f"{self.currency}/{self.base_currency} {self.rate_type} = {self.value}"
 
+    @property
+    def scope(self) -> str:
+        """Return ``bank``, ``branch`` or ``cash_desk`` for the rate."""
+        if self.cash_desk_id is not None:
+            return "cash_desk"
+        if self.branch_id is not None:
+            return "branch"
+        return "bank"
+
+    @property
+    def is_current(self) -> bool:
+        """Return whether the row is the active version (not superseded)."""
+        return self.superseded_at is None
+
     def clean(self):
         super().clean()
+        self.currency = (self.currency or "").strip().upper()
+        self.base_currency = (self.base_currency or "").strip().upper()
+        if not self.base_currency:
+            self.base_currency = BankSettings.load().base_currency
         if self.currency and self.currency == self.base_currency:
             raise ValidationError(
                 {"base_currency": _("The base currency must differ from the currency.")}
             )
+        if self.branch_id is not None and self.cash_desk_id is not None:
+            raise ValidationError(_("A rate belongs to one scope: bank, branch or cash desk."))
+        if self.units is None or self.units < 1:
+            raise ValidationError({"units": _("The number of units must be at least one.")})
+        if self.value is not None and self.value <= 0:
+            raise ValidationError({"value": _("The rate value must be greater than zero.")})
+
+        rate_type = registry.get(REFERENCE_DIRECTORY).get_rate_type(self.rate_type)
+        if rate_type is None:
+            raise ValidationError({"rate_type": _("Unknown rate type.")})
+        if rate_type.principle == CurrencyRatePrinciple.OFFICIAL and (
+            self.branch_id is not None or self.cash_desk_id is not None
+        ):
+            raise ValidationError(
+                {"rate_type": _("The national bank rate is set for the whole bank.")}
+            )
+
+        bank_settings = BankSettings.load()
+        if rate_type.principle == CurrencyRatePrinciple.CONVERSION:
+            if (
+                bank_settings.conversion_mode == BankSettings.ConversionMode.VIA_BASE
+                and self.base_currency != bank_settings.base_currency
+            ):
+                raise ValidationError(
+                    {
+                        "base_currency": _(
+                            "Conversion through the base currency requires the bank's "
+                            "base currency as the quote currency."
+                        )
+                    }
+                )
+        elif self.base_currency != bank_settings.base_currency:
+            raise ValidationError(
+                {
+                    "base_currency": _(
+                        "Only the bank's base currency can be used as the quote currency "
+                        "for this rate type."
+                    )
+                }
+            )
+
+        if rate_type.validity == RateTypeValidity.CALENDAR_DAY:
+            if self.effective_date is None and self.effective_from is not None:
+                # Historical callers set only the timestamp; a calendar-day rate
+                # is stored by its local date.
+                if timezone.is_naive(self.effective_from):
+                    self.effective_from = timezone.make_aware(
+                        self.effective_from, timezone.get_current_timezone()
+                    )
+                self.effective_date = timezone.localtime(self.effective_from).date()
+            if self.effective_date is None:
+                raise ValidationError({"effective_date": _("A calendar-day rate requires a date.")})
+            self.effective_from = timezone.make_aware(
+                datetime.combine(self.effective_date, time.min),
+                timezone.get_current_timezone(),
+            )
+        else:
+            if self.effective_date is not None:
+                raise ValidationError({"effective_date": _("Only a calendar-day rate has a date.")})
+            if self.effective_from is None:
+                raise ValidationError(
+                    {"effective_from": _("A since-set rate requires a date and time.")}
+                )
+            if timezone.is_naive(self.effective_from):
+                self.effective_from = timezone.make_aware(
+                    self.effective_from, timezone.get_current_timezone()
+                )
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        return super().save(*args, **kwargs)
 
 
 class BaseValue(TimeStampedModel):
@@ -526,9 +703,7 @@ class BaseValue(TimeStampedModel):
                     or existing.currency_code != self.currency_code
                 )
                 if changed:
-                    raise ValidationError(
-                        _("An effective base value cannot be changed.")
-                    )
+                    raise ValidationError(_("An effective base value cannot be changed."))
 
     def save(self, *args, **kwargs):
         if not self.currency_code:
@@ -546,15 +721,31 @@ class BaseValue(TimeStampedModel):
 class BankSettings(TimeStampedModel):
     """Bank-wide settings (a singleton row).
 
-    Holds the languages the application offers, the bank-wide language default
-    and the national (base) currency. The row is created on first access from the
-    ``settings`` defaults (``LANGUAGES`` and ``LANGUAGE_CODE``); see
-    ``docs/adr/0015-application-language-layers.md``.
+    Holds the languages the application offers, the bank-wide language default,
+    the national (base) currency and the conversion mode used when converting
+    between currencies. The row is created on first access from the ``settings``
+    defaults (``LANGUAGES`` and ``LANGUAGE_CODE``); see
+    ``docs/adr/0015-application-language-layers.md`` and
+    ``docs/adr/0020-currency-rate-units-and-conversion.md``.
     """
+
+    class ConversionMode(models.TextChoices):
+        VIA_BASE = "via_base", _("Through the base currency")
+        DIRECT = "direct", _("Direct cross rates")
 
     default_language = models.CharField(_("default language"), max_length=8, default="ru")
     enabled_languages = models.JSONField(_("enabled languages"), default=list, blank=True)
     base_currency = models.CharField(_("base currency"), max_length=8, default="BYN")
+    conversion_mode = models.CharField(
+        _("conversion mode"),
+        max_length=16,
+        choices=ConversionMode.choices,
+        default=ConversionMode.VIA_BASE,
+        help_text=_(
+            "Through the base currency uses cross rates via the national currency; "
+            "direct uses explicit pairs such as EUR/USD."
+        ),
+    )
 
     class Meta:
         verbose_name = _("bank settings")
@@ -630,6 +821,7 @@ class BankSettings(TimeStampedModel):
                 "default_language": settings.LANGUAGE_CODE.split("-")[0],
                 "enabled_languages": [code for code, _name in settings.LANGUAGES],
                 "base_currency": "BYN",
+                "conversion_mode": cls.ConversionMode.VIA_BASE,
             },
         )
         return obj

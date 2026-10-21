@@ -196,12 +196,15 @@ Frontend собран из хоста (`frontend/src/`) и фронтендов 
 - API пользователей и справочников `core`: `modules/core/backend/views.py`
 - Справочники (валюты, типы курсов): `modules/references/backend/models.py`
 - Настройки банка и базовые величины: `modules/core/backend/models.py`
+- Разрешение и установка курсов валют: `modules/core/backend/rates.py`
 - Пороги типов операций и история настроек: `modules/operations/backend/thresholds.py`,
   `modules/operations/backend/history.py`
 - HTTP-клиент SPA: `frontend/src/api/client.ts`
 - Контекст аутентификации: `frontend/src/auth/AuthContext.tsx`
 - Реестр модулей SPA: `frontend/src/registry/index.ts`
 - Контракт фронтенд-модуля: `frontend/src/registry/contract.ts`
+- Страницы курсов валют: `modules/core/frontend/pages/RatesEntryPage.tsx`,
+  `RatesJournalPage.tsx`, `CurrentRatesPage.tsx`
 
 ## Проверка перед завершением задачи
 

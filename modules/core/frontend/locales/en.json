@@ -8,6 +8,9 @@
     "cashDeskCurrencies": "Cash desk currencies",
     "bankSettings": "Bank settings",
     "baseValues": "Base values",
+    "ratesEntry": "Set rates",
+    "ratesJournal": "Rate journal",
+    "currentRates": "Current rates",
     "shifts": "Shifts",
     "workplace": "Workplace"
   },
@@ -127,6 +130,8 @@
       "parent": "Parent branch",
       "address": "Address",
       "phone": "Phone",
+      "individualRates": "Uses individual rates",
+      "individualRatesHint": "Rates of the bank and parent branches do not apply to this branch. Only its own rates and the rates of its subordinates are used.",
       "active": "Active"
     }
   },
@@ -157,6 +162,8 @@
       "macAddress": "MAC address",
       "macAddressDescription": "Network address of the workstation",
       "hostname": "Computer name",
+      "individualRates": "Uses individual rates",
+      "individualRatesHint": "Rates of the bank and the branch do not apply to this cash desk. Only its own rates are used.",
       "active": "Active"
     }
   },
@@ -203,6 +210,14 @@
     "baseCurrency": "National (base) currency",
     "baseCurrencyHint": "The bank's national currency is used as the base for thresholds, rates and base values.",
     "baseCurrencyReadonlyHint": "Changing the currency is blocked while rates or base values in another currency exist.",
+    "conversionMode": "Conversion type",
+    "conversionModeHint": "How the bank converts amounts between currencies.",
+    "conversionModeViaBaseHint": "Conversion rates are quoted against the national currency and conversion goes through it.",
+    "conversionModeDirectHint": "Direct pairs such as EUR/USD can be quoted without the national currency in between.",
+    "conversionModes": {
+      "via_base": "Through the base currency",
+      "direct": "Direct cross rates"
+    },
     "saved": "Bank settings saved"
   },
   "baseValues": {
@@ -224,6 +239,122 @@
     "form": {
       "effectiveFrom": "Effective from",
       "amount": "Amount, {{currency}}"
+    }
+  },
+  "ratesEntry": {
+    "title": "Set rates",
+    "scope": "Scope",
+    "scopes": {
+      "bank": "Bank",
+      "branch": "Branch",
+      "cash_desk": "Cash desk"
+    },
+    "rateType": "Rate type",
+    "tabs": {
+      "rates": "Currency rates",
+      "conversion": "Conversion"
+    },
+    "branch": "Branch",
+    "cashDesk": "Cash desk",
+    "date": "Date",
+    "time": "Time",
+    "baseCurrency": "Base currency: {{currency}}",
+    "validityHint": "Rate validity: {{validity}}",
+    "validity": {
+      "calendar_day": "calendar day",
+      "since_set": "since set"
+    },
+    "noOpenShift": "Open a shift to set a rate for a cash desk.",
+    "gridTitle": "Rates by currency",
+    "addCurrency": "Add currency",
+    "nothingToSave": "Enter at least one rate.",
+    "saved": "Rates saved",
+    "loading": "Loading…",
+    "empty": "No currencies to set. Add a currency.",
+    "columns": {
+      "currency": "Currency",
+      "units": "Units",
+      "value": "Rate to {{currency}}"
+    },
+    "conversion": {
+      "title": "Direct cross rates",
+      "hint": "A pair like EUR/USD means \"1 EUR = X USD\"; buy and sell are quoted per the given number of units.",
+      "badge": "Direct cross rates",
+      "addPair": "Add pair",
+      "pairIncomplete": "Select both currencies of the pair.",
+      "sameCurrency": "The pair currencies must differ.",
+      "valuesRequired": "Enter buy and sell for every pair.",
+      "saved": "Conversion rates saved",
+      "empty": "No pairs set. Add a pair.",
+      "columns": {
+        "currency": "Currency",
+        "quote": "Quote currency",
+        "units": "Units",
+        "buy": "Buy",
+        "sell": "Sell"
+      }
+    }
+  },
+  "ratesJournal": {
+    "title": "Rate journal",
+    "hint": "Every rate ever set, including replaced versions. Filter by currency, type, scope, dates and author.",
+    "currency": "Currency",
+    "quoteCurrency": "Quote currency",
+    "rateType": "Rate type",
+    "scope": "Scope",
+    "branch": "Branch",
+    "cashDesk": "Cash desk",
+    "status": "Status",
+    "current": "Active",
+    "superseded": "Superseded",
+    "effectiveFrom": "Effective date from",
+    "effectiveTo": "Effective date to",
+    "effectiveFromTime": "Effective from (time)",
+    "effectiveToTime": "Effective to (time)",
+    "createdFrom": "Set from",
+    "createdTo": "Set to",
+    "empty": "No rates found",
+    "scopes": {
+      "bank": "Bank",
+      "branch": "Branch",
+      "cash_desk": "Cash desk"
+    },
+    "columns": {
+      "setAt": "Set at",
+      "scope": "Scope",
+      "currency": "Currency",
+      "rateType": "Rate type",
+      "units": "Units",
+      "value": "Rate",
+      "effective": "Effective",
+      "author": "Author",
+      "status": "Status"
+    }
+  },
+  "currentRates": {
+    "title": "Current rates",
+    "hint": "Rates in force at the moment, within your available branches.",
+    "refresh": "Refresh",
+    "currency": "Currency",
+    "quoteCurrency": "Quote currency",
+    "rateType": "Rate type",
+    "scope": "Scope",
+    "branch": "Branch",
+    "cashDesk": "Cash desk",
+    "empty": "No current rates found",
+    "scopes": {
+      "bank": "Bank",
+      "branch": "Branch",
+      "cash_desk": "Cash desk"
+    },
+    "columns": {
+      "currency": "Currency",
+      "rateType": "Rate type",
+      "units": "Units",
+      "value": "Rate",
+      "scope": "Scope",
+      "effective": "Effective",
+      "author": "Author"
     }
   },
   "shifts": {

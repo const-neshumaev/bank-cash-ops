@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-16 12:21+0300\n"
+"POT-Creation-Date: 2026-10-21 11:10+0300\n"
 "PO-Revision-Date: 2026-10-16 12:30+0300\n"
 "Last-Translator: BankCashOps\n"
 "Language-Team: ru\n"
@@ -18,118 +18,143 @@ msgstr ""
 "n%10<=4 && (n%100<12 || n%100>14) ? 1 : n%10==0 || (n%10>=5 && n%10<=9) || "
 "(n%100>=11 && n%100<=14)? 2 : 3);\n"
 
-#: modules/references/backend/apps.py:11
+#: apps.py:11
 msgid "Reference data"
 msgstr "Справочные данные"
 
-#: modules/references/backend/models.py:28
-#: modules/references/backend/models.py:110
+#: models.py:34 models.py:120
 msgid "code"
 msgstr "код"
 
-#: modules/references/backend/models.py:30
+#: models.py:36
 msgid "numeric code"
 msgstr "числовой код"
 
-#: modules/references/backend/models.py:33
+#: models.py:39
 msgid "ISO 4217 numeric code, when the currency has one."
 msgstr "Числовой код ISO 4217, если он у валюты есть."
 
-#: modules/references/backend/models.py:35
-#: modules/references/backend/models.py:76
-#: modules/references/backend/models.py:111
-#: modules/references/backend/models.py:159
+#: models.py:41 models.py:82 models.py:121 models.py:221
 msgid "name"
 msgstr "название"
 
-#: modules/references/backend/models.py:36
+#: models.py:42
 msgid "symbol"
 msgstr "символ"
 
-#: modules/references/backend/models.py:37
+#: models.py:43
 msgid "minor units"
 msgstr "минорные единицы"
 
-#: modules/references/backend/models.py:38
-#: modules/references/backend/models.py:123
+#: models.py:44 models.py:148
 msgid "active"
 msgstr "активный"
 
-#: modules/references/backend/models.py:41
-#: modules/references/backend/models.py:73
+#: models.py:47 models.py:79
 msgid "currency"
 msgstr "валюта"
 
-#: modules/references/backend/models.py:42
+#: models.py:48
 msgid "currencies"
 msgstr "валюты"
 
-#: modules/references/backend/models.py:75
-#: modules/references/backend/models.py:158
+#: models.py:81 models.py:220
 msgid "language"
 msgstr "язык"
 
-#: modules/references/backend/models.py:79
+#: models.py:85
 msgid "currency translation"
 msgstr "перевод валюты"
 
-#: modules/references/backend/models.py:80
+#: models.py:86
 msgid "currency translations"
 msgstr "переводы валют"
 
-#: modules/references/backend/models.py:105
+#: models.py:111
 msgid "Official"
 msgstr "Официальный"
 
-#: modules/references/backend/models.py:106
+#: models.py:112
 msgid "Buy"
 msgstr "Покупка"
 
-#: modules/references/backend/models.py:107
+#: models.py:113
 msgid "Sell"
 msgstr "Продажа"
 
-#: modules/references/backend/models.py:108
+#: models.py:114
 msgid "Conversion"
 msgstr "Конверсия"
 
-#: modules/references/backend/models.py:113
+#: models.py:117
+msgid "Calendar day"
+msgstr "На календарный день"
+
+#: models.py:118
+msgid "Since set"
+msgstr "С момента установки"
+
+#: models.py:123
 msgid "principle"
 msgstr "принцип"
 
-#: modules/references/backend/models.py:119
+#: models.py:129
+msgid "rate validity"
+msgstr "действие курса"
+
+#: models.py:134
+msgid ""
+"Calendar day keeps one active rate per date; since set applies a rate from "
+"an explicit date and time."
+msgstr ""
+"На календарный день допускается один действующий курс на дату; с момента "
+"установки курс действует с указанных даты и времени."
+
+#: models.py:139
+msgid "daily required"
+msgstr "требуется ежедневно"
+
+#: models.py:141
+msgid "A rate of this type must exist for the date of the operation."
+msgstr "Курс этого типа должен быть установлен на дату выполнения операции."
+
+#: models.py:144
 msgid "system rate type"
 msgstr "системный тип курса"
 
-#: modules/references/backend/models.py:121
+#: models.py:146
 msgid "System rate types are shipped with the product and cannot be deleted."
-msgstr "Системные типы курсов поставляются с продуктом и не могут быть удалены."
+msgstr ""
+"Системные типы курсов поставляются с продуктом и не могут быть удалены."
 
-#: modules/references/backend/models.py:124
+#: models.py:149
 msgid "order"
 msgstr "порядок"
 
-#: modules/references/backend/models.py:127
-#: modules/references/backend/models.py:156
+#: models.py:152 models.py:218
 msgid "rate type"
 msgstr "тип курса"
 
-#: modules/references/backend/models.py:128
+#: models.py:153
 msgid "rate types"
 msgstr "типы курсов"
 
-#: modules/references/backend/models.py:162
+#: models.py:196 serializers.py:79
+msgid "The rate validity cannot be changed while rates of this type exist."
+msgstr "Действие курса нельзя изменить, пока существуют курсы этого типа."
+
+#: models.py:224
 msgid "rate type translation"
 msgstr "перевод типа курса"
 
-#: modules/references/backend/models.py:163
+#: models.py:225
 msgid "rate type translations"
 msgstr "переводы типов курсов"
 
-#: modules/references/backend/permission_codes.py:26
+#: permission_codes.py:26
 msgid "View reference data"
 msgstr "Просмотр справочных данных"
 
-#: modules/references/backend/permission_codes.py:27
+#: permission_codes.py:27
 msgid "Manage reference data"
 msgstr "Управление справочными данными"

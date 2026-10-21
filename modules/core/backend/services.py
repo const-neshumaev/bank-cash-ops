@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from django.db.models import Q
-from django.utils import timezone
-
-from modules.core.backend import currency_config, scoping
+from modules.core.backend import currency_config, rates, scoping
 from modules.core.backend.models import (
     CashDesk,
     CurrencyRate,
@@ -105,53 +102,24 @@ class CashDeskConfigService:
         currency_code: str,
         rate_type: str,
         *,
+        target_currency: str | None = None,
         cash_desk_id: int | None = None,
         at=None,
     ):
-        moment = at or timezone.now()
-        rows = CurrencyRate.objects.filter(
-            currency=(currency_code or "").strip().upper(),
-            rate_type=rate_type,
-            effective_from__lte=moment,
+        row = rates.resolve_rate(
+            currency_code,
+            rate_type,
+            target_currency=target_currency,
+            cash_desk_id=cash_desk_id,
+            at=at,
         )
-        if cash_desk_id is not None:
-            scoped = rows.filter(cash_desk_id=cash_desk_id).order_by("-effective_from").first()
-            if scoped is not None:
-                return scoped.value
-        bank = rows.filter(cash_desk__isnull=True).order_by("-effective_from").first()
-        return bank.value if bank is not None else None
+        if row is None:
+            return None
+        return row.value / row.units if row.units else row.value
 
     def cash_desk_rates(self, cash_desk_id: int) -> tuple[CurrencyRateDTO, ...]:
-        moment = timezone.now()
-        rows = CurrencyRate.objects.filter(effective_from__lte=moment).filter(
-            Q(cash_desk_id=cash_desk_id) | Q(cash_desk__isnull=True)
-        )
-        keys = sorted({(row.currency, row.base_currency, row.rate_type) for row in rows})
-        resolved: list[CurrencyRateDTO] = []
-        for currency, base, rate_type in keys:
-            scoped = (
-                rows.filter(
-                    currency=currency,
-                    base_currency=base,
-                    rate_type=rate_type,
-                    cash_desk_id=cash_desk_id,
-                )
-                .order_by("-effective_from")
-                .first()
-            )
-            chosen = scoped or (
-                rows.filter(
-                    currency=currency,
-                    base_currency=base,
-                    rate_type=rate_type,
-                    cash_desk__isnull=True,
-                )
-                .order_by("-effective_from")
-                .first()
-            )
-            if chosen is not None:
-                resolved.append(self._rate_to_dto(chosen))
-        return tuple(resolved)
+        rows = rates.cash_desk_rates(cash_desk_id)
+        return tuple(self._rate_to_dto(row) for row in rows)
 
     @staticmethod
     def _rate_to_dto(rate: CurrencyRate) -> CurrencyRateDTO:
@@ -162,4 +130,15 @@ class CashDeskConfigService:
             value=rate.value,
             effective_from=rate.effective_from,
             cash_desk_id=rate.cash_desk_id,
+            branch_id=rate.branch_id,
+            scope=rate.scope,
+            effective_date=rate.effective_date,
+            units=rate.units,
         )
+
+
+class RateTypeUsageGuardService:
+    """Implementation of the ``references.rate_type_usage_guard`` callback."""
+
+    def is_rate_type_used(self, code: str) -> bool:
+        return CurrencyRate.objects.filter(rate_type=code).exists()

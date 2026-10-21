@@ -24,6 +24,7 @@ interface FormValues {
   mac_address: string
   hostname: string
   is_active: boolean
+  uses_individual_rates: boolean
 }
 
 const EMPTY_VALUES: FormValues = {
@@ -33,6 +34,7 @@ const EMPTY_VALUES: FormValues = {
   mac_address: '',
   hostname: '',
   is_active: true,
+  uses_individual_rates: false,
 }
 
 const MAC_PATTERN = /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/
@@ -73,6 +75,7 @@ export function CashDeskFormModal({ opened, cashDesk, onClose, onSaved }: CashDe
         mac_address: cashDesk.mac_address ?? '',
         hostname: cashDesk.hostname,
         is_active: cashDesk.is_active,
+        uses_individual_rates: cashDesk.uses_individual_rates,
       })
     } else {
       form.setValues(EMPTY_VALUES)
@@ -96,6 +99,7 @@ export function CashDeskFormModal({ opened, cashDesk, onClose, onSaved }: CashDe
         mac_address: values.mac_address.trim() || null,
         hostname: values.hostname.trim(),
         is_active: values.is_active,
+        uses_individual_rates: values.uses_individual_rates,
       }
       if (cashDesk) {
         await cashDesksApi.updateCashDesk(cashDesk.id, payload)
@@ -144,7 +148,15 @@ export function CashDeskFormModal({ opened, cashDesk, onClose, onSaved }: CashDe
             {...form.getInputProps('mac_address')}
           />
           <TextInput label={t('cashDesks.form.hostname')} {...form.getInputProps('hostname')} />
-          <Switch label={t('cashDesks.form.active')} {...form.getInputProps('is_active', { type: 'checkbox' })} />
+          <Switch
+            label={t('cashDesks.form.individualRates')}
+            description={t('cashDesks.form.individualRatesHint')}
+            {...form.getInputProps('uses_individual_rates', { type: 'checkbox' })}
+          />
+          <Switch
+            label={t('cashDesks.form.active')}
+            {...form.getInputProps('is_active', { type: 'checkbox' })}
+          />
           <Group justify="flex-end">
             <Button variant="default" onClick={onClose}>
               {t('common.cancel')}
