@@ -19,6 +19,7 @@ TRACKED_FIELDS: tuple[str, ...] = (
     "threshold_type",
     "threshold_value",
     "threshold_currency",
+    "rate_type",
     "is_active",
 )
 
@@ -34,6 +35,7 @@ def snapshot(operation_type: OperationType) -> dict[str, Any]:
             else str(operation_type.threshold_value.quantize(Decimal("0.01")))
         ),
         "threshold_currency": operation_type.threshold_currency,
+        "rate_type": operation_type.rate_type,
         "is_active": operation_type.is_active,
     }
 

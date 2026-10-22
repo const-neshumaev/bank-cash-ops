@@ -16,12 +16,14 @@ class CoreConfig(AppConfig):
         from modules.common.contracts import registry
         from modules.core.backend.permission_codes import CATALOG
         from modules.core.backend.services import (
+            BankSettingsService,
             CashDeskConfigService,
             OrgDirectoryService,
             RateTypeUsageGuardService,
             UserDirectoryService,
         )
         from modules.core.contracts import (
+            BANK_SETTINGS,
             CASH_DESK_CONFIG,
             ORG_DIRECTORY,
             USER_DIRECTORY,
@@ -32,4 +34,5 @@ class CoreConfig(AppConfig):
         registry.register(USER_DIRECTORY, UserDirectoryService())
         registry.register(ORG_DIRECTORY, OrgDirectoryService())
         registry.register(CASH_DESK_CONFIG, CashDeskConfigService())
+        registry.register(BANK_SETTINGS, BankSettingsService())
         registry.register(RATE_TYPE_USAGE_GUARD, RateTypeUsageGuardService())

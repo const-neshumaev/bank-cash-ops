@@ -7,14 +7,27 @@ export interface SlotDef {
   required: boolean
   fixed_currency: string
   order: number
+  multiple: boolean
+  currency_policy: 'any' | 'foreign' | 'base'
+  amount_mode: 'input' | 'computed'
+  computation: '' | 'multiply' | 'divide'
+  stores_rate: boolean
+  threshold_basis: boolean
 }
 
 export interface WorkplaceOperation {
   code: string
   name: string
   kind: string
+  form: 'amount' | 'multi_currency' | 'exchange'
   client_data_policy: 'never' | 'always' | 'threshold'
   requires_client: boolean
+  threshold_type: string
+  threshold_value: string | null
+  threshold_currency: string
+  rate_principle: '' | 'buy' | 'sell' | 'conversion'
+  rate_type: string
+  rate_type_display: string
   slots: SlotDef[]
 }
 
@@ -47,6 +60,8 @@ export interface OperationLine {
   currency: string
   amount: string
   rate: string | null
+  rate_type?: string
+  rate_is_individual?: boolean
 }
 
 export interface Operation {
@@ -70,6 +85,10 @@ export interface Operation {
 export interface WorkplaceContext {
   shift_id: number | null
   cash_desk_id: number | null
+  base_currency: string
+  conversion_mode: 'via_base' | 'direct'
+  base_value: string | null
+  base_value_date: string | null
   currencies: Currency[]
   rates: WorkplaceRate[]
   balances: CashBalance[]
@@ -83,6 +102,22 @@ export interface PostOperationPayload {
   client_document?: string
   comment?: string
   idempotency_key?: string
+}
+
+export interface ClientDataRequirement {
+  policy: 'never' | 'always' | 'threshold'
+  required: boolean
+  reason: 'never' | 'always' | 'threshold' | 'below_threshold'
+  amount: string | null
+  threshold: string | null
+  currency: string
+}
+
+export interface PreviewOperation {
+  operation_type: string
+  operation_type_name: string
+  lines: OperationLine[]
+  client_data: ClientDataRequirement
 }
 
 export async function fetchWorkplace(): Promise<WorkplaceContext> {
@@ -99,6 +134,11 @@ export async function listOperations(cashDesk: number): Promise<Operation[]> {
 
 export async function postOperation(payload: PostOperationPayload): Promise<Operation> {
   const { data } = await api.post<Operation>('/operations/operations/', payload)
+  return data
+}
+
+export async function previewOperation(payload: PostOperationPayload): Promise<PreviewOperation> {
+  const { data } = await api.post<PreviewOperation>('/operations/operations/preview/', payload)
   return data
 }
 

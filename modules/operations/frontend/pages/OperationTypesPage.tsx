@@ -32,6 +32,7 @@ import type {
   HistoryValue,
   OperationTypeSettings,
   OperationTypeSettingsChange,
+  RateTypeOption,
   ThresholdTypeOption,
 } from '../api/operationTypes'
 
@@ -56,6 +57,7 @@ export function OperationTypesPage() {
   const [types, setTypes] = useState<OperationTypeSettings[]>([])
   const [thresholdTypes, setThresholdTypes] = useState<ThresholdTypeOption[]>([])
   const [currencies, setCurrencies] = useState<CurrencyOption[]>([])
+  const [rateTypes, setRateTypes] = useState<RateTypeOption[]>([])
   const [loading, setLoading] = useState(false)
 
   const [editing, setEditing] = useState<OperationTypeSettings | null>(null)
@@ -63,6 +65,7 @@ export function OperationTypesPage() {
   const [thresholdType, setThresholdType] = useState<string | null>(null)
   const [thresholdValue, setThresholdValue] = useState('')
   const [thresholdCurrency, setThresholdCurrency] = useState<string | null>(null)
+  const [rateType, setRateType] = useState<string | null>(null)
   const [isActive, setIsActive] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -83,14 +86,16 @@ export function OperationTypesPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [typeRows, thresholdRows, currencyRows] = await Promise.all([
+      const [typeRows, thresholdRows, currencyRows, rateTypeRows] = await Promise.all([
         operationTypesApi.listOperationTypeSettings(),
         operationTypesApi.listThresholdTypes(),
         operationTypesApi.listActiveCurrencies(),
+        operationTypesApi.listRateTypes(),
       ])
       setTypes(typeRows)
       setThresholdTypes(thresholdRows)
       setCurrencies(currencyRows)
+      setRateTypes(rateTypeRows)
     } catch (error) {
       notifyError(error)
     } finally {
@@ -129,6 +134,13 @@ export function OperationTypesPage() {
     [thresholdTypes],
   )
 
+  const rateTypeOptions = useMemo(() => {
+    if (!editing) return []
+    return rateTypes
+      .filter((item) => !editing.rate_principle || item.principle === editing.rate_principle)
+      .map((item) => ({ value: item.code, label: item.name }))
+  }, [editing, rateTypes])
+
   const selectedThresholdType = thresholdTypes.find((item) => item.code === thresholdType)
 
   const openEdit = (operationType: OperationTypeSettings) => {
@@ -137,6 +149,7 @@ export function OperationTypesPage() {
     setThresholdType(operationType.threshold_type || null)
     setThresholdValue(operationType.threshold_value ?? '')
     setThresholdCurrency(operationType.threshold_currency || null)
+    setRateType(operationType.rate_type || null)
     setIsActive(operationType.is_active)
   }
 
@@ -144,6 +157,14 @@ export function OperationTypesPage() {
 
   const save = async () => {
     if (!editing) return
+    if (editing.kind === 'exchange' && !rateType) {
+      notifications.show({
+        color: 'red',
+        title: t('common.error'),
+        message: t('operationTypes.form.rateTypeRequired'),
+      })
+      return
+    }
     setSaving(true)
     try {
       await operationTypesApi.updateOperationTypeSettings(editing.code, {
@@ -154,6 +175,7 @@ export function OperationTypesPage() {
           policy === 'threshold' && selectedThresholdType?.requires_currency
             ? thresholdCurrency ?? ''
             : '',
+        rate_type: editing.kind === 'exchange' ? rateType ?? '' : '',
         is_active: isActive,
       })
       notifications.show({ color: 'green', message: t('operationTypes.saved') })
@@ -189,6 +211,9 @@ export function OperationTypesPage() {
     if (field === 'threshold_type') {
       return thresholdTypes.find((item) => item.code === value)?.name ?? String(value)
     }
+    if (field === 'rate_type') {
+      return rateTypes.find((item) => item.code === value)?.name ?? String(value)
+    }
     if (field === 'is_active') {
       return value ? t('operationTypes.active') : t('operationTypes.inactive')
     }
@@ -213,6 +238,7 @@ export function OperationTypesPage() {
                 <Table.Th>{t('operationTypes.columns.kind')}</Table.Th>
                 <Table.Th>{t('operationTypes.columns.clientData')}</Table.Th>
                 <Table.Th>{t('operationTypes.columns.threshold')}</Table.Th>
+                <Table.Th>{t('operationTypes.columns.rateType')}</Table.Th>
                 <Table.Th>{t('operationTypes.columns.status')}</Table.Th>
                 <Table.Th />
               </Table.Tr>
@@ -220,7 +246,7 @@ export function OperationTypesPage() {
             <Table.Tbody>
               {loading ? (
                 <Table.Tr>
-                  <Table.Td colSpan={6}>
+                  <Table.Td colSpan={7}>
                     <Center py="md">
                       <Loader size="sm" />
                     </Center>
@@ -228,7 +254,7 @@ export function OperationTypesPage() {
                 </Table.Tr>
               ) : types.length === 0 ? (
                 <Table.Tr>
-                  <Table.Td colSpan={6}>
+                  <Table.Td colSpan={7}>
                     <Center py="md">
                       <Text c="dimmed">{t('operationTypes.empty')}</Text>
                     </Center>
@@ -250,6 +276,7 @@ export function OperationTypesPage() {
                       </Badge>
                     </Table.Td>
                     <Table.Td>{thresholdSummary(operationType)}</Table.Td>
+                    <Table.Td>{operationType.rate_type_display || '—'}</Table.Td>
                     <Table.Td>
                       <Badge color={operationType.is_active ? 'teal' : 'gray'} variant="light">
                         {operationType.is_active
@@ -369,6 +396,20 @@ export function OperationTypesPage() {
             allowDeselect={false}
           />
 
+          {editing?.kind === 'exchange' && (
+            <Select
+              label={t('operationTypes.form.rateType')}
+              data={rateTypeOptions}
+              value={rateType}
+              onChange={setRateType}
+              required
+              error={
+                !rateType ? t('operationTypes.form.rateTypeRequired') : undefined
+              }
+              allowDeselect={false}
+            />
+          )}
+
           {policy === 'threshold' && (
             <>
               <Select
@@ -413,7 +454,11 @@ export function OperationTypesPage() {
             <Button variant="default" onClick={closeEdit}>
               {t('common.cancel')}
             </Button>
-            <Button loading={saving} onClick={() => void save()}>
+            <Button
+              loading={saving}
+              disabled={editing?.kind === 'exchange' && !rateType}
+              onClick={() => void save()}
+            >
               {t('common.save')}
             </Button>
           </Group>

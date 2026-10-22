@@ -12,9 +12,14 @@ balance and ``turnover`` for the analytical turnover.
 from __future__ import annotations
 
 from modules.operations.contracts import (
+    OperationForm,
     OperationKind,
+    OperationRatePrinciple,
     OperationTypeSpec,
     RegisterCode,
+    SlotAmountMode,
+    SlotComputation,
+    SlotCurrencyPolicy,
     SlotSpec,
 )
 
@@ -30,12 +35,14 @@ def _en(name: str) -> dict[str, str]:
     return {"en": name}
 
 
-def _amount_slots(currency: str = "") -> tuple[SlotSpec, ...]:
+def _amount_slots(currency: str = "", *, multiple: bool = False) -> tuple[SlotSpec, ...]:
     return (
         SlotSpec(
             code="amount",
             name="Сумма",
             fixed_currency=currency,
+            multiple=multiple,
+            threshold_basis=True,
             translations=_en("Amount"),
         ),
     )
@@ -50,18 +57,73 @@ def _amount_template(sign: int) -> dict:
     }
 
 
-def _exchange_slots() -> tuple[SlotSpec, ...]:
+def _purchase_slots() -> tuple[SlotSpec, ...]:
+    """The bank buys foreign cash and pays the national currency."""
     return (
         SlotSpec(
             code="received",
             name="Принято от клиента",
             order=0,
+            currency_policy=SlotCurrencyPolicy.FOREIGN,
+            stores_rate=True,
+            threshold_basis=True,
             translations=_en("Received from client"),
         ),
         SlotSpec(
             code="issued",
             name="Выдано клиенту",
             order=1,
+            currency_policy=SlotCurrencyPolicy.BASE,
+            amount_mode=SlotAmountMode.COMPUTED,
+            computation=SlotComputation.MULTIPLY,
+            translations=_en("Issued to client"),
+        ),
+    )
+
+
+def _sale_slots() -> tuple[SlotSpec, ...]:
+    """The bank sells foreign cash for the national currency."""
+    return (
+        SlotSpec(
+            code="received",
+            name="Принято от клиента",
+            order=0,
+            currency_policy=SlotCurrencyPolicy.BASE,
+            threshold_basis=True,
+            translations=_en("Received from client"),
+        ),
+        SlotSpec(
+            code="issued",
+            name="Выдано клиенту",
+            order=1,
+            currency_policy=SlotCurrencyPolicy.FOREIGN,
+            amount_mode=SlotAmountMode.COMPUTED,
+            computation=SlotComputation.DIVIDE,
+            stores_rate=True,
+            translations=_en("Issued to client"),
+        ),
+    )
+
+
+def _conversion_slots() -> tuple[SlotSpec, ...]:
+    """The bank exchanges one foreign currency for another."""
+    return (
+        SlotSpec(
+            code="received",
+            name="Принято от клиента",
+            order=0,
+            currency_policy=SlotCurrencyPolicy.FOREIGN,
+            threshold_basis=True,
+            translations=_en("Received from client"),
+        ),
+        SlotSpec(
+            code="issued",
+            name="Выдано клиенту",
+            order=1,
+            currency_policy=SlotCurrencyPolicy.FOREIGN,
+            amount_mode=SlotAmountMode.COMPUTED,
+            computation=SlotComputation.MULTIPLY,
+            stores_rate=True,
             translations=_en("Issued to client"),
         ),
     )
@@ -85,12 +147,15 @@ def _income(
     translations: dict[str, str],
     currency: str = "",
     requires_client: bool = False,
+    form: str = OperationForm.AMOUNT,
+    multiple: bool = False,
 ):
     return OperationTypeSpec(
         code=code,
         name=name,
         kind=OperationKind.INCOME,
-        slots=_amount_slots(currency),
+        form=form,
+        slots=_amount_slots(currency, multiple=multiple),
         template=_amount_template(1),
         requires_client=requires_client,
         permission_code=PERMISSION,
@@ -105,12 +170,15 @@ def _expense(
     translations: dict[str, str],
     currency: str = "",
     requires_client: bool = False,
+    form: str = OperationForm.AMOUNT,
+    multiple: bool = False,
 ):
     return OperationTypeSpec(
         code=code,
         name=name,
         kind=OperationKind.EXPENSE,
-        slots=_amount_slots(currency),
+        form=form,
+        slots=_amount_slots(currency, multiple=multiple),
         template=_amount_template(-1),
         requires_client=requires_client,
         permission_code=PERMISSION,
@@ -118,12 +186,21 @@ def _expense(
     )
 
 
-def _exchange(code: str, name: str, *, translations: dict[str, str]):
+def _exchange(
+    code: str,
+    name: str,
+    *,
+    translations: dict[str, str],
+    slots: tuple[SlotSpec, ...],
+    rate_principle: str,
+):
     return OperationTypeSpec(
         code=code,
         name=name,
         kind=OperationKind.EXCHANGE,
-        slots=_exchange_slots(),
+        form=OperationForm.EXCHANGE,
+        rate_principle=rate_principle,
+        slots=slots,
         template=_exchange_template(),
         requires_client=True,
         permission_code=PERMISSION,
@@ -138,6 +215,8 @@ OPERATION_TYPES: tuple[OperationTypeSpec, ...] = (
         "cash_replenishment",
         "Подкрепление кассы",
         translations=_en("Cash desk replenishment"),
+        form=OperationForm.MULTI_CURRENCY,
+        multiple=True,
     ),
     _income(
         "cash_receipt",
@@ -209,28 +288,38 @@ OPERATION_TYPES: tuple[OperationTypeSpec, ...] = (
     ),
     _expense(
         "cash_handover",
-        "Сдача наличных в кассу банка",
-        translations=_en("Cash handover to the bank"),
+        "Инкассация кассы",
+        translations=_en("Cash collection"),
+        form=OperationForm.MULTI_CURRENCY,
+        multiple=True,
     ),
     # Exchange
     _exchange(
         "currency_sale",
         "Продажа валюты клиенту",
         translations=_en("Currency sale to client"),
+        slots=_sale_slots(),
+        rate_principle=OperationRatePrinciple.SELL,
     ),
     _exchange(
         "currency_purchase",
         "Покупка валюты у клиента",
         translations=_en("Currency purchase from client"),
+        slots=_purchase_slots(),
+        rate_principle=OperationRatePrinciple.BUY,
     ),
     _exchange(
         "currency_conversion",
         "Конвертация валюты",
         translations=_en("Currency conversion"),
+        slots=_conversion_slots(),
+        rate_principle=OperationRatePrinciple.CONVERSION,
     ),
     _exchange(
         "fractional_currency_purchase",
         "Покупка дробной части валюты",
         translations=_en("Fractional currency purchase"),
+        slots=_purchase_slots(),
+        rate_principle=OperationRatePrinciple.BUY,
     ),
 )

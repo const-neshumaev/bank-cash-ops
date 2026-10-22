@@ -1,6 +1,9 @@
+from decimal import Decimal
+
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
+from modules.common.contracts import registry
 from modules.operations.backend.models import (
     CashBalance,
     Movement,
@@ -16,6 +19,7 @@ from modules.operations.backend.thresholds import (
     ClientDataPolicy,
     threshold_errors,
 )
+from modules.references.contracts import REFERENCE_DIRECTORY
 
 
 class SlotDefSerializer(serializers.ModelSerializer):
@@ -23,7 +27,19 @@ class SlotDefSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SlotDef
-        fields = ("code", "name", "required", "fixed_currency", "order")
+        fields = (
+            "code",
+            "name",
+            "required",
+            "fixed_currency",
+            "order",
+            "multiple",
+            "currency_policy",
+            "amount_mode",
+            "computation",
+            "stores_rate",
+            "threshold_basis",
+        )
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -35,8 +51,9 @@ class OperationTypeSerializer(serializers.ModelSerializer):
     """Read and update representation of an operation type and its slots.
 
     Only the administrator-managed settings are writable: the client-data policy,
-    the threshold configuration and the activity flag. Declarative metadata (code,
-    name, kind, slots, posting template) is owned by the declaring module.
+    the threshold configuration, the exchange rate type and the activity flag.
+    Declarative metadata (code, name, kind, form, slots, posting template) is owned
+    by the declaring module.
     """
 
     slots = SlotDefSerializer(many=True, read_only=True)
@@ -45,6 +62,7 @@ class OperationTypeSerializer(serializers.ModelSerializer):
         source="get_client_data_policy_display", read_only=True
     )
     threshold_type_display = serializers.SerializerMethodField()
+    rate_type_display = serializers.SerializerMethodField()
 
     class Meta:
         model = OperationType
@@ -53,6 +71,7 @@ class OperationTypeSerializer(serializers.ModelSerializer):
             "name",
             "kind",
             "kind_display",
+            "form",
             "is_external",
             "client_data_policy",
             "client_data_policy_display",
@@ -60,6 +79,9 @@ class OperationTypeSerializer(serializers.ModelSerializer):
             "threshold_type_display",
             "threshold_value",
             "threshold_currency",
+            "rate_principle",
+            "rate_type",
+            "rate_type_display",
             "permission_code",
             "is_active",
             "slots",
@@ -69,9 +91,12 @@ class OperationTypeSerializer(serializers.ModelSerializer):
             "name",
             "kind",
             "kind_display",
+            "form",
             "is_external",
             "client_data_policy_display",
             "threshold_type_display",
+            "rate_principle",
+            "rate_type_display",
             "permission_code",
             "slots",
         )
@@ -81,6 +106,12 @@ class OperationTypeSerializer(serializers.ModelSerializer):
             (item for item in THRESHOLD_TYPES if item.code == obj.threshold_type), None
         )
         return str(threshold.name) if threshold is not None else ""
+
+    def get_rate_type_display(self, obj) -> str:
+        if not obj.rate_type:
+            return ""
+        rate_type = registry.get(REFERENCE_DIRECTORY).get_rate_type(obj.rate_type)
+        return rate_type.name if rate_type is not None else obj.rate_type
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -112,6 +143,33 @@ class OperationTypeSerializer(serializers.ModelSerializer):
             attrs["threshold_type"] = ""
             attrs["threshold_value"] = None
             attrs["threshold_currency"] = ""
+
+        kind = attrs.get("kind", getattr(instance, "kind", ""))
+        rate_type = (attrs.get("rate_type", getattr(instance, "rate_type", "")) or "").strip()
+        if kind == OperationType.Kind.EXCHANGE:
+            if not rate_type:
+                raise serializers.ValidationError(
+                    {"rate_type": _("The rate type is required for an exchange operation.")}
+                )
+            directory = registry.get(REFERENCE_DIRECTORY)
+            rate_type_dto = directory.get_rate_type(rate_type)
+            if rate_type_dto is None or not rate_type_dto.is_active:
+                raise serializers.ValidationError(
+                    {"rate_type": _("Unknown or inactive rate type.")}
+                )
+            principle = getattr(instance, "rate_principle", "")
+            if principle and rate_type_dto.principle != principle:
+                raise serializers.ValidationError(
+                    {
+                        "rate_type": _(
+                            "The rate type must use the '%(principle)s' principle."
+                        )
+                        % {"principle": principle}
+                    }
+                )
+            attrs["rate_type"] = rate_type
+        else:
+            attrs["rate_type"] = ""
         return attrs
 
 
@@ -141,7 +199,14 @@ class OperationLineSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OperationLine
-        fields = ("slot", "currency", "amount", "rate")
+        fields = (
+            "slot",
+            "currency",
+            "amount",
+            "rate",
+            "rate_type",
+            "rate_is_individual",
+        )
 
 
 class OperationSerializer(serializers.ModelSerializer):
@@ -184,10 +249,13 @@ class OperationLineInputSerializer(serializers.Serializer):
 
     slot = serializers.CharField(max_length=64)
     currency = serializers.CharField(max_length=8)
-    amount = serializers.DecimalField(max_digits=18, decimal_places=2)
+    amount = serializers.DecimalField(
+        max_digits=18, decimal_places=2, required=False, default=Decimal("0")
+    )
     rate = serializers.DecimalField(
         max_digits=18, decimal_places=8, required=False, allow_null=True
     )
+    rate_is_individual = serializers.BooleanField(required=False, default=False)
 
 
 class PostOperationSerializer(serializers.Serializer):
@@ -266,6 +334,7 @@ class WorkplaceOperationSerializer(serializers.ModelSerializer):
 
     slots = SlotDefSerializer(many=True, read_only=True)
     requires_client = serializers.BooleanField(read_only=True)
+    rate_type_display = serializers.SerializerMethodField()
 
     class Meta:
         model = OperationType
@@ -273,10 +342,23 @@ class WorkplaceOperationSerializer(serializers.ModelSerializer):
             "code",
             "name",
             "kind",
+            "form",
             "client_data_policy",
             "requires_client",
+            "threshold_type",
+            "threshold_value",
+            "threshold_currency",
+            "rate_principle",
+            "rate_type",
+            "rate_type_display",
             "slots",
         )
+
+    def get_rate_type_display(self, obj) -> str:
+        if not obj.rate_type:
+            return ""
+        rate_type = registry.get(REFERENCE_DIRECTORY).get_rate_type(obj.rate_type)
+        return rate_type.name if rate_type is not None else obj.rate_type
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

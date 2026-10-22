@@ -2,14 +2,26 @@
 
 from __future__ import annotations
 
+from datetime import date
+
+from django.utils import timezone
+
 from modules.core.backend import currency_config, rates, scoping
 from modules.core.backend.models import (
+    BankSettings,
+    BaseValue,
     CashDesk,
     CurrencyRate,
     Shift,
     User,
 )
-from modules.core.contracts.dto import CashDeskDTO, CurrencyRateDTO, ShiftDTO, UserDTO
+from modules.core.contracts.dto import (
+    BankSettingsDTO,
+    CashDeskDTO,
+    CurrencyRateDTO,
+    ShiftDTO,
+    UserDTO,
+)
 
 
 class UserDirectoryService:
@@ -134,6 +146,25 @@ class CashDeskConfigService:
             scope=rate.scope,
             effective_date=rate.effective_date,
             units=rate.units,
+        )
+
+
+class BankSettingsService:
+    """In-process implementation of the ``BankSettingsDirectory`` contract."""
+
+    def get_settings(self, on: date | None = None) -> BankSettingsDTO:
+        settings = BankSettings.load()
+        moment = on or timezone.localdate()
+        base_value = (
+            BaseValue.objects.filter(effective_from__lte=moment)
+            .order_by("-effective_from")
+            .first()
+        )
+        return BankSettingsDTO(
+            base_currency=settings.base_currency,
+            conversion_mode=settings.conversion_mode,
+            base_value=base_value.amount if base_value is not None else None,
+            base_value_date=base_value.effective_from if base_value is not None else None,
         )
 
 

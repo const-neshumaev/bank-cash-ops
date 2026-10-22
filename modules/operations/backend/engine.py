@@ -17,6 +17,7 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 
 from modules.common.backend import outbox
+from modules.operations.backend.client_data import enforce_client_data
 from modules.operations.backend.models import (
     CashBalance,
     Movement,
@@ -25,6 +26,7 @@ from modules.operations.backend.models import (
     OperationNumberSequence,
     OperationType,
 )
+from modules.operations.backend.preparation import prepare_operation
 from modules.operations.backend.registers import RegisterCode
 from modules.operations.backend.registry import operation_type_registry
 from modules.operations.contracts.dto import (
@@ -64,7 +66,17 @@ def post_operation(
         if existing is not None:
             return existing
 
-    line_values = _validate_lines(operation_type, lines)
+    prepared = prepare_operation(
+        operation_type=operation_type,
+        cash_desk_id=cash_desk_id,
+        lines=tuple(lines),
+    )
+    enforce_client_data(
+        prepared.client_data,
+        client_name=client_name,
+        client_document=client_document,
+    )
+    line_values = prepared.lines
     request = OperationRequest(
         operation_type=_to_dto(operation_type),
         context=OperationContext(
@@ -136,7 +148,14 @@ def reverse_operation(
         for m in operation.movements.all()
     )
     lines = tuple(
-        SlotValue(slot=line.slot, currency=line.currency, amount=-line.amount, rate=line.rate)
+        SlotValue(
+            slot=line.slot,
+            currency=line.currency,
+            amount=-line.amount,
+            rate=line.rate,
+            rate_type=line.rate_type,
+            rate_is_individual=line.rate_is_individual,
+        )
         for line in operation.lines.all()
     )
 
@@ -168,40 +187,8 @@ def reverse_operation(
 
 
 # --------------------------------------------------------------------------- #
-# Validation
+# Posting plan
 # --------------------------------------------------------------------------- #
-def _validate_lines(
-    operation_type: OperationType, lines: Iterable[SlotValue]
-) -> tuple[SlotValue, ...]:
-    values = tuple(lines)
-    slot_defs = {slot.code: slot for slot in operation_type.slots.all()}
-    if not slot_defs:
-        return values
-
-    seen: set[str] = set()
-    for value in values:
-        if value.slot in seen:
-            raise ValidationError(
-                _("The slot '%(slot)s' is filled more than once.") % {"slot": value.slot}
-            )
-        seen.add(value.slot)
-        slot = slot_defs.get(value.slot)
-        if slot is None:
-            raise ValidationError(_("Unknown slot '%(slot)s'.") % {"slot": value.slot})
-        if slot.fixed_currency and slot.fixed_currency != value.currency:
-            raise ValidationError(
-                _("The slot '%(slot)s' only accepts %(currency)s.")
-                % {"slot": value.slot, "currency": slot.fixed_currency}
-            )
-
-    missing = [code for code, slot in slot_defs.items() if slot.required and code not in seen]
-    if missing:
-        raise ValidationError(
-            _("Missing required slots: %(slots)s.") % {"slots": ", ".join(sorted(missing))}
-        )
-    return values
-
-
 def _build_plan(operation_type: OperationType, request: OperationRequest) -> PostingPlan:
     handler = operation_type_registry.get_handler(operation_type.code)
     if handler is not None:
@@ -221,22 +208,22 @@ def _plan_from_template(operation_type: OperationType, request: OperationRequest
     movement takes its currency and amount from the referenced slot line and
     applies ``sign`` (default ``1``).
     """
-    by_slot = {line.slot: line for line in request.lines}
     specs: list[MovementSpec] = []
     for movement in operation_type.template.get("movements", []):
         slot_code = movement["slot"]
-        line = by_slot.get(slot_code)
-        if line is None:
+        slot_lines = [line for line in request.lines if line.slot == slot_code]
+        if not slot_lines:
             raise ValidationError(
                 _("The template references an unfilled slot '%(slot)s'.") % {"slot": slot_code}
             )
-        specs.append(
-            MovementSpec(
-                register=movement["register"],
-                currency=line.currency,
-                amount=line.amount * int(movement.get("sign", 1)),
+        for line in slot_lines:
+            specs.append(
+                MovementSpec(
+                    register=movement["register"],
+                    currency=line.currency,
+                    amount=line.amount * int(movement.get("sign", 1)),
+                )
             )
-        )
     return PostingPlan(movements=tuple(specs))
 
 
@@ -279,6 +266,8 @@ def _persist(
             currency=line.currency,
             amount=line.amount,
             rate=line.rate,
+            rate_type=line.rate_type,
+            rate_is_individual=line.rate_is_individual,
         )
     for movement in movements:
         Movement.objects.create(
@@ -362,4 +351,7 @@ def _to_dto(operation_type: OperationType) -> OperationTypeDTO:
         kind=operation_type.kind,
         is_external=operation_type.is_external,
         requires_client=operation_type.requires_client,
+        form=operation_type.form,
+        rate_principle=operation_type.rate_principle,
+        rate_type=operation_type.rate_type,
     )

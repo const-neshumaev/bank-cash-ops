@@ -19,7 +19,15 @@ from modules.operations.backend.thresholds import ClientDataPolicy
 from modules.operations.contracts.dto import OperationTypeSpec
 
 #: Fields owned by the declaring module: synchronisation always refreshes them.
-DECLARATIVE_FIELDS = ("name", "kind", "is_external", "permission_code", "template")
+DECLARATIVE_FIELDS = (
+    "name",
+    "kind",
+    "form",
+    "rate_principle",
+    "is_external",
+    "permission_code",
+    "template",
+)
 
 
 def sync_operation_types() -> int:
@@ -34,6 +42,8 @@ def sync_operation_types() -> int:
         defaults = {
             "name": spec.name,
             "kind": spec.kind,
+            "form": spec.form,
+            "rate_principle": spec.rate_principle,
             "is_external": spec.is_external,
             "permission_code": spec.permission_code,
             "template": spec.template,
@@ -75,6 +85,12 @@ def _sync_slots(operation_type: OperationType, spec: OperationTypeSpec) -> None:
                 "required": slot.required,
                 "fixed_currency": slot.fixed_currency,
                 "order": slot.order,
+                "multiple": slot.multiple,
+                "currency_policy": slot.currency_policy,
+                "amount_mode": slot.amount_mode,
+                "computation": slot.computation,
+                "stores_rate": slot.stores_rate,
+                "threshold_basis": slot.threshold_basis,
             },
         )
         _sync_translations(SlotDefTranslation, slot_def, "slot", slot.translations)

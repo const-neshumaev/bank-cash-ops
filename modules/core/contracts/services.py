@@ -6,11 +6,17 @@ implementation that lives in ``modules.core.backend``.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Protocol
 
-from modules.core.contracts.dto import CashDeskDTO, CurrencyRateDTO, ShiftDTO, UserDTO
+from modules.core.contracts.dto import (
+    BankSettingsDTO,
+    CashDeskDTO,
+    CurrencyRateDTO,
+    ShiftDTO,
+    UserDTO,
+)
 
 
 class UserDirectory(Protocol):
@@ -89,4 +95,17 @@ class CashDeskConfigDirectory(Protocol):
 
     def cash_desk_rates(self, cash_desk_id: int) -> tuple[CurrencyRateDTO, ...]:
         """Effective rates in force at a cash desk."""
+        ...
+
+
+class BankSettingsDirectory(Protocol):
+    """Read-only access to the bank-wide settings other modules rely on.
+
+    The national currency, the conversion mode and the effective base value are
+    owned by ``core``. Modules that evaluate client-data thresholds or convert
+    amounts read them through this contract instead of ``core``'s tables.
+    """
+
+    def get_settings(self, on: date | None = None) -> BankSettingsDTO:
+        """Return the settings and the base value in force on ``on``."""
         ...
