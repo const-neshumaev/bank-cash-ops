@@ -11,7 +11,10 @@
     "cancel": "Cancel"
   },
   "validation": {
-    "amounts": "Enter the amounts and currencies"
+    "amounts": "Enter the amounts and currencies",
+    "clientRequired": "Enter the client",
+    "documentRequired": "Enter the document",
+    "clientData": "The client data is required for this operation"
   },
   "workplace": {
     "title": "Cash desk",
@@ -34,6 +37,8 @@
       "central": "central"
     },
     "newOperation": "New operation",
+    "newOperationHint": "Select an operation and fill in its parameters.",
+    "createOperation": "Create operation",
     "operation": "Operation",
     "operationPlaceholder": "Select an operation",
     "operationNotFound": "No operations found",
@@ -45,6 +50,31 @@
     "reverse": "Reverse",
     "posted": "Operation posted",
     "reversed": "Operation reversed",
+    "clientData": {
+      "title": "Client data",
+      "message": "The client data is required for this operation",
+      "reasonAlways": "The operation always requires the client's data",
+      "reasonThreshold": "The threshold is exceeded: {{amount}} {{currency}} > {{threshold}} {{currency}}"
+    },
+    "exchange": {
+      "rate": "Rate",
+      "individualRate": "Individual rate",
+      "rateMissing": "No rate was found for the selected pair",
+      "rateTypeMissing": "No rate type is configured for the operation type",
+      "rateType": "Rate type: {{name}}"
+    },
+    "confirm": {
+      "title": "Confirm the operation",
+      "question": "Post the operation “{{name}}”?",
+      "slot": "Parameter",
+      "amount": "Amount",
+      "currency": "Currency",
+      "rate": "Rate",
+      "confirm": "Post",
+      "reverseTitle": "Confirm the reversal",
+      "reverseQuestion": "Reverse operation No. {{number}} “{{name}}”?",
+      "reverseConfirm": "Reverse"
+    },
     "recent": {
       "title": "Recent operations",
       "empty": "No operations at this cash desk yet.",
@@ -75,6 +105,7 @@
       "kind": "Kind",
       "clientData": "Client data",
       "threshold": "Threshold",
+      "rateType": "Rate type",
       "status": "Status",
       "changedAt": "Date and time",
       "changedBy": "User",
@@ -96,6 +127,7 @@
       "threshold_type": "Threshold type",
       "threshold_value": "Threshold value",
       "threshold_currency": "Threshold currency",
+      "rate_type": "Rate type",
       "is_active": "Activity"
     },
     "form": {
@@ -105,6 +137,8 @@
       "thresholdValueHintBaseValue": "A number of base values; the value in force is resolved on the operation date.",
       "thresholdValueHintCurrency": "An amount in the selected currency.",
       "thresholdCurrency": "Threshold currency",
+      "rateType": "Rate type",
+      "rateTypeRequired": "Select a rate type for an exchange operation",
       "active": "Operation type is active"
     }
   },

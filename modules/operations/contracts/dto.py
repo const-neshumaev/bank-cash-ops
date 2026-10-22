@@ -22,6 +22,63 @@ class OperationKind:
     INTERNAL = "internal"
 
 
+class OperationForm:
+    """Stable identifiers of the input form an operation type uses.
+
+    The form is declarative metadata: the generic cashier UI and the engine read
+    it to know how many amounts to ask for, which currencies are allowed and how
+    the exchange legs are computed.
+    """
+
+    AMOUNT = "amount"
+    MULTI_CURRENCY = "multi_currency"
+    EXCHANGE = "exchange"
+
+    VALUES = (AMOUNT, MULTI_CURRENCY, EXCHANGE)
+
+
+class SlotCurrencyPolicy:
+    """Stable identifiers of the currency rule of an amount slot."""
+
+    ANY = "any"
+    FOREIGN = "foreign"
+    BASE = "base"
+
+    VALUES = (ANY, FOREIGN, BASE)
+
+
+class SlotAmountMode:
+    """Stable identifiers of how the amount of a slot is obtained."""
+
+    INPUT = "input"
+    COMPUTED = "computed"
+
+    VALUES = (INPUT, COMPUTED)
+
+
+class SlotComputation:
+    """Stable identifiers of how a computed amount derives from the basis."""
+
+    MULTIPLY = "multiply"
+    DIVIDE = "divide"
+
+    VALUES = (MULTIPLY, DIVIDE)
+
+
+class OperationRatePrinciple:
+    """Stable identifiers of the rate direction an exchange operation needs.
+
+    The value is declarative; the concrete bank rate type is configured by an
+    administrator on the operation type.
+    """
+
+    BUY = "buy"
+    SELL = "sell"
+    CONVERSION = "conversion"
+
+    VALUES = (BUY, SELL, CONVERSION)
+
+
 @dataclass(frozen=True)
 class OperationTypeDTO:
     """Immutable view of an operation type crossing the module boundary."""
@@ -31,6 +88,9 @@ class OperationTypeDTO:
     kind: str
     is_external: bool
     requires_client: bool
+    form: str = OperationForm.AMOUNT
+    rate_principle: str = ""
+    rate_type: str = ""
 
 
 @dataclass(frozen=True)
@@ -41,6 +101,8 @@ class SlotValue:
     currency: str
     amount: Decimal
     rate: Decimal | None = None
+    rate_type: str = ""
+    rate_is_individual: bool = False
 
 
 @dataclass(frozen=True)
@@ -99,6 +161,18 @@ class SlotSpec:
     fixed_currency: str = ""
     order: int = 0
     translations: dict[str, str] = field(default_factory=dict)
+    #: The slot may be filled once per currency (for multi-currency operations).
+    multiple: bool = False
+    #: ``any``, ``foreign`` or ``base`` (the bank's national currency).
+    currency_policy: str = SlotCurrencyPolicy.ANY
+    #: ``input`` when the cashier enters the amount, ``computed`` otherwise.
+    amount_mode: str = SlotAmountMode.INPUT
+    #: ``multiply`` or ``divide`` for a computed slot.
+    computation: str = ""
+    #: The slot holds the operation's rate (one exchange leg).
+    stores_rate: bool = False
+    #: The slot is summed when the client-data threshold is evaluated.
+    threshold_basis: bool = False
 
 
 @dataclass(frozen=True)
@@ -127,6 +201,10 @@ class OperationTypeSpec:
     kind: str
     slots: tuple[SlotSpec, ...] = ()
     template: dict[str, Any] = field(default_factory=dict)
+    #: ``amount``, ``multi_currency`` or ``exchange`` (see ``OperationForm``).
+    form: str = OperationForm.AMOUNT
+    #: Rate direction of an exchange form (see ``OperationRatePrinciple``).
+    rate_principle: str = ""
     is_external: bool = False
     requires_client: bool = False
     client_id_threshold: Decimal | None = None

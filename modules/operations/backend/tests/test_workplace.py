@@ -5,7 +5,7 @@ from decimal import Decimal
 
 import pytest
 
-from modules.core.contracts import CurrencyRateDTO
+from modules.core.contracts import BankSettingsDTO, CurrencyRateDTO
 from modules.operations.backend.models import CashBalance, OperationTemplate
 
 pytestmark = pytest.mark.django_db
@@ -64,3 +64,23 @@ def test_workplace_exposes_the_effective_rates(auth_client, contracts):
     assert response.data["rates"][0]["currency"] == "USD"
     assert response.data["rates"][0]["rate_type"] == "buy"
     assert response.data["rates"][0]["value"] == "3.25"
+
+
+def test_workplace_exposes_the_form_and_bank_settings(auth_client, contracts, income_type):
+    OperationTemplate.objects.create(branch_id=None).operation_types.set([income_type])
+    contracts.bank_settings.settings = BankSettingsDTO(
+        base_currency="BYN",
+        conversion_mode="via_base",
+        base_value=Decimal("40.00"),
+    )
+
+    response = auth_client.get(WORKPLACE_URL)
+
+    assert response.status_code == 200, response.content
+    assert response.data["base_currency"] == "BYN"
+    assert response.data["conversion_mode"] == "via_base"
+    assert response.data["base_value"] == "40.00"
+    operation = response.data["operations"][0]
+    assert operation["form"] == "amount"
+    assert operation["slots"][0]["threshold_basis"] is True
+    assert operation["slots"][0]["multiple"] is False

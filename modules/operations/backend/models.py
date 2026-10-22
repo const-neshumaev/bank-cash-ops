@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -20,12 +21,21 @@ from django.utils.translation import gettext_lazy as _
 from modules.common.backend.i18n import pick_translation
 from modules.common.backend.models import TimeStampedModel
 from modules.common.backend.schemas import qualified_table
+from modules.common.contracts import registry
 from modules.operations.backend.registers import RegisterCode
 from modules.operations.backend.thresholds import (
     ClientDataPolicy,
     raise_threshold_errors,
 )
-from modules.operations.contracts.dto import OperationKind
+from modules.operations.contracts.dto import (
+    OperationForm,
+    OperationKind,
+    OperationRatePrinciple,
+    SlotAmountMode,
+    SlotComputation,
+    SlotCurrencyPolicy,
+)
+from modules.references.contracts import REFERENCE_DIRECTORY
 
 
 class OperationType(TimeStampedModel):
@@ -45,6 +55,26 @@ class OperationType(TimeStampedModel):
     code = models.SlugField(_("code"), max_length=64, unique=True)
     name = models.CharField(_("name"), max_length=150)
     kind = models.CharField(_("kind"), max_length=16, choices=Kind.choices)
+    form = models.CharField(
+        _("form"),
+        max_length=16,
+        choices=[(value, value) for value in OperationForm.VALUES],
+        default=OperationForm.AMOUNT,
+        help_text=_("The input form used by the cashier workplace."),
+    )
+    rate_principle = models.CharField(
+        _("rate principle"),
+        max_length=16,
+        blank=True,
+        choices=[(value, value) for value in OperationRatePrinciple.VALUES],
+        help_text=_("Direction of the rate an exchange operation resolves."),
+    )
+    rate_type = models.CharField(
+        _("rate type"),
+        max_length=64,
+        blank=True,
+        help_text=_("Bank rate type used by an exchange operation."),
+    )
     is_external = models.BooleanField(
         _("external operation"),
         default=False,
@@ -113,6 +143,36 @@ class OperationType(TimeStampedModel):
             self.threshold_value,
             self.threshold_currency,
         )
+        self._clean_rate_type()
+
+    def _clean_rate_type(self):
+        """Require a valid rate type for an existing exchange operation.
+
+        The check is skipped when the type is first materialised from a
+        declaration (``pk`` is ``None``): the rate type is an administrator
+        setting and the declaration does not provide it.
+        """
+        if self.kind != self.Kind.EXCHANGE:
+            self.rate_type = ""
+            return
+        if self.pk is None:
+            return
+        code = (self.rate_type or "").strip()
+        if not code:
+            raise ValidationError(
+                {"rate_type": _("The rate type is required for an exchange operation.")}
+            )
+        rate_type = registry.get(REFERENCE_DIRECTORY).get_rate_type(code)
+        if rate_type is None or not rate_type.is_active:
+            raise ValidationError({"rate_type": _("Unknown or inactive rate type.")})
+        if self.rate_principle and rate_type.principle != self.rate_principle:
+            raise ValidationError(
+                {
+                    "rate_type": _("The rate type must use the '%(principle)s' principle.")
+                    % {"principle": self.rate_principle}
+                }
+            )
+        self.rate_type = code
 
     def localized_name(self, language: str | None = None) -> str:
         """Return the name in ``language`` (the active one when omitted).
@@ -164,10 +224,10 @@ class OperationTypeSettingsChange(TimeStampedModel):
     """An audit entry of a change to the configurable settings of a type.
 
     Only settings managed by an administrator are recorded: the client-data
-    policy, the threshold configuration and the activity flag. ``changes`` keeps
-    the before/after values of the changed fields. The user is stored by a stable
-    id plus an email snapshot so the history stays readable after the account is
-    gone (``operations`` must not reference ``core`` tables).
+    policy, the threshold configuration, the exchange rate type and the activity
+    flag. ``changes`` keeps the before/after values of the changed fields. The user
+    is stored by a stable id plus an email snapshot so the history stays readable
+    after the account is gone (``operations`` must not reference ``core`` tables).
     """
 
     operation_type = models.ForeignKey(
@@ -209,6 +269,42 @@ class SlotDef(TimeStampedModel):
     code = models.SlugField(_("code"), max_length=64)
     name = models.CharField(_("name"), max_length=150)
     required = models.BooleanField(_("required"), default=True)
+    multiple = models.BooleanField(
+        _("multiple currencies"),
+        default=False,
+        help_text=_("The slot may be filled once per currency."),
+    )
+    currency_policy = models.CharField(
+        _("currency policy"),
+        max_length=16,
+        choices=[(value, value) for value in SlotCurrencyPolicy.VALUES],
+        default=SlotCurrencyPolicy.ANY,
+        help_text=_("Whether the slot accepts any, only foreign or only the base currency."),
+    )
+    amount_mode = models.CharField(
+        _("amount mode"),
+        max_length=16,
+        choices=[(value, value) for value in SlotAmountMode.VALUES],
+        default=SlotAmountMode.INPUT,
+        help_text=_("Whether the cashier enters the amount or it is computed."),
+    )
+    computation = models.CharField(
+        _("computation"),
+        max_length=16,
+        blank=True,
+        choices=[(value, value) for value in SlotComputation.VALUES],
+        help_text=_("How a computed amount derives from the basis slot."),
+    )
+    stores_rate = models.BooleanField(
+        _("stores the rate"),
+        default=False,
+        help_text=_("The slot holds the rate of an exchange operation."),
+    )
+    threshold_basis = models.BooleanField(
+        _("threshold basis"),
+        default=False,
+        help_text=_("The slot is summed when the client-data threshold is evaluated."),
+    )
     fixed_currency = models.CharField(
         _("currency"),
         max_length=8,
@@ -361,6 +457,8 @@ class OperationLine(TimeStampedModel):
     currency = models.CharField(_("currency"), max_length=8)
     amount = models.DecimalField(_("amount"), max_digits=18, decimal_places=2)
     rate = models.DecimalField(_("rate"), max_digits=18, decimal_places=8, null=True, blank=True)
+    rate_type = models.CharField(_("rate type"), max_length=64, blank=True)
+    rate_is_individual = models.BooleanField(_("individual rate"), default=False)
 
     class Meta:
         verbose_name = _("operation line")

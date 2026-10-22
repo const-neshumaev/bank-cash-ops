@@ -14,14 +14,19 @@ from rest_framework.test import APIClient
 
 from modules.common.contracts import registry
 from modules.core.contracts import (
+    BANK_SETTINGS,
     CASH_DESK_CONFIG,
     ORG_DIRECTORY,
+    BankSettingsDTO,
     CashDeskDTO,
     ShiftDTO,
 )
 from modules.operations.backend.models import OperationType, SlotDef
 from modules.operations.contracts import OperationKind
-from modules.references.contracts import REFERENCE_DIRECTORY, CurrencyDTO
+from modules.references.contracts import (
+    REFERENCE_DIRECTORY,
+    CurrencyDTO,
+)
 
 User = get_user_model()
 
@@ -68,36 +73,55 @@ class FakeOrgDirectory:
 
 
 class FakeReferenceDirectory:
-    """Minimal ``references`` directory: the currency dictionary."""
+    """Minimal ``references`` directory: the currency dictionary and rate types."""
+
+    def __init__(self, rate_types=(), currencies=DEFAULT_CURRENCIES):
+        self._rate_types = tuple(rate_types)
+        self._currencies = tuple(currencies)
 
     def currencies(self):
-        return DEFAULT_CURRENCIES
+        return self._currencies
 
     def get_currency(self, code):
-        return next((currency for currency in DEFAULT_CURRENCIES if currency.code == code), None)
+        return next((currency for currency in self._currencies if currency.code == code), None)
 
     def rate_types(self):
-        return ()
+        return self._rate_types
 
     def get_rate_type(self, code):
-        return None
+        return next((item for item in self._rate_types if item.code == code), None)
 
 
 class FakeCashDeskConfig:
     """Minimal ``core`` cash desk configuration; by default every currency is allowed."""
 
-    def __init__(self, allowed=None, rates=()):
+    def __init__(self, allowed=None, rates=(), currency_rates=None):
         self.allowed = allowed if allowed is not None else {c.code for c in DEFAULT_CURRENCIES}
         self.rates = rates
+        self.currency_rates = currency_rates or {}
 
     def cash_desk_currency_codes(self, cash_desk_id):
         return self.allowed
 
-    def rate(self, currency_code, rate_type, *, cash_desk_id=None, at=None):
-        return None
+    def rate(self, currency_code, rate_type, *, target_currency=None, cash_desk_id=None, at=None):
+        return self.currency_rates.get((currency_code, rate_type, target_currency))
 
     def cash_desk_rates(self, cash_desk_id):
         return self.rates
+
+
+class FakeBankSettings:
+    """Minimal ``core`` bank settings directory used by threshold and exchange rules."""
+
+    def __init__(self, base_currency="BYN", conversion_mode="via_base", base_value=None):
+        self.settings = BankSettingsDTO(
+            base_currency=base_currency,
+            conversion_mode=conversion_mode,
+            base_value=base_value,
+        )
+
+    def get_settings(self, on=None):
+        return self.settings
 
 
 @pytest.fixture
@@ -109,6 +133,7 @@ def contracts(monkeypatch):
     )
     references = FakeReferenceDirectory()
     cash_desk_config = FakeCashDeskConfig()
+    bank_settings = FakeBankSettings()
     original_get = registry.get
 
     def _get(name):
@@ -118,10 +143,17 @@ def contracts(monkeypatch):
             return references
         if name == CASH_DESK_CONFIG:
             return cash_desk_config
+        if name == BANK_SETTINGS:
+            return bank_settings
         return original_get(name)
 
     monkeypatch.setattr(registry, "get", _get)
-    return SimpleNamespace(org=org, references=references, cash_desk_config=cash_desk_config)
+    return SimpleNamespace(
+        org=org,
+        references=references,
+        cash_desk_config=cash_desk_config,
+        bank_settings=bank_settings,
+    )
 
 
 @pytest.fixture
@@ -146,7 +178,10 @@ def income_type():
         code="cash_receipt",
         name="Приход наличных",
         kind=OperationKind.INCOME,
+        form="amount",
         template={"movements": [{"register": "cash", "slot": "amount", "sign": 1}]},
     )
-    SlotDef.objects.create(operation_type=operation_type, code="amount", name="Сумма")
+    SlotDef.objects.create(
+        operation_type=operation_type, code="amount", name="Сумма", threshold_basis=True
+    )
     return operation_type

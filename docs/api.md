@@ -562,11 +562,19 @@ units?, buy, sell }]`. Запрос атомарен: для каждой пар
 (фильтры), `search` (по `code`, `name`), `ordering` (`name`, `code`).
 
 В ответе тип содержит массив `slots` (`code`, `name`, `required`,
-`fixed_currency`, `order`) — по нему строится форма проведения.
+`fixed_currency`, `order`, `multiple`, `currency_policy`, `amount_mode`,
+`computation`, `stores_rate`, `threshold_basis`) — по нему строится форма
+проведения. Поле `form` задаёт вид формы: `amount`, `multi_currency` или
+`exchange`; `rate_principle` — направление курса обмена (`buy`, `sell`,
+`conversion`).
 
 Администратор может изменить только настройки: `client_data_policy`, `threshold_type`,
-`threshold_value`, `threshold_currency`, `is_active`. Код, название, вид, слоты и
-шаблон проводок остаются декларативными и не перезаписываются.
+`threshold_value`, `threshold_currency`, `rate_type`, `is_active`. Код, название,
+вид, форма, слоты и шаблон проводок остаются декларативными и не перезаписываются.
+
+Для типа с видом `exchange` поле `rate_type` обязательно: это код банковского
+типа курса из `/api/references/rate-types/`, принцип которого совпадает с
+`rate_principle`. Без настроенного типа курса операция обмена не проводится.
 
 Политика данных клиента:
 
@@ -575,6 +583,13 @@ units?, buy, sell }]`. Запрос атомарен: для каждой пар
 | `never` | данные клиента не запрашиваются; порог не задаётся |
 | `always` | данные клиента запрашиваются всегда |
 | `threshold` | данные запрашиваются при превышении порога; тип и значение порога обязательны |
+
+Проверка выполняется при проведении и в предварительном просмотре. При `always`
+обязательны оба поля — `client_name` и `client_document`. При `threshold`
+сравнивается сумма слотов с `threshold_basis`: для обмена это «Принято от
+клиента», для остальных операций — суммы всех слотов. Сравнение строгое (`>`),
+иностранные суммы пересчитываются по курсу Национального банка (`official`).
+Если курс или действующая базовая величина недоступны, операция отклоняется.
 
 Способы задания порога (`threshold_type`) заданы в коде:
 
@@ -604,6 +619,7 @@ units?, buy, sell }]`. Запрос атомарен: для каждой пар
 | --- | --- | --- | --- |
 | GET | `/api/operations/operations/` | `operations.view` | Журнал операций (см. параметры) |
 | POST | `/api/operations/operations/` | `operations.create` | Провести операцию |
+| POST | `/api/operations/operations/preview/` | `operations.create` | Проверить и подготовить операцию без проведения |
 | GET | `/api/operations/operations/{id}/` | `operations.view` | Карточка операции (строки и проводки) |
 | POST | `/api/operations/operations/{id}/reverse/` | `operations.reverse` | Сторнировать операцию |
 
@@ -620,7 +636,13 @@ Content-Type: application/json
 {
   "operation_type": "cash_receipt",
   "lines": [
-    { "slot": "amount", "currency": "USD", "amount": "500.00", "rate": null }
+    {
+      "slot": "amount",
+      "currency": "USD",
+      "amount": "500.00",
+      "rate": null,
+      "rate_is_individual": false
+    }
   ],
   "client_name": "Иванов И. И.",
   "client_document": "AB 1234567",
@@ -635,13 +657,50 @@ Content-Type: application/json
   выдан пользователю, иначе `403`;
 - операция должна быть доступна на кассе (комплектация кассы) — иначе `400`;
 - валюты строк должны быть доступны на кассе — иначе `400`;
-- суммы проверяются по слотам типа (обязательные, известные, фиксированные валюты) —
-  иначе `400`;
+- суммы проверяются по слотам типа (обязательные, известные, фиксированные валюты,
+  положительные суммы) — иначе `400`;
+- слот с `multiple = true` принимает несколько строк — по одной на валюту;
+- слот с `currency_policy = base` принимает только национальную валюту, с
+  `foreign` — только иностранную;
+- для обмена суммы и курсы проверяются движком: курс берётся из настроенного
+  `rate_type`, вычисляемая строка пересчитывается на сервере; индивидуальный курс
+  (`rate_is_individual = true`) должен быть больше нуля;
+- данные клиента проверяются по политике типа (см. «Типы операций»); при
+  необходимости оба поля обязательны — иначе `400` с ошибками полей;
 - расход не может превысить остаток наличных в кассе — иначе `400` (и ничего не
   записывается);
 - повтор запроса с тем же `idempotency_key` на той же кассе возвращает уже
   проведённую операцию (`201`), дубля не создаётся;
 - без открытой смены у кассира — `400`.
+
+#### Предварительный просмотр
+
+`POST /api/operations/operations/preview/` принимает те же данные, что и
+проведение, применяет те же правила, но ничего не записывает. Ответ содержит
+нормализованные строки (`lines`) и результат проверки данных клиента:
+
+```json
+{
+  "operation_type": "currency_purchase",
+  "operation_type_name": "Покупка валюты у клиента",
+  "lines": [
+    { "slot": "received", "currency": "USD", "amount": "100.00", "rate": "3.25000000", "rate_type": "buy", "rate_is_individual": false },
+    { "slot": "issued", "currency": "BYN", "amount": "325.00", "rate": null, "rate_type": "", "rate_is_individual": false }
+  ],
+  "client_data": {
+    "policy": "always",
+    "required": true,
+    "reason": "always",
+    "amount": null,
+    "threshold": null,
+    "currency": ""
+  }
+}
+```
+
+`reason` принимает значения `never`, `always`, `threshold` (порог превышен) и
+`below_threshold`. При превышении порога в `amount`, `threshold` и `currency`
+возвращаются сумма, порог и валюта сравнения.
 
 #### Сторнирование
 
@@ -656,13 +715,18 @@ Content-Type: application/json
 | GET | `/api/operations/workplace/` | `operations.view` | Контекст экрана кассира |
 
 Возвращает всё, что нужно экрану: открытую смену и кассу, остатки наличных,
-доступные на кассе операции (со слотами) и доступные валюты. Если смены нет —
-пустой контекст (`shift_id: null`).
+доступные на кассе операции (со слотами и метаданными формы), доступные валюты,
+национальную валюту, режим конверсии и действующую базовую величину. Если смены
+нет — пустой контекст (`shift_id: null`).
 
 ```json
 {
   "shift_id": 11,
   "cash_desk_id": 7,
+  "base_currency": "BYN",
+  "conversion_mode": "via_base",
+  "base_value": "40.00",
+  "base_value_date": "2026-01-01",
   "currencies": [ { "code": "USD", "name": "Доллар США", "symbol": "$", "minor_units": 2 } ],
   "rates": [
     { "currency": "USD", "base_currency": "BYN", "rate_type": "buy", "units": 1, "value": "3.250000", "value_per_unit": "3.250000", "effective_from": "..." }
@@ -672,12 +736,22 @@ Content-Type: application/json
   ],
   "operations": [
     {
-      "code": "cash_receipt",
-      "name": "Приход наличных",
-      "kind": "income",
+      "code": "currency_purchase",
+      "name": "Покупка валюты у клиента",
+      "kind": "exchange",
+      "form": "exchange",
       "client_data_policy": "always",
       "requires_client": true,
-      "slots": [ { "code": "amount", "name": "Сумма", "required": true, "fixed_currency": "", "order": 0 } ]
+      "threshold_type": "",
+      "threshold_value": null,
+      "threshold_currency": "",
+      "rate_principle": "buy",
+      "rate_type": "buy",
+      "rate_type_display": "Курс покупки",
+      "slots": [
+        { "code": "received", "name": "Принято от клиента", "required": true, "fixed_currency": "", "order": 0, "multiple": false, "currency_policy": "foreign", "amount_mode": "input", "computation": "", "stores_rate": true, "threshold_basis": true },
+        { "code": "issued", "name": "Выдано клиенту", "required": true, "fixed_currency": "", "order": 1, "multiple": false, "currency_policy": "base", "amount_mode": "computed", "computation": "multiply", "stores_rate": false, "threshold_basis": false }
+      ]
     }
   ]
 }

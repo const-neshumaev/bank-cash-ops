@@ -42,10 +42,17 @@ class SlotDefTranslationInline(admin.TabularInline):
 class OperationTypeAdmin(admin.ModelAdmin):
     """Administration of the operation type catalogue."""
 
-    list_display = ("name", "code", "kind", "client_data_policy", "is_active")
+    list_display = (
+        "name",
+        "code",
+        "kind",
+        "client_data_policy",
+        "rate_type",
+        "is_active",
+    )
     list_filter = ("kind", "is_external", "client_data_policy", "is_active")
     search_fields = ("name", "code")
-    readonly_fields = ("created_at", "updated_at")
+    readonly_fields = ("form", "rate_principle", "created_at", "updated_at")
     inlines = (SlotDefInline, OperationTypeTranslationInline)
 
     def save_model(self, request, obj, form, change):
@@ -73,7 +80,7 @@ class OperationLineInline(admin.TabularInline):
     model = OperationLine
     extra = 0
     can_delete = False
-    readonly_fields = ("slot", "currency", "amount", "rate")
+    readonly_fields = ("slot", "currency", "amount", "rate", "rate_type", "rate_is_individual")
 
     def has_add_permission(self, request, obj=None):
         return False

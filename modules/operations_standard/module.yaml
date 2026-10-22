@@ -1,7 +1,7 @@
 name: operations_standard
 title: Базовые кассовые операции
-version: 0.1.0
-description: Базовый набор типов кассовых операций (приход, расход, обмен).
+version: 0.2.0
+description: Базовый набор типов кассовых операций (приход, расход, обмен) с декларативными формами ввода.
 
 dependencies:
   - name: operations

@@ -10,6 +10,7 @@ export interface OperationTypeSettings {
   name: string
   kind: string
   kind_display: string
+  form: 'amount' | 'multi_currency' | 'exchange'
   is_external: boolean
   client_data_policy: ClientDataPolicy
   client_data_policy_display: string
@@ -17,6 +18,9 @@ export interface OperationTypeSettings {
   threshold_type_display: string
   threshold_value: string | null
   threshold_currency: string
+  rate_principle: '' | 'buy' | 'sell' | 'conversion'
+  rate_type: string
+  rate_type_display: string
   permission_code: string
   is_active: boolean
   slots: SlotDef[]
@@ -27,6 +31,7 @@ export interface OperationTypeSettingsPayload {
   threshold_type?: string
   threshold_value?: string | null
   threshold_currency?: string
+  rate_type?: string
   is_active: boolean
 }
 
@@ -41,6 +46,14 @@ export interface CurrencyOption {
   name: string
   symbol: string
   minor_units: number
+}
+
+export interface RateTypeOption {
+  id: number
+  code: string
+  name: string
+  principle: string
+  is_active: boolean
 }
 
 export type HistoryValue = string | boolean | null
@@ -90,6 +103,13 @@ export async function listThresholdTypes(): Promise<ThresholdTypeOption[]> {
 export async function listActiveCurrencies(): Promise<CurrencyOption[]> {
   const { data } = await api.get<Paginated<CurrencyOption>>('/references/currencies/', {
     params: { page_size: 100, is_active: true, ordering: 'code' },
+  })
+  return data.results
+}
+
+export async function listRateTypes(): Promise<RateTypeOption[]> {
+  const { data } = await api.get<Paginated<RateTypeOption>>('/references/rate-types/', {
+    params: { page_size: 100, is_active: true },
   })
   return data.results
 }

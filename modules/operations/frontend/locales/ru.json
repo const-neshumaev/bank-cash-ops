@@ -11,7 +11,10 @@
     "cancel": "Отмена"
   },
   "validation": {
-    "amounts": "Заполните суммы и валюты"
+    "amounts": "Заполните суммы и валюты",
+    "clientRequired": "Укажите клиента",
+    "documentRequired": "Укажите документ",
+    "clientData": "Для выполнения операции необходимы данные клиента"
   },
   "workplace": {
     "title": "Касса",
@@ -34,6 +37,8 @@
       "central": "учётный"
     },
     "newOperation": "Новая операция",
+    "newOperationHint": "Выберите операцию и заполните её параметры.",
+    "createOperation": "Создать операцию",
     "operation": "Операция",
     "operationPlaceholder": "Выберите операцию",
     "operationNotFound": "Операции не найдены",
@@ -45,6 +50,31 @@
     "reverse": "Сторно",
     "posted": "Операция проведена",
     "reversed": "Операция сторнирована",
+    "clientData": {
+      "title": "Данные клиента",
+      "message": "Для выполнения операции необходимы данные клиента",
+      "reasonAlways": "Операция всегда требует ввода данных клиента",
+      "reasonThreshold": "Превышен порог: {{amount}} {{currency}} > {{threshold}} {{currency}}"
+    },
+    "exchange": {
+      "rate": "Курс",
+      "individualRate": "Индивидуальный курс",
+      "rateMissing": "Курс для выбранной пары не найден",
+      "rateTypeMissing": "Для типа операции не настроен тип курса",
+      "rateType": "Тип курса: {{name}}"
+    },
+    "confirm": {
+      "title": "Подтверждение операции",
+      "question": "Провести операцию «{{name}}»?",
+      "slot": "Параметр",
+      "amount": "Сумма",
+      "currency": "Валюта",
+      "rate": "Курс",
+      "confirm": "Провести",
+      "reverseTitle": "Подтверждение сторно",
+      "reverseQuestion": "Сторнировать операцию №{{number}} «{{name}}»?",
+      "reverseConfirm": "Сторнировать"
+    },
     "recent": {
       "title": "Последние операции",
       "empty": "Операций по кассе пока нет.",
@@ -75,6 +105,7 @@
       "kind": "Вид",
       "clientData": "Данные клиента",
       "threshold": "Порог",
+      "rateType": "Тип курса",
       "status": "Статус",
       "changedAt": "Дата и время",
       "changedBy": "Пользователь",
@@ -96,6 +127,7 @@
       "threshold_type": "Тип порога",
       "threshold_value": "Значение порога",
       "threshold_currency": "Валюта порога",
+      "rate_type": "Тип курса",
       "is_active": "Активность"
     },
     "form": {
@@ -105,6 +137,8 @@
       "thresholdValueHintBaseValue": "Количество базовых величин; действующая величина определяется на дату операции.",
       "thresholdValueHintCurrency": "Сумма в выбранной валюте.",
       "thresholdCurrency": "Валюта порога",
+      "rateType": "Тип курса",
+      "rateTypeRequired": "Для операции обмена выберите тип курса",
       "active": "Тип операции активен"
     }
   },

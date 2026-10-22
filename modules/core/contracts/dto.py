@@ -8,6 +8,16 @@ from decimal import Decimal
 
 
 @dataclass(frozen=True)
+class BankSettingsDTO:
+    """Immutable view of the bank-wide settings."""
+
+    base_currency: str
+    conversion_mode: str
+    base_value: Decimal | None = None
+    base_value_date: date | None = None
+
+
+@dataclass(frozen=True)
 class UserDTO:
     """Immutable view of a user crossing the module boundary."""
 

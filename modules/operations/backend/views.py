@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from django.db import transaction
 from django.db.models import Q
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
@@ -20,7 +21,7 @@ from rest_framework.views import APIView
 
 from modules.common.backend.permissions import PermissionRequired
 from modules.common.contracts import registry
-from modules.core.contracts import CASH_DESK_CONFIG, ORG_DIRECTORY
+from modules.core.contracts import BANK_SETTINGS, CASH_DESK_CONFIG, ORG_DIRECTORY
 from modules.operations.backend import config, serializers
 from modules.operations.backend import history as history_service
 from modules.operations.backend.engine import post_operation, reverse_operation
@@ -32,6 +33,7 @@ from modules.operations.backend.models import (
     OperationType,
 )
 from modules.operations.backend.permission_codes import PermissionCode
+from modules.operations.backend.preparation import prepare_operation
 from modules.operations.backend.thresholds import THRESHOLD_TYPES
 from modules.operations.contracts import SlotValue
 from modules.references.contracts import REFERENCE_DIRECTORY
@@ -230,6 +232,7 @@ class OperationViewSet(
         "list": PermissionCode.VIEW,
         "retrieve": PermissionCode.VIEW,
         "create": PermissionCode.CREATE,
+        "preview": PermissionCode.CREATE,
         "reverse": PermissionCode.REVERSE,
     }
     filterset_class = OperationFilter
@@ -244,14 +247,12 @@ class OperationViewSet(
         return queryset
 
     def get_serializer_class(self):
-        if self.action == "create":
+        if self.action in ("create", "preview"):
             return serializers.PostOperationSerializer
         return serializers.OperationSerializer
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
+    def _validate_post_request(self, request, data):
+        """Apply the posting rules shared by the preview and the create action."""
         operation_type = data["operation_type"]
 
         if operation_type.permission_code and not request.user.has_permission(
@@ -270,6 +271,7 @@ class OperationViewSet(
                 currency=line["currency"],
                 amount=line["amount"],
                 rate=line.get("rate"),
+                rate_is_individual=line.get("rate_is_individual", False),
             )
             for line in data["lines"]
         )
@@ -281,6 +283,46 @@ class OperationViewSet(
                     _("The currency %(currency)s is not available at this cash desk.")
                     % {"currency": line.currency}
                 )
+        return operation_type, shift, lines
+
+    @action(detail=False, methods=["post"])
+    def preview(self, request):
+        """Validate an operation and return the prepared lines and client policy."""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        operation_type, shift, lines = self._validate_post_request(request, data)
+        prepared = prepare_operation(
+            operation_type=operation_type,
+            cash_desk_id=shift.cash_desk_id,
+            lines=lines,
+        )
+        requirement = prepared.client_data
+        return Response(
+            {
+                "operation_type": operation_type.code,
+                "operation_type_name": operation_type.localized_name(),
+                "lines": serializers.OperationLineSerializer(
+                    prepared.lines, many=True
+                ).data,
+                "client_data": {
+                    "policy": requirement.policy,
+                    "required": requirement.required,
+                    "reason": requirement.reason,
+                    "amount": None if requirement.amount is None else str(requirement.amount),
+                    "threshold": (
+                        None if requirement.threshold is None else str(requirement.threshold)
+                    ),
+                    "currency": requirement.currency,
+                },
+            }
+        )
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        operation_type, shift, lines = self._validate_post_request(request, data)
 
         operation = post_operation(
             operation_type=operation_type,
@@ -437,10 +479,21 @@ class WorkplaceView(APIView):
 
         shift = _org_directory().get_open_shift(request.user.id)
         if shift is None:
+            settings = registry.get(BANK_SETTINGS).get_settings(timezone.localdate())
             return Response(
                 {
                     "shift_id": None,
                     "cash_desk_id": None,
+                    "base_currency": settings.base_currency,
+                    "conversion_mode": settings.conversion_mode,
+                    "base_value": (
+                        None if settings.base_value is None else str(settings.base_value)
+                    ),
+                    "base_value_date": (
+                        None
+                        if settings.base_value_date is None
+                        else settings.base_value_date.isoformat()
+                    ),
                     "currencies": [],
                     "rates": [],
                     "balances": [],
@@ -449,6 +502,7 @@ class WorkplaceView(APIView):
             )
 
         cash_desk_id = shift.cash_desk_id
+        settings = registry.get(BANK_SETTINGS).get_settings(timezone.localdate())
         currencies_directory = _reference_directory()
         cash_desk_config = _cash_desk_config()
         allowed = cash_desk_config.cash_desk_currency_codes(cash_desk_id)
@@ -461,6 +515,14 @@ class WorkplaceView(APIView):
             {
                 "shift_id": shift.id,
                 "cash_desk_id": cash_desk_id,
+                "base_currency": settings.base_currency,
+                "conversion_mode": settings.conversion_mode,
+                "base_value": None if settings.base_value is None else str(settings.base_value),
+                "base_value_date": (
+                    None
+                    if settings.base_value_date is None
+                    else settings.base_value_date.isoformat()
+                ),
                 "currencies": [
                     {
                         "code": currency.code,
