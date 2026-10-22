@@ -57,6 +57,9 @@
       "reasonThreshold": "Превышен порог: {{amount}} {{currency}} > {{threshold}} {{currency}}"
     },
     "exchange": {
+      "knownAmount": "Известна сумма",
+      "knownReceived": "Известна сумма, полученная от клиента",
+      "knownIssued": "Известна сумма выдачи клиенту",
       "rate": "Курс",
       "individualRate": "Индивидуальный курс",
       "rateMissing": "Курс для выбранной пары не найден",

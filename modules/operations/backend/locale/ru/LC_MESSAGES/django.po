@@ -519,6 +519,11 @@ msgstr "Касса недоступна для вас."
 msgid "No cash desk matches the given query."
 msgstr "Нет кассы, соответствующей запросу."
 
+#: modules/operations/backend/preparation.py
+#, python-format
+msgid "The slot '%(slot)s' is not an exchange leg of the operation."
+msgstr "Слот «%(slot)s» не является стороной обмена этой операции."
+
 #~ msgid "requires client data"
 #~ msgstr "требуются данные клиента"
 

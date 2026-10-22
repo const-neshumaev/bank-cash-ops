@@ -98,6 +98,8 @@ export interface WorkplaceContext {
 export interface PostOperationPayload {
   operation_type: string
   lines: OperationLine[]
+  /** Code of the exchange slot whose amount the cashier entered. */
+  basis_slot?: string
   client_name?: string
   client_document?: string
   comment?: string
