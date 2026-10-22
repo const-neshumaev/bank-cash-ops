@@ -12,6 +12,14 @@ export interface ExchangeSlots {
   rate: SlotDef
 }
 
+/** The exchange legs split into the one the cashier enters and the derived one. */
+export interface ExchangeEntry {
+  known: SlotDef
+  derived: SlotDef
+  /** How the derived amount is obtained from the known one. */
+  computation: 'multiply' | 'divide'
+}
+
 export function exchangeSlots(operation: WorkplaceOperation): ExchangeSlots | null {
   const computed = operation.slots.find((slot) => slot.amount_mode === 'computed')
   const rate = operation.slots.find((slot) => slot.stores_rate)
@@ -19,6 +27,41 @@ export function exchangeSlots(operation: WorkplaceOperation): ExchangeSlots | nu
   const basis = operation.slots.find((slot) => slot.code !== computed.code)
   if (!basis) return null
   return { basis, computed, rate }
+}
+
+/** Return the exchange legs in the declared order (received, then issued). */
+export function exchangeLegs(exchange: ExchangeSlots): SlotDef[] {
+  return [exchange.basis, exchange.computed].sort((a, b) => a.order - b.order)
+}
+
+/**
+ * Split the exchange legs by the amount the cashier knows.
+ *
+ * ``knownSlot`` names the entered leg; when it is the declared computed leg,
+ * the declared input leg is derived with the inverse computation.
+ */
+export function exchangeEntry(
+  exchange: ExchangeSlots,
+  knownSlot: string | null,
+): ExchangeEntry | null {
+  if (knownSlot === exchange.computed.code) {
+    const computation =
+      exchange.computed.computation === 'multiply'
+        ? 'divide'
+        : exchange.computed.computation === 'divide'
+          ? 'multiply'
+          : null
+    if (!computation) return null
+    return { known: exchange.computed, derived: exchange.basis, computation }
+  }
+  if (knownSlot === exchange.basis.code && exchange.computed.computation) {
+    return {
+      known: exchange.basis,
+      derived: exchange.computed,
+      computation: exchange.computed.computation,
+    }
+  }
+  return null
 }
 
 export function currencyByCode(

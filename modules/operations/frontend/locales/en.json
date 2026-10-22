@@ -57,6 +57,9 @@
       "reasonThreshold": "The threshold is exceeded: {{amount}} {{currency}} > {{threshold}} {{currency}}"
     },
     "exchange": {
+      "knownAmount": "Known amount",
+      "knownReceived": "Amount received from the client is known",
+      "knownIssued": "Amount issued to the client is known",
       "rate": "Rate",
       "individualRate": "Individual rate",
       "rateMissing": "No rate was found for the selected pair",

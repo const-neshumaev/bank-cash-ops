@@ -52,6 +52,7 @@ def post_operation(
     client_document: str = "",
     comment: str = "",
     idempotency_key: str = "",
+    basis_slot: str = "",
 ) -> Operation:
     """Post an operation and return the journal document.
 
@@ -70,6 +71,7 @@ def post_operation(
         operation_type=operation_type,
         cash_desk_id=cash_desk_id,
         lines=tuple(lines),
+        basis_slot=basis_slot,
     )
     enforce_client_data(
         prepared.client_data,

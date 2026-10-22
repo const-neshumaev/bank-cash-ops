@@ -269,6 +269,9 @@ class PostOperationSerializer(serializers.Serializer):
         slug_field="code", queryset=OperationType.objects.all()
     )
     lines = OperationLineInputSerializer(many=True)
+    basis_slot = serializers.CharField(
+        max_length=64, required=False, allow_blank=True, default=""
+    )
     client_name = serializers.CharField(
         max_length=255, required=False, allow_blank=True, default=""
     )

@@ -296,6 +296,7 @@ class OperationViewSet(
             operation_type=operation_type,
             cash_desk_id=shift.cash_desk_id,
             lines=lines,
+            basis_slot=data["basis_slot"],
         )
         requirement = prepared.client_data
         return Response(
@@ -334,6 +335,7 @@ class OperationViewSet(
             client_document=data["client_document"],
             comment=data["comment"],
             idempotency_key=data["idempotency_key"],
+            basis_slot=data["basis_slot"],
         )
         return Response(
             serializers.OperationSerializer(operation).data,

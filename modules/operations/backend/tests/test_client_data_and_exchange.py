@@ -219,6 +219,140 @@ def test_conversion_uses_the_cross_rate_via_the_base_currency(auth_client, contr
     assert issued["amount"] == "75.00"
 
 
+def _known_issued_lines(received_currency, issued_currency, issued, **extra):
+    """Lines of an exchange where only the issued amount is known."""
+    return [
+        {"slot": "received", "currency": received_currency, "amount": "0.00"},
+        {"slot": "issued", "currency": issued_currency, "amount": issued, **extra},
+    ]
+
+
+def test_purchase_computes_the_received_amount_when_the_issued_amount_is_known(
+    auth_client, contracts
+):
+    operation_type = _exchange_type()
+    CashBalance.objects.create(cash_desk_id=7, currency="BYN", amount=Decimal("1000.00"))
+    contracts.cash_desk_config.currency_rates = {("USD", "buy", None): Decimal("3.25")}
+
+    response = _post(
+        auth_client,
+        operation_type,
+        _known_issued_lines("USD", "BYN", "325.00"),
+        basis_slot="issued",
+        client_name="Иванов И. И.",
+        client_document="AB 1234567",
+    )
+
+    assert response.status_code == 201, response.content
+    lines = {line["slot"]: line for line in response.data["lines"]}
+    assert lines["received"]["amount"] == "100.00"
+    assert lines["issued"]["amount"] == "325.00"
+    assert lines["received"]["rate"] == "3.25000000"
+    assert CashBalance.objects.get(cash_desk_id=7, currency="BYN").amount == Decimal("675.00")
+    assert CashBalance.objects.get(cash_desk_id=7, currency="USD").amount == Decimal("100.00")
+
+
+def test_sale_computes_the_received_amount_when_the_issued_amount_is_known(
+    auth_client, contracts
+):
+    operation_type = _exchange_type(
+        code="currency_sale", principle=OperationRatePrinciple.SELL, rate_type="sell"
+    )
+    operation_type.slots.filter(code="received").update(
+        currency_policy="base", stores_rate=False
+    )
+    operation_type.slots.filter(code="issued").update(
+        currency_policy="foreign", stores_rate=True, computation="divide"
+    )
+    CashBalance.objects.create(cash_desk_id=7, currency="USD", amount=Decimal("100.00"))
+    contracts.cash_desk_config.currency_rates = {("USD", "sell", None): Decimal("4.00")}
+
+    response = _post(
+        auth_client,
+        operation_type,
+        _known_issued_lines("BYN", "USD", "100.00"),
+        basis_slot="issued",
+        client_name="Иванов И. И.",
+        client_document="AB 1234567",
+    )
+
+    assert response.status_code == 201, response.content
+    lines = {line["slot"]: line for line in response.data["lines"]}
+    assert lines["received"]["amount"] == "400.00"
+    assert lines["issued"]["amount"] == "100.00"
+    assert lines["issued"]["rate"] == "4.00000000"
+    assert CashBalance.objects.get(cash_desk_id=7, currency="USD").amount == Decimal("0.00")
+
+
+def test_conversion_computes_the_received_amount_when_the_issued_amount_is_known(
+    auth_client, contracts
+):
+    operation_type = _exchange_type(
+        code="currency_conversion",
+        principle=OperationRatePrinciple.CONVERSION,
+        rate_type="conversion",
+    )
+    operation_type.slots.filter(code="issued").update(currency_policy="foreign")
+    contracts.cash_desk_config.allowed = {"BYN", "USD", "EUR"}
+    contracts.references._currencies = (
+        *contracts.references.currencies(),
+        CurrencyDTO(code="EUR", name="Евро", symbol="€", minor_units=2),
+    )
+    contracts.cash_desk_config.currency_rates = {
+        ("USD", "conversion", None): Decimal("3.00"),
+        ("EUR", "conversion", None): Decimal("4.00"),
+    }
+    CashBalance.objects.create(cash_desk_id=7, currency="EUR", amount=Decimal("100.00"))
+
+    response = _post(
+        auth_client,
+        operation_type,
+        _known_issued_lines("USD", "EUR", "75.00"),
+        basis_slot="issued",
+        client_name="Иванов И. И.",
+        client_document="AB 1234567",
+    )
+
+    assert response.status_code == 201, response.content
+    lines = {line["slot"]: line for line in response.data["lines"]}
+    assert lines["received"]["amount"] == "100.00"
+    assert lines["issued"]["amount"] == "75.00"
+
+
+def test_a_foreign_basis_slot_blocks_the_operation(auth_client, contracts):
+    operation_type = _exchange_type()
+    contracts.cash_desk_config.currency_rates = {("USD", "buy", None): Decimal("3.25")}
+
+    response = _post(
+        auth_client,
+        operation_type,
+        _known_issued_lines("USD", "BYN", "325.00"),
+        basis_slot="amount",
+        client_name="Иванов И. И.",
+        client_document="AB 1234567",
+    )
+
+    assert response.status_code == 400
+    assert Operation.objects.count() == 0
+
+
+def test_the_entered_exchange_amount_must_be_positive(auth_client, contracts):
+    operation_type = _exchange_type()
+    contracts.cash_desk_config.currency_rates = {("USD", "buy", None): Decimal("3.25")}
+
+    response = _post(
+        auth_client,
+        operation_type,
+        _known_issued_lines("USD", "BYN", "0.00"),
+        basis_slot="issued",
+        client_name="Иванов И. И.",
+        client_document="AB 1234567",
+    )
+
+    assert response.status_code == 400
+    assert Operation.objects.count() == 0
+
+
 def test_direct_conversion_uses_the_direction_correct_pair_side(auth_client, contracts):
     operation_type = _exchange_type(
         code="currency_conversion",

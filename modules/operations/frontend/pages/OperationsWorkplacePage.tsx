@@ -38,6 +38,8 @@ import type {
 import {
   computeAmount,
   currencyOptions,
+  exchangeEntry,
+  exchangeLegs,
   exchangeSlots,
   formatAmount,
   formatRate,
@@ -92,6 +94,7 @@ export function OperationsWorkplacePage() {
   const [multiAmounts, setMultiAmounts] = useState<Record<string, string>>({})
 
   const [exchangeAmount, setExchangeAmount] = useState('')
+  const [knownSlot, setKnownSlot] = useState<string | null>(null)
   const [basisCurrency, setBasisCurrency] = useState<string | null>(null)
   const [computedCurrency, setComputedCurrency] = useState<string | null>(null)
   const [individualRate, setIndividualRate] = useState(false)
@@ -116,6 +119,10 @@ export function OperationsWorkplacePage() {
     () => (selectedOperation ? exchangeSlots(selectedOperation) : null),
     [selectedOperation],
   )
+  const entry = useMemo(
+    () => (exchange ? exchangeEntry(exchange, knownSlot) : null),
+    [exchange, knownSlot],
+  )
 
   const resolvedRate = useMemo(() => {
     if (!context || !selectedOperation || !exchange || !basisCurrency || !computedCurrency) {
@@ -126,10 +133,10 @@ export function OperationsWorkplacePage() {
 
   const effectiveRate = individualRate ? parseAmount(rateInput) : resolvedRate
 
-  const computedAmount = useMemo(() => {
-    if (!exchange || !effectiveRate) return 0
-    return computeAmount(parseAmount(exchangeAmount), effectiveRate, exchange.computed.computation)
-  }, [exchange, effectiveRate, exchangeAmount])
+  const derivedAmount = useMemo(() => {
+    if (!entry || !effectiveRate) return 0
+    return computeAmount(parseAmount(exchangeAmount), effectiveRate, entry.computation)
+  }, [entry, effectiveRate, exchangeAmount])
 
   const rateTypeLabel = (rateType: string) => t(RATE_TYPE_LABEL_KEYS[rateType] ?? rateType)
 
@@ -156,6 +163,7 @@ export function OperationsWorkplacePage() {
     setSlotCurrencies({})
     setMultiAmounts({})
     setExchangeAmount('')
+    setKnownSlot(null)
     setBasisCurrency(null)
     setComputedCurrency(null)
     setIndividualRate(false)
@@ -185,6 +193,7 @@ export function OperationsWorkplacePage() {
     setSlotCurrencies({})
     setMultiAmounts({})
     setExchangeAmount('')
+    setKnownSlot(null)
     setIndividualRate(false)
     setRateInput('')
     setClientName('')
@@ -249,32 +258,40 @@ export function OperationsWorkplacePage() {
           base
     setBasisCurrency(initialBasis)
     setComputedCurrency(initialComputed)
+    // The cashier enters the issued leg by default; it is the declared computed
+    // leg, which keeps the declaration the single source of the exchange shape.
+    setKnownSlot(slots.computed.code)
   }
 
   const buildDraftLines = useCallback((): OperationLine[] | null => {
     if (!context || !selectedOperation) return null
 
-    if (selectedOperation.form === 'exchange' && exchange) {
+    if (selectedOperation.form === 'exchange' && exchange && entry) {
       if (!basisCurrency || !computedCurrency || !effectiveRate) return null
-      const basisAmount = parseAmount(exchangeAmount)
-      if (basisAmount <= 0) return null
+      const enteredAmount = parseAmount(exchangeAmount)
+      if (enteredAmount <= 0) return null
       const rateValue = String(effectiveRate)
-      const basisLine: OperationLine = {
-        slot: exchange.basis.code,
-        currency: basisCurrency,
-        amount: formatAmount(basisAmount, basisCurrency, context.currencies),
-        rate: exchange.rate.code === exchange.basis.code ? rateValue : null,
-        rate_is_individual: exchange.rate.code === exchange.basis.code ? individualRate : false,
+      const currencyOf = (slotCode: string) =>
+        slotCode === exchange.basis.code ? basisCurrency : computedCurrency
+      const amountOf: Record<string, string> = {
+        [entry.known.code]: formatAmount(
+          enteredAmount,
+          currencyOf(entry.known.code),
+          context.currencies,
+        ),
+        [entry.derived.code]: formatAmount(
+          derivedAmount,
+          currencyOf(entry.derived.code),
+          context.currencies,
+        ),
       }
-      const computedLine: OperationLine = {
-        slot: exchange.computed.code,
-        currency: computedCurrency,
-        amount: formatAmount(computedAmount, computedCurrency, context.currencies),
-        rate: exchange.rate.code === exchange.computed.code ? rateValue : null,
-        rate_is_individual:
-          exchange.rate.code === exchange.computed.code ? individualRate : false,
-      }
-      return [basisLine, computedLine]
+      return [entry.known, entry.derived].map((slot) => ({
+        slot: slot.code,
+        currency: currencyOf(slot.code),
+        amount: amountOf[slot.code],
+        rate: exchange.rate.code === slot.code ? rateValue : null,
+        rate_is_individual: exchange.rate.code === slot.code ? individualRate : false,
+      }))
     }
 
     if (selectedOperation.form === 'multi_currency') {
@@ -309,11 +326,12 @@ export function OperationsWorkplacePage() {
     context,
     selectedOperation,
     exchange,
+    entry,
     basisCurrency,
     computedCurrency,
     effectiveRate,
     exchangeAmount,
-    computedAmount,
+    derivedAmount,
     multiAmounts,
     slotAmounts,
     slotCurrencies,
@@ -354,6 +372,7 @@ export function OperationsWorkplacePage() {
         .previewOperation({
           operation_type: selectedOperation.code,
           lines: draftLines,
+          basis_slot: entry?.known.code,
         })
         .then((preview) => {
           if (!cancelled) {
@@ -372,7 +391,7 @@ export function OperationsWorkplacePage() {
       cancelled = true
       clearTimeout(timer)
     }
-  }, [operationModalOpen, selectedOperation, draftLines])
+  }, [operationModalOpen, selectedOperation, draftLines, entry])
 
   const clientDataRequired = Boolean(clientRequirement?.required)
 
@@ -414,6 +433,7 @@ export function OperationsWorkplacePage() {
       const preview = await operationsApi.previewOperation({
         operation_type: selectedOperation.code,
         lines: draftLines,
+        basis_slot: entry?.known.code,
         client_name: clientName,
         client_document: clientDocument,
         comment,
@@ -457,6 +477,7 @@ export function OperationsWorkplacePage() {
         client_name: clientName,
         client_document: clientDocument,
         comment,
+        basis_slot: entry?.known.code,
         idempotency_key: crypto.randomUUID(),
       })
       notifications.show({ color: 'green', message: t('workplace.posted') })
@@ -658,65 +679,87 @@ export function OperationsWorkplacePage() {
                   </Group>
                 ))}
 
-              {selectedOperation.form === 'exchange' && exchange && (
+              {selectedOperation.form === 'exchange' && exchange && entry && (
                 <Stack>
-                  <Group align="flex-end" grow>
-                    <TextInput
-                      label={exchange.basis.name}
-                      placeholder="0.00"
-                      inputMode="decimal"
-                      value={exchangeAmount}
-                      onChange={(event) => setExchangeAmount(event.currentTarget.value)}
-                    />
-                    <Select
-                      label={t('workplace.currency')}
-                      data={inputCurrencyOptions(exchange.basis.currency_policy)}
-                      value={basisCurrency}
-                      onChange={(value) => {
-                        setBasisCurrency(value ?? '')
-                        if (value && value === computedCurrency) {
-                          const alternative = context.currencies.find(
-                            (currency) =>
-                              currency.code !== value &&
-                              currency.code !== baseCurrency,
-                          )
-                          setComputedCurrency(alternative?.code ?? '')
-                        }
-                      }}
-                      disabled={
-                        Boolean(exchange.basis.fixed_currency) ||
-                        exchange.basis.currency_policy === 'base'
-                      }
-                      allowDeselect={false}
-                    />
-                  </Group>
+                  <Select
+                    label={t('workplace.exchange.knownAmount')}
+                    // The declared input leg is the amount the client gives, the
+                    // computed leg is what the bank issues.
+                    data={[
+                      {
+                        value: exchange.basis.code,
+                        label: t('workplace.exchange.knownReceived'),
+                      },
+                      {
+                        value: exchange.computed.code,
+                        label: t('workplace.exchange.knownIssued'),
+                      },
+                    ]}
+                    value={entry.known.code}
+                    onChange={(value) => {
+                      setKnownSlot(value ?? exchange.computed.code)
+                      setExchangeAmount('')
+                    }}
+                    allowDeselect={false}
+                  />
 
-                  <Group align="flex-end" grow>
-                    <TextInput
-                      label={exchange.computed.name}
-                      value={formatAmount(
-                        computedAmount,
-                        computedCurrency ?? baseCurrency,
-                        context.currencies,
-                      )}
-                      readOnly
-                      disabled
-                    />
-                    <Select
-                      label={t('workplace.currency')}
-                      data={inputCurrencyOptions(
-                        exchange.computed.currency_policy,
-                        basisCurrency ? [basisCurrency] : [],
-                      )}
-                      value={computedCurrency}
-                      onChange={(value) => setComputedCurrency(value ?? '')}
-                      disabled={
-                        Boolean(exchange.computed.fixed_currency) ||
-                        exchange.computed.currency_policy === 'base'
-                      }
-                      allowDeselect={false}
-                    />
-                  </Group>
+                  {exchangeLegs(exchange).map((slot) => {
+                    const isBasis = slot.code === exchange.basis.code
+                    const isKnown = entry.known.code === slot.code
+                    const currency = isBasis ? basisCurrency : computedCurrency
+                    return (
+                      <Group key={slot.code} align="flex-end" grow>
+                        <TextInput
+                          label={slot.name}
+                          placeholder="0.00"
+                          inputMode="decimal"
+                          value={
+                            isKnown
+                              ? exchangeAmount
+                              : formatAmount(
+                                  derivedAmount,
+                                  currency ?? baseCurrency,
+                                  context.currencies,
+                                )
+                          }
+                          onChange={
+                            isKnown
+                              ? (event) => setExchangeAmount(event.currentTarget.value)
+                              : undefined
+                          }
+                          readOnly={!isKnown}
+                          disabled={!isKnown}
+                        />
+                        <Select
+                          label={t('workplace.currency')}
+                          data={inputCurrencyOptions(
+                            slot.currency_policy,
+                            isBasis ? [] : basisCurrency ? [basisCurrency] : [],
+                          )}
+                          value={currency}
+                          onChange={(value) => {
+                            if (!isBasis) {
+                              setComputedCurrency(value ?? '')
+                              return
+                            }
+                            setBasisCurrency(value ?? '')
+                            if (value && value === computedCurrency) {
+                              const alternative = context.currencies.find(
+                                (item) =>
+                                  item.code !== value && item.code !== baseCurrency,
+                              )
+                              setComputedCurrency(alternative?.code ?? '')
+                            }
+                          }}
+                          disabled={
+                            Boolean(slot.fixed_currency) ||
+                            slot.currency_policy === 'base'
+                          }
+                          allowDeselect={false}
+                        />
+                      </Group>
+                    )
+                  })}
 
                   <Group align="flex-end" grow>
                     <TextInput
