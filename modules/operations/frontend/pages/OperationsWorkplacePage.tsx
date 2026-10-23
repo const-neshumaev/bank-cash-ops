@@ -8,6 +8,7 @@ import {
   Group,
   Loader,
   Modal,
+  ScrollArea,
   Select,
   Stack,
   Table,
@@ -36,6 +37,7 @@ import type {
   PrintDocument,
   WorkplaceContext,
   WorkplaceOperation,
+  WorkplaceRate,
 } from '../api/operations'
 import {
   computeAmount,
@@ -54,12 +56,15 @@ function currencyLabel(code: string, currencies: Currency[]): string {
   return currency ? `${currency.code} — ${currency.name}` : code
 }
 
-/** i18n keys of the rate-type labels (under `workplace.rateType.*`). */
-const RATE_TYPE_LABEL_KEYS: Record<string, string> = {
-  buy: 'workplace.rateType.buy',
-  sell: 'workplace.rateType.sell',
-  central: 'workplace.rateType.central',
+interface RateGroup {
+  code: string
+  name: string
+  rates: WorkplaceRate[]
 }
+
+const RATE_ROW_HEIGHT = 30
+/** Header plus four currency rows; longer groups scroll vertically. */
+const RATE_GROUP_MAX_HEIGHT = RATE_ROW_HEIGHT * 5
 
 function amountsText(operation: Operation): string {
   return operation.lines.map((line) => `${line.amount} ${line.currency}`).join(', ')
@@ -142,7 +147,24 @@ export function OperationsWorkplacePage() {
     return computeAmount(parseAmount(exchangeAmount), effectiveRate, entry.computation)
   }, [entry, effectiveRate, exchangeAmount])
 
-  const rateTypeLabel = (rateType: string) => t(RATE_TYPE_LABEL_KEYS[rateType] ?? rateType)
+  const rateGroups = useMemo<RateGroup[]>(() => {
+    const groups: RateGroup[] = []
+    // The API returns rates ordered by rate type, so the first appearance fixes
+    // the order of the groups.
+    for (const rate of context?.rates ?? []) {
+      let group = groups.find((item) => item.code === rate.rate_type)
+      if (!group) {
+        group = {
+          code: rate.rate_type,
+          name: rate.rate_type_display || rate.rate_type,
+          rates: [],
+        }
+        groups.push(group)
+      }
+      group.rates.push(rate)
+    }
+    return groups
+  }, [context])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -603,18 +625,66 @@ export function OperationsWorkplacePage() {
         </Stack>
       </Card>
 
-      {context.rates.length > 0 && (
+      {rateGroups.length > 0 && (
         <Card withBorder padding="lg" radius="md">
-          <Stack gap="xs">
+          <Stack gap="sm">
             <Text fw={500}>{t('workplace.rates.title')}</Text>
-            <Group gap="xl">
-              {context.rates.map((rate) => (
-                <Text key={`${rate.currency}-${rate.base_currency}-${rate.rate_type}`} size="sm">
-                  {rate.units} {rate.currency} = <b>{rate.value}</b> {rate.base_currency} (
-                  {rateTypeLabel(rate.rate_type)})
-                </Text>
-              ))}
-            </Group>
+            <ScrollArea type="auto" scrollbars="x" offsetScrollbars>
+              <Group gap="md" align="flex-start" wrap="nowrap">
+                {rateGroups.map((group) => (
+                  <Card key={group.code} withBorder radius="sm" padding="sm" w={240}>
+                    <Stack gap={6}>
+                      <Text size="sm" fw={500} lineClamp={1} title={group.name}>
+                        {group.name}
+                      </Text>
+                      <ScrollArea.Autosize
+                        type="auto"
+                        scrollbars="y"
+                        offsetScrollbars
+                        mah={RATE_GROUP_MAX_HEIGHT}
+                      >
+                        <Table
+                          fz="xs"
+                          verticalSpacing="xs"
+                          withRowBorders={false}
+                          striped
+                          stickyHeader
+                        >
+                          <Table.Thead>
+                            <Table.Tr style={{ height: RATE_ROW_HEIGHT }}>
+                              <Table.Th>{t('workplace.rates.currency')}</Table.Th>
+                              <Table.Th ta="right">{t('workplace.rates.rate')}</Table.Th>
+                            </Table.Tr>
+                          </Table.Thead>
+                          <Table.Tbody>
+                            {group.rates.map((rate) => (
+                              <Table.Tr
+                                key={`${rate.currency}-${rate.base_currency}`}
+                                style={{ height: RATE_ROW_HEIGHT }}
+                              >
+                                <Table.Td>{`${rate.units} ${rate.currency}`}</Table.Td>
+                                <Table.Td
+                                  ta="right"
+                                  style={{
+                                    fontVariantNumeric: 'tabular-nums',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  <b>{rate.value}</b>{' '}
+                                  <Text span size="xs" c="dimmed">
+                                    {rate.base_currency}
+                                  </Text>
+                                </Table.Td>
+                              </Table.Tr>
+                            ))}
+                          </Table.Tbody>
+                        </Table>
+                      </ScrollArea.Autosize>
+                    </Stack>
+                  </Card>
+                ))}
+              </Group>
+            </ScrollArea>
           </Stack>
         </Card>
       )}

@@ -29,12 +29,9 @@
       "empty": "No balances yet."
     },
     "rates": {
-      "title": "Exchange rates"
-    },
-    "rateType": {
-      "buy": "buy",
-      "sell": "sell",
-      "central": "central"
+      "title": "Exchange rates",
+      "currency": "Currency",
+      "rate": "Rate"
     },
     "newOperation": "New operation",
     "newOperationHint": "Select an operation and fill in its parameters.",

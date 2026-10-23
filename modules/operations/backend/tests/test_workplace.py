@@ -7,6 +7,7 @@ import pytest
 
 from modules.core.contracts import BankSettingsDTO, CurrencyRateDTO
 from modules.operations.backend.models import CashBalance, OperationTemplate
+from modules.references.contracts import RateTypeDTO
 
 pytestmark = pytest.mark.django_db
 
@@ -63,7 +64,54 @@ def test_workplace_exposes_the_effective_rates(auth_client, contracts):
 
     assert response.data["rates"][0]["currency"] == "USD"
     assert response.data["rates"][0]["rate_type"] == "buy"
+    assert response.data["rates"][0]["rate_type_display"] == "buy"
     assert response.data["rates"][0]["value"] == "3.25"
+
+
+def test_workplace_orders_and_labels_rates_by_rate_type(auth_client, contracts):
+    contracts.references._rate_types = (
+        RateTypeDTO(code="buy", name="Покупка", principle="buy", is_active=True),
+        RateTypeDTO(code="official", name="Учётный", principle="official", is_active=True),
+    )
+    contracts.cash_desk_config.rates = (
+        CurrencyRateDTO(
+            currency_code="USD",
+            base_currency_code="BYN",
+            rate_type="official",
+            value=Decimal("2.9"),
+            effective_from=datetime(2026, 10, 14, tzinfo=UTC),
+            cash_desk_id=None,
+        ),
+        CurrencyRateDTO(
+            currency_code="USD",
+            base_currency_code="BYN",
+            rate_type="buy",
+            value=Decimal("2.935"),
+            effective_from=datetime(2026, 10, 14, tzinfo=UTC),
+            cash_desk_id=None,
+        ),
+        CurrencyRateDTO(
+            currency_code="EUR",
+            base_currency_code="BYN",
+            rate_type="buy",
+            value=Decimal("3.3"),
+            effective_from=datetime(2026, 10, 14, tzinfo=UTC),
+            cash_desk_id=None,
+        ),
+    )
+
+    response = auth_client.get(WORKPLACE_URL)
+
+    assert [(row["rate_type"], row["currency"]) for row in response.data["rates"]] == [
+        ("buy", "EUR"),
+        ("buy", "USD"),
+        ("official", "USD"),
+    ]
+    assert [row["rate_type_display"] for row in response.data["rates"]] == [
+        "Покупка",
+        "Покупка",
+        "Учётный",
+    ]
 
 
 def test_workplace_exposes_the_form_and_bank_settings(auth_client, contracts, income_type):
