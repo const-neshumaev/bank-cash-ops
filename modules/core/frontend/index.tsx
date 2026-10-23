@@ -32,6 +32,7 @@ import { WorkplacePage } from './pages/WorkplacePage'
 
 const ADMIN_SECTION = 'admin'
 const RATES_SECTION = 'rates'
+const CATALOGS_SECTION = 'catalogs'
 const CURRENCIES_PERMISSIONS = [
   'core.currencies.config.manage',
   'core.currencies.config.manage.branch',
@@ -154,6 +155,7 @@ export const coreFrontend: FrontendModule = {
       to: '/base-values',
       icon: <IconRuler2 size={18} />,
       permission: 'core.base_values.view',
+      section: CATALOGS_SECTION,
     },
     {
       labelKey: 'nav.shifts',

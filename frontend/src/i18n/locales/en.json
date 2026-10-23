@@ -4,12 +4,12 @@
     "error": "Error"
   },
   "nav": {
-    "dashboard": "Dashboard",
     "profile": "Profile",
     "logout": "Sign out"
   },
   "sections": {
     "admin": "Administration",
+    "catalogs": "Reference data",
     "rates": "Currency rates"
   },
   "language": {
@@ -31,21 +31,8 @@
     }
   },
   "dashboard": {
-    "title": "Dashboard",
     "signedInAs": "Signed in as",
-    "description": "The bank's cash operations accounting system. The available menu sections depend on the roles and permissions of your account.",
-    "sections": "Available sections",
-    "available": "Available.",
-    "admin": {
-      "name": "Administration",
-      "text": "— users, roles, bank branches and cash desks.",
-      "restricted": "Available to administrators."
-    },
-    "shifts": {
-      "name": "Cash shifts",
-      "text": "— opening and closing shifts, binding to a cash desk.",
-      "restricted": "Available to cashiers and managers."
-    }
+    "description": "The bank's cash operations accounting system. The available menu sections depend on the roles and permissions of your account."
   },
   "profile": {
     "title": "Profile",
