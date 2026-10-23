@@ -39,15 +39,6 @@ export function AppLayout() {
             <IconCashBanknote size={28} />
             <Title order={4}>BankCashOps</Title>
 
-            <Button
-              component={RouterNavLink}
-              to="/"
-              variant={isActive('/') && location.pathname === '/' ? 'light' : 'subtle'}
-              size="compact-md"
-            >
-              {t('nav.dashboard')}
-            </Button>
-
             {plainItems.map((item) => (
               <Button
                 key={item.to}
