@@ -1,7 +1,7 @@
 name: operations
 title: Кассовые операции
-version: 0.3.0
-description: Ядро операционного учёта кассовых операций (движок, регистры, журнал, формы операций, контроль данных клиента и курсы обмена).
+version: 0.4.0
+description: Ядро операционного учёта кассовых операций (движок, регистры, журнал, формы операций, контроль данных клиента, курсы обмена и печатные документы).
 
 dependencies:
   - name: core
@@ -9,6 +9,9 @@ dependencies:
     access: inprocess        # inprocess | http
   - name: references
     version: "0.3.0"
+    access: inprocess
+  - name: printing
+    version: ">=0.1,<1"
     access: inprocess
 
 provides:

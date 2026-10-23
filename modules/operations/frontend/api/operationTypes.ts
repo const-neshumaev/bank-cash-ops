@@ -5,6 +5,14 @@ import type { SlotDef } from './operations'
 
 export type ClientDataPolicy = 'never' | 'always' | 'threshold'
 
+export interface OperationPrintConfig {
+  document_type: string
+  document_type_name: string
+  template: string
+  template_name: string
+  is_active: boolean
+}
+
 export interface OperationTypeSettings {
   code: string
   name: string
@@ -24,6 +32,40 @@ export interface OperationTypeSettings {
   permission_code: string
   is_active: boolean
   slots: SlotDef[]
+  print_configs: OperationPrintConfig[]
+}
+
+export interface PrintVariableOption {
+  code: string
+  description: string
+  example: string
+}
+
+export interface PrintTemplateOption {
+  code: string
+  name: string
+  document_type: string
+  document_type_name: string
+  description: string
+  has_file: boolean
+  file_name: string
+  is_active: boolean
+  variables: PrintVariableOption[]
+}
+
+export interface PrintDocumentTypeOption {
+  code: string
+  name: string
+  description: string
+  numbering_scope: string
+  is_active: boolean
+  templates: PrintTemplateOption[]
+}
+
+export interface OperationPrintConfigPayload {
+  document_type: string
+  template: string
+  is_active: boolean
 }
 
 export interface OperationTypeSettingsPayload {
@@ -112,4 +154,29 @@ export async function listRateTypes(): Promise<RateTypeOption[]> {
     params: { page_size: 100, is_active: true },
   })
   return data.results
+}
+
+export async function listAvailablePrintDocumentTypes(): Promise<PrintDocumentTypeOption[]> {
+  const { data } = await api.get<PrintDocumentTypeOption[]>('/operations/print-templates/')
+  return data
+}
+
+export async function fetchOperationPrintConfigs(
+  code: string,
+): Promise<OperationPrintConfig[]> {
+  const { data } = await api.get<OperationPrintConfig[]>(
+    `/operations/types/${encodeURIComponent(code)}/print-configs/`,
+  )
+  return data
+}
+
+export async function updateOperationPrintConfigs(
+  code: string,
+  configs: OperationPrintConfigPayload[],
+): Promise<OperationPrintConfig[]> {
+  const { data } = await api.put<OperationPrintConfig[]>(
+    `/operations/types/${encodeURIComponent(code)}/print-configs/`,
+    { configs },
+  )
+  return data
 }

@@ -1,0 +1,14 @@
+name: printing
+title: Печатные формы
+version: 0.1.0
+description: Печатные документы: шаблоны Word, нумерация документов и повторная печать.
+
+dependencies:
+  - name: core
+    version: ">=0.1,<1"
+    access: inprocess        # inprocess | http
+
+provides:
+  contracts: modules.printing.contracts
+  api_base: /api/printing/
+  frontend_routes: true

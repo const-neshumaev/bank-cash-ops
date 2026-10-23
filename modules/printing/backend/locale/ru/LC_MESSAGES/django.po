@@ -1,0 +1,166 @@
+# Russian translation of the printing module.
+# The source strings are English (see docs/adr/0015-application-language-layers.md).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: BankCashOps printing\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-23 10:00+0300\n"
+"PO-Revision-Date: 2026-10-23 10:00+0300\n"
+"Last-Translator: BankCashOps\n"
+"Language-Team: Russian\n"
+"Language: ru\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=4; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<12 || n%100>14) ? 1 : n%10==0 || (n%10>=5 && n%10<=9) || (n%100>=11 && n%100<=14)? 2 : 3);\n"
+
+msgid "Printing"
+msgstr "Печать документов"
+
+msgid "View print templates"
+msgstr "Просмотр шаблонов печатных форм"
+
+msgid "Manage print templates"
+msgstr "Управление шаблонами печатных форм"
+
+msgid "Print documents"
+msgstr "Печать документов"
+
+msgid "print document type"
+msgstr "тип печатного документа"
+
+msgid "print document types"
+msgstr "типы печатных документов"
+
+msgid "print document type translation"
+msgstr "перевод типа печатного документа"
+
+msgid "print document type translations"
+msgstr "переводы типов печатных документов"
+
+msgid "print template"
+msgstr "шаблон печатной формы"
+
+msgid "print templates"
+msgstr "шаблоны печатных форм"
+
+msgid "print template translation"
+msgstr "перевод шаблона печатной формы"
+
+msgid "print template translations"
+msgstr "переводы шаблонов печатных форм"
+
+msgid "print number sequence"
+msgstr "счётчик номеров печатных документов"
+
+msgid "print number sequences"
+msgstr "счётчики номеров печатных документов"
+
+msgid "printed document"
+msgstr "печатный документ"
+
+msgid "printed documents"
+msgstr "печатные документы"
+
+msgid "code"
+msgstr "код"
+
+msgid "name"
+msgstr "название"
+
+msgid "description"
+msgstr "описание"
+
+msgid "numbering scope"
+msgstr "область нумерации"
+
+msgid "Bank-wide"
+msgstr "Сквозная по банку"
+
+msgid "active"
+msgstr "активен"
+
+msgid "document type"
+msgstr "тип документа"
+
+msgid "document type name"
+msgstr "наименование типа документа"
+
+msgid "provider"
+msgstr "поставщик переменных"
+
+msgid "file"
+msgstr "файл"
+
+msgid "The Word template (.docx) uploaded by the administrator."
+msgstr "Шаблон Word (.docx), загруженный администратором."
+
+msgid "file name"
+msgstr "имя файла"
+
+msgid "file size"
+msgstr "размер файла"
+
+msgid "file updated at"
+msgstr "файл обновлён"
+
+msgid "file updated by"
+msgstr "файл обновил"
+
+msgid "last error"
+msgstr "последняя ошибка"
+
+msgid "last error at"
+msgstr "время последней ошибки"
+
+msgid "last number"
+msgstr "последний номер"
+
+msgid "template"
+msgstr "шаблон"
+
+msgid "template name"
+msgstr "наименование шаблона"
+
+msgid "operation"
+msgstr "операция"
+
+msgid "operation type"
+msgstr "тип операции"
+
+msgid "cash desk"
+msgstr "касса"
+
+msgid "number"
+msgstr "номер"
+
+msgid "content"
+msgstr "содержимое"
+
+msgid "context"
+msgstr "контекст подстановки"
+
+msgid "created by"
+msgstr "создал"
+
+msgid "language"
+msgstr "язык"
+
+msgid "Upload a Word document (.docx)."
+msgstr "Загрузите документ Word (.docx)."
+
+msgid "The template file is too large (maximum 10 MB)."
+msgstr "Файл шаблона слишком большой (не более 10 МБ)."
+
+msgid "The file is not a valid Word document."
+msgstr "Файл не является документом Word."
+
+msgid "The template file has not been uploaded yet."
+msgstr "Файл шаблона ещё не загружен."
+
+msgid "No such document."
+msgstr "Документ не найден."
+
+msgid "You do not have permission to perform this action."
+msgstr "У вас нет прав на выполнение этого действия."

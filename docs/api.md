@@ -556,6 +556,9 @@ units?, buy, sell }]`. Запрос атомарен: для каждой пар
 | GET | `/api/operations/types/{code}/` | `operations.view` | Тип операции со слотами сумм |
 | PATCH | `/api/operations/types/{code}/` | `operations.types.manage` | Изменить настройки типа |
 | GET | `/api/operations/types/{code}/history/` | `operations.view` | История изменений настроек |
+| GET | `/api/operations/types/{code}/print-configs/` | `operations.view` | Печатные документы типа |
+| PUT | `/api/operations/types/{code}/print-configs/` | `operations.types.manage` | Заменить печатные документы типа |
+| GET | `/api/operations/print-templates/` | `operations.view` | Доступные типы документов и шаблоны |
 | GET | `/api/operations/threshold-types/` | `operations.view` | Предопределённые способы задания порога |
 
 Параметры списка: `kind`, `is_active`, `is_external`, `client_data_policy`
@@ -602,6 +605,30 @@ units?, buy, sell }]`. Запрос атомарен: для каждой пар
 ведётся и при изменении через Django admin. В элементе истории поле `changes`
 содержит значения «до/после» по каждому изменённому полю.
 
+Печатные документы типа операции:
+
+```http
+PUT /api/operations/types/currency_purchase/print-configs/
+Content-Type: application/json
+
+{
+  "configs": [
+    {
+      "document_type": "cash_receipt",
+      "template": "cash_receipt_currency_purchase",
+      "is_active": true
+    }
+  ]
+}
+```
+
+Список заменяется целиком: отсутствующий тип документа больше не печатается.
+Шаблон должен принадлежать выбранному типу документа (проверяется по контракту
+`printing`). Ответ — массив `{document_type, document_type_name, template,
+template_name, is_active}`. `print_configs` также входит в ответ типа операции.
+Доступные типы документов и шаблоны с переменными возвращает
+`GET /api/operations/print-templates/`.
+
 ### Остатки наличных (`/api/operations/balances/`)
 
 | Метод | Путь | Право | Описание |
@@ -622,6 +649,12 @@ units?, buy, sell }]`. Запрос атомарен: для каждой пар
 | POST | `/api/operations/operations/preview/` | `operations.create` | Проверить и подготовить операцию без проведения |
 | GET | `/api/operations/operations/{id}/` | `operations.view` | Карточка операции (строки и проводки) |
 | POST | `/api/operations/operations/{id}/reverse/` | `operations.reverse` | Сторнировать операцию |
+
+В строке журнала и карточке есть `has_print_documents`: были ли при проведении
+созданы печатные документы. Ответ проведения дополнительно содержит
+`print_documents` — метаданные созданных документов (`id`, тип, шаблон, номер,
+имя файла). Если включённые шаблоны не сформировали ни одного документа,
+массив пуст.
 
 Параметры списка: `cash_desk`, `shift`, `cashier`, `operation_type` (код),
 `direction` (вид: `income` / `expense` / `exchange` / `internal`), `status`,
@@ -817,6 +850,46 @@ Content-Type: application/json
 Тело PUT — `{ "operations": [...] }`. Пустой список — определённый **пустой
 шаблон**, запрещающий все операции. Отдельный GET возвращает `defined: false`,
 когда шаблон не задан.
+
+## Печатные документы (`/api/printing/`)
+
+Модуль печатных документов. Требуемые права: `printing.templates.view` —
+просмотр и скачивание шаблонов, `printing.templates.manage` — загрузка шаблонов,
+`printing.print` — просмотр и скачивание документов операций. Доступ к
+документам операции дополнительно ограничен доступными пользователю кассами.
+
+### Шаблоны (`/api/printing/templates/`)
+
+| Метод | Путь | Право | Описание |
+| --- | --- | --- | --- |
+| GET | `/api/printing/templates/` | `printing.templates.view` | Объявленные шаблоны печатных форм |
+| GET | `/api/printing/templates/{code}/` | `printing.templates.view` | Один шаблон |
+| GET | `/api/printing/templates/{code}/file/` | `printing.templates.view` | Скачать шаблон `.docx` |
+| POST | `/api/printing/templates/{code}/file/` | `printing.templates.manage` | Загрузить шаблон `.docx` |
+
+Загрузка — `multipart/form-data`, поле `file`. Принимается только документ Word
+(`.docx`) размером до 10 МБ. Ответ содержит метаданные шаблона. Поле `variables`
+перечисляет доступные переменные подстановки (`code`, `description`, `example`),
+`has_file` показывает, загружен ли файл, `last_error` — последнюю ошибку
+рендеринга. Параметры списка: `document_type`, `is_active`, `search`, `ordering`.
+
+### Типы документов (`/api/printing/document-types/`)
+
+| Метод | Путь | Право | Описание |
+| --- | --- | --- | --- |
+| GET | `/api/printing/document-types/` | `printing.templates.view` | Типы печатных документов |
+
+### Документы операций (`/api/printing/operations/{id}/documents/`)
+
+| Метод | Путь | Право | Описание |
+| --- | --- | --- | --- |
+| GET | `/api/printing/operations/{id}/documents/` | `printing.print` | Документы, созданные для операции |
+| GET | `/api/printing/documents/{id}/file/` | `printing.print` | Скачать отрендеренный документ |
+
+Документы операции возвращаются в порядке создания. Повторная печать
+воспроизводит сохранённый при проведении `.docx` и не зависит от последующих
+изменений шаблона. Документ недоступной кассы не возвращается (`404` для файла,
+пустой список для операции).
 
 ## Коды ошибок
 

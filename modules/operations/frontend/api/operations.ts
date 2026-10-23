@@ -79,7 +79,22 @@ export interface Operation {
   comment: string
   posted_at: string
   reversal_of: number | null
+  has_print_documents?: boolean
   lines: OperationLine[]
+}
+
+export interface PrintDocument {
+  id: number
+  document_type: string
+  document_type_name: string
+  template_code: string
+  template_name: string
+  operation_id: number
+  operation_type_code: string
+  cash_desk_id: number
+  number: number
+  file_name: string
+  created_at: string
 }
 
 export interface WorkplaceContext {
@@ -134,8 +149,12 @@ export async function listOperations(cashDesk: number): Promise<Operation[]> {
   return data.results
 }
 
-export async function postOperation(payload: PostOperationPayload): Promise<Operation> {
-  const { data } = await api.post<Operation>('/operations/operations/', payload)
+export interface PostedOperation extends Operation {
+  print_documents?: PrintDocument[]
+}
+
+export async function postOperation(payload: PostOperationPayload): Promise<PostedOperation> {
+  const { data } = await api.post<PostedOperation>('/operations/operations/', payload)
   return data
 }
 
@@ -146,5 +165,19 @@ export async function previewOperation(payload: PostOperationPayload): Promise<P
 
 export async function reverseOperation(id: number): Promise<Operation> {
   const { data } = await api.post<Operation>(`/operations/operations/${id}/reverse/`, {})
+  return data
+}
+
+export async function listOperationDocuments(operationId: number): Promise<PrintDocument[]> {
+  const { data } = await api.get<PrintDocument[]>(
+    `/printing/operations/${operationId}/documents/`,
+  )
+  return data
+}
+
+export async function downloadPrintDocument(documentId: number): Promise<Blob> {
+  const { data } = await api.get<Blob>(`/printing/documents/${documentId}/file/`, {
+    responseType: 'blob',
+  })
   return data
 }

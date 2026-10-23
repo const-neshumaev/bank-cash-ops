@@ -21,9 +21,7 @@ def _registry():
 
 
 def test_the_baseline_types_are_registered_at_startup():
-    assert {spec.code for spec in OPERATION_TYPES} <= {
-        spec.code for spec in _registry().types()
-    }
+    assert {spec.code for spec in OPERATION_TYPES} <= {spec.code for spec in _registry().types()}
 
 
 def test_codes_are_unique():
@@ -55,6 +53,21 @@ def test_income_increases_and_expense_decreases_cash():
             assert cash_signs == {1}, spec.code
         elif spec.kind == OperationKind.EXPENSE:
             assert cash_signs == {-1}, spec.code
+
+
+def test_exchange_operations_declare_their_cash_receipt_templates():
+    expected = {
+        "currency_purchase": "cash_receipt_currency_purchase",
+        "currency_sale": "cash_receipt_currency_sale",
+        "currency_conversion": "cash_receipt_currency_conversion",
+    }
+    by_code = {spec.code: spec for spec in OPERATION_TYPES}
+
+    for operation_code, template_code in expected.items():
+        configs = by_code[operation_code].print_configs
+        assert len(configs) == 1
+        assert configs[0].document_type == "cash_receipt"
+        assert configs[0].template == template_code
 
 
 def test_exchange_moves_cash_in_two_directions():

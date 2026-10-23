@@ -610,6 +610,41 @@ class OperationTemplate(TimeStampedModel):
         return _("Bank template") if self.branch_id is None else f"Branch {self.branch_id}"
 
 
+class OperationPrintConfig(TimeStampedModel):
+    """A printed document the operation type produces.
+
+    The binding is owned by ``operations`` because it configures the operation
+    type. The template itself belongs to the ``printing`` module and is
+    referenced by its stable code; no ORM relation crosses the module boundary.
+    One template is selected per printed document type.
+    """
+
+    operation_type = models.ForeignKey(
+        OperationType,
+        on_delete=models.CASCADE,
+        related_name="print_configs",
+        verbose_name=_("operation type"),
+    )
+    document_type = models.CharField(_("document type"), max_length=64)
+    template_code = models.CharField(_("template"), max_length=64)
+    is_active = models.BooleanField(_("active"), default=True)
+
+    class Meta:
+        verbose_name = _("operation print document")
+        verbose_name_plural = _("operation print documents")
+        db_table = qualified_table("operations", "operations_operationprintconfig")
+        ordering = ("document_type",)
+        constraints = (
+            models.UniqueConstraint(
+                fields=["operation_type", "document_type"],
+                name="operations_unique_operation_print_document",
+            ),
+        )
+
+    def __str__(self):
+        return f"{self.operation_type} — {self.document_type}"
+
+
 # Re-exported for convenience of callers that build movements.
 __all__ = [
     "CashBalance",

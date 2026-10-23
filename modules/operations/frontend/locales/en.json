@@ -78,6 +78,16 @@
       "reverseQuestion": "Reverse operation No. {{number}} “{{name}}”?",
       "reverseConfirm": "Reverse"
     },
+    "print": {
+      "title": "Printed documents",
+      "document": "Document No. {{number}} ({{index}} of {{total}})",
+      "previous": "Previous",
+      "next": "Next",
+      "download": "Download",
+      "print": "Print",
+      "reprint": "Print",
+      "empty": "No printed documents"
+    },
     "recent": {
       "title": "Recent operations",
       "empty": "No operations at this cash desk yet.",
@@ -132,6 +142,17 @@
       "threshold_currency": "Threshold currency",
       "rate_type": "Rate type",
       "is_active": "Activity"
+    },
+    "print": {
+      "title": "Printed documents",
+      "modalTitle": "Printed documents: {{name}}",
+      "hint": "Select a template for each printed document type. When the operation is posted these documents are generated and shown for printing.",
+      "template": "Print template",
+      "noTemplate": "do not print",
+      "active": "Print when the operation is posted",
+      "noFile": "No file is uploaded for the selected template. Upload it in “Print templates”.",
+      "empty": "No printed document types are declared.",
+      "saved": "Printed documents saved"
     },
     "form": {
       "clientDataPolicy": "Client data",

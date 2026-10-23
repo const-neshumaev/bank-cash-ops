@@ -9,11 +9,13 @@ from modules.operations.backend.models import (
     Movement,
     Operation,
     OperationLine,
+    OperationPrintConfig,
     OperationTemplate,
     OperationType,
     OperationTypeSettingsChange,
     SlotDef,
 )
+from modules.operations.backend.printing import operation_ids_with_documents
 from modules.operations.backend.thresholds import (
     THRESHOLD_TYPES,
     ClientDataPolicy,
@@ -47,6 +49,32 @@ class SlotDefSerializer(serializers.ModelSerializer):
         return data
 
 
+class OperationPrintConfigSerializer(serializers.ModelSerializer):
+    """A printed document configured for an operation type."""
+
+    template = serializers.CharField(source="template_code")
+    document_type_name = serializers.SerializerMethodField()
+    template_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OperationPrintConfig
+        fields = (
+            "document_type",
+            "document_type_name",
+            "template",
+            "template_name",
+            "is_active",
+        )
+
+    def get_document_type_name(self, obj) -> str:
+        names = self.context.get("print_document_type_names") or {}
+        return names.get(obj.document_type, obj.document_type)
+
+    def get_template_name(self, obj) -> str:
+        names = self.context.get("print_template_names") or {}
+        return names.get(obj.template_code, obj.template_code)
+
+
 class OperationTypeSerializer(serializers.ModelSerializer):
     """Read and update representation of an operation type and its slots.
 
@@ -57,6 +85,7 @@ class OperationTypeSerializer(serializers.ModelSerializer):
     """
 
     slots = SlotDefSerializer(many=True, read_only=True)
+    print_configs = OperationPrintConfigSerializer(many=True, read_only=True)
     kind_display = serializers.CharField(source="get_kind_display", read_only=True)
     client_data_policy_display = serializers.CharField(
         source="get_client_data_policy_display", read_only=True
@@ -85,6 +114,7 @@ class OperationTypeSerializer(serializers.ModelSerializer):
             "permission_code",
             "is_active",
             "slots",
+            "print_configs",
         )
         read_only_fields = (
             "code",
@@ -99,6 +129,7 @@ class OperationTypeSerializer(serializers.ModelSerializer):
             "rate_type_display",
             "permission_code",
             "slots",
+            "print_configs",
         )
 
     def get_threshold_type_display(self, obj) -> str:
@@ -217,9 +248,16 @@ class OperationSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source="get_status_display", read_only=True)
     lines = OperationLineSerializer(many=True, read_only=True)
     movements = MovementSerializer(many=True, read_only=True)
+    has_print_documents = serializers.SerializerMethodField()
 
     def get_operation_type_name(self, obj) -> str:
         return obj.operation_type.localized_name()
+
+    def get_has_print_documents(self, obj) -> bool:
+        known = self.context.get("print_operation_ids")
+        if known is not None:
+            return obj.id in known
+        return obj.id in operation_ids_with_documents([obj.id])
 
     class Meta:
         model = Operation
@@ -238,10 +276,27 @@ class OperationSerializer(serializers.ModelSerializer):
             "comment",
             "posted_at",
             "reversal_of",
+            "has_print_documents",
             "lines",
             "movements",
         )
         read_only_fields = fields
+
+
+class PrintDocumentInfoSerializer(serializers.Serializer):
+    """Metadata of a rendered document returned after posting."""
+
+    id = serializers.IntegerField()
+    document_type = serializers.CharField()
+    document_type_name = serializers.CharField()
+    template_code = serializers.CharField()
+    template_name = serializers.CharField()
+    operation_id = serializers.IntegerField()
+    operation_type_code = serializers.CharField()
+    cash_desk_id = serializers.IntegerField()
+    number = serializers.IntegerField()
+    file_name = serializers.CharField()
+    created_at = serializers.DateTimeField()
 
 
 class OperationLineInputSerializer(serializers.Serializer):

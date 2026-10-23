@@ -14,6 +14,7 @@ api_patterns = [
     path("auth/", include("modules.core.backend.auth_urls")),
     path("references/", include("modules.references.backend.urls")),
     path("", include("modules.core.backend.urls")),
+    path("printing/", include("modules.printing.backend.urls")),
     path("operations/", include("modules.operations.backend.urls")),
 ]
 
