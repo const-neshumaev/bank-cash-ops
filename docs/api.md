@@ -760,6 +760,10 @@ Content-Type: application/json
 национальную валюту, режим конверсии и действующую базовую величину. Если смены
 нет — пустой контекст (`shift_id: null`).
 
+Действующие курсы упорядочены по типу курса (в порядке типов справочника), затем
+по валюте и валюте курса. `rate_type_display` — название типа курса для заголовка
+группы на экране кассира.
+
 ```json
 {
   "shift_id": 11,
@@ -770,7 +774,7 @@ Content-Type: application/json
   "base_value_date": "2026-01-01",
   "currencies": [ { "code": "USD", "name": "Доллар США", "symbol": "$", "minor_units": 2 } ],
   "rates": [
-    { "currency": "USD", "base_currency": "BYN", "rate_type": "buy", "units": 1, "value": "3.250000", "value_per_unit": "3.250000", "effective_from": "..." }
+    { "currency": "USD", "base_currency": "BYN", "rate_type": "buy", "rate_type_display": "Покупка", "units": 1, "value": "3.250000", "value_per_unit": "3.250000", "effective_from": "..." }
   ],
   "balances": [
     { "cash_desk_id": 7, "currency": "USD", "amount": "500.00", "updated_at": "..." }

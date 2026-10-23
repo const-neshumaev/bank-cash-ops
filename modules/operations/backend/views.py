@@ -682,7 +682,18 @@ class WorkplaceView(APIView):
         currencies = [
             currency for currency in currencies_directory.currencies() if currency.code in allowed
         ]
-        rates = cash_desk_config.cash_desk_rates(cash_desk_id)
+        rate_types = currencies_directory.rate_types()
+        rate_type_names = {rate_type.code: rate_type.name for rate_type in rate_types}
+        rate_type_order = {rate_type.code: index for index, rate_type in enumerate(rate_types)}
+        rates = sorted(
+            cash_desk_config.cash_desk_rates(cash_desk_id),
+            key=lambda rate: (
+                rate_type_order.get(rate.rate_type, len(rate_type_order)),
+                rate.rate_type,
+                rate.currency_code,
+                rate.base_currency_code,
+            ),
+        )
         balances = CashBalance.objects.filter(cash_desk_id=cash_desk_id).order_by("currency")
         return Response(
             {
@@ -710,6 +721,9 @@ class WorkplaceView(APIView):
                         "currency": rate.currency_code,
                         "base_currency": rate.base_currency_code,
                         "rate_type": rate.rate_type,
+                        "rate_type_display": rate_type_names.get(
+                            rate.rate_type, rate.rate_type
+                        ),
                         "units": rate.units,
                         "value": str(rate.value),
                         "value_per_unit": str(rate.value_per_unit),
