@@ -1,0 +1,12 @@
+name: printing_standard
+title: Базовые печатные формы
+version: 0.1.0
+description: Базовый тип печатного документа «Кассовый чек» и шаблоны для операций обмена валют.
+
+dependencies:
+  - name: printing
+    version: ">=0.1,<1"
+    access: inprocess        # inprocess | http
+
+provides:
+  frontend_routes: false

@@ -57,13 +57,21 @@ class OrgDirectoryService:
         return self._shift_to_dto(shift) if shift is not None else None
 
     def get_cash_desk(self, cash_desk_id: int) -> CashDeskDTO | None:
-        cash_desk = CashDesk.objects.filter(pk=cash_desk_id).first()
+        cash_desk = CashDesk.objects.select_related("branch").filter(pk=cash_desk_id).first()
         if cash_desk is None:
             return None
+        branch = cash_desk.branch
+        root = branch
+        for ancestor in branch.ancestors():
+            root = ancestor
         return CashDeskDTO(
             id=cash_desk.id,
             branch_id=cash_desk.branch_id,
             is_active=cash_desk.is_active,
+            name=cash_desk.name,
+            code=cash_desk.code or "",
+            branch_name=branch.name,
+            bank_name=root.name,
         )
 
     def accessible_cash_desk_ids(self, user_id: int) -> set[int] | None:

@@ -104,6 +104,7 @@ docker compose exec frontend npm run build
 docker compose exec backend python manage.py makemigrations
 docker compose exec backend python manage.py migrate
 docker compose exec backend python manage.py sync_operation_types
+docker compose exec backend python manage.py sync_print_templates
 docker compose exec backend python manage.py dispatch_outbox
 docker compose exec backend python manage.py createsuperuser
 docker compose exec backend python manage.py shell
@@ -114,8 +115,10 @@ docker compose exec backend black .
 ```
 
 `sync_operation_types` создаёт и обновляет типы кассовых операций, объявленные
-установленными модулями (движок и базовый набор). Команда идемпотентна и уже
-выполняется при старте backend (entrypoint, после миграций); вручную нужна после
+установленными модулями (движок и базовый набор). `sync_print_templates` делает
+то же для типов печатных документов и шаблонов печатных форм и устанавливает
+образец `.docx`, если банк ещё не загрузил свой. Обе команды идемпотентны и уже
+выполняются при старте backend (entrypoint, после миграций); вручную нужны после
 изменения объявлений без перезапуска контейнера.
 
 `dispatch_outbox` доставляет доменные события (outbox) подписчикам. С флагом

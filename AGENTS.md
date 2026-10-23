@@ -35,14 +35,16 @@ frontend, backend и данных и публикует контракт. Осн
 `docs/adr/0001-modular-monolith.md` и `docs/modules.md`.
 
 Текущее состояние: техническая библиотека `common` и доменные модули
-`references`, `core`, `operations` и `operations_standard` живут в `modules/`.
-`references` владеет общесистемными справочниками — валютами ISO 4217 и типами
-курсов (`docs/adr/0017-references-module.md`). В `core` реализованы пользователи,
-аутентификация, **управляемые данными роли и права**, оргструктура (отделения и
-кассы), **настройки банка и базовые величины**, валюты касс и шаблоны валют и
-кассовые смены; `operations` — кассовые операции, регистры и остатки;
-`operations_standard` объявляет базовый набор операций. Остальные модули
-добавляются по мере развития.
+`references`, `core`, `printing`, `operations` и `operations_standard` живут в
+`modules/`. `references` владеет общесистемными справочниками — валютами ISO
+4217 и типами курсов (`docs/adr/0017-references-module.md`). В `core`
+реализованы пользователи, аутентификация, **управляемые данными роли и права**,
+оргструктура (отделения и кассы), **настройки банка и базовые величины**,
+валюты касс и шаблоны валют и кассовые смены; `operations` — кассовые операции,
+регистры и остатки; `operations_standard` объявляет базовый набор операций;
+`printing` ведёт печатные документы, шаблоны Word в базе и повторную печать, а
+`printing_standard` объявляет кассовый чек (`docs/adr/0023-print-documents.md`).
+Остальные модули добавляются по мере развития.
 
 ## Языковые правила
 
@@ -184,6 +186,7 @@ Frontend собран из хоста (`frontend/src/`) и фронтендов 
 - Общая архитектура: `docs/architecture.md`
 - Архитектура модуля core: `docs/architecture-module-core.md`
 - Архитектура модуля references: `docs/architecture-module-references.md`
+- Архитектура модуля printing: `docs/architecture-module-printing.md`
 - Архитектурные решения: `docs/adr/`
 - Правила модулей и контрактов: `docs/modules.md`
 - Настройки: `backend/config/settings.py`
@@ -199,6 +202,11 @@ Frontend собран из хоста (`frontend/src/`) и фронтендов 
 - Разрешение и установка курсов валют: `modules/core/backend/rates.py`
 - Пороги типов операций и история настроек: `modules/operations/backend/thresholds.py`,
   `modules/operations/backend/history.py`
+- Печатные документы — движок и шаблоны: `modules/printing/backend/rendering.py`,
+  `modules/printing/backend/registry.py`,
+  `modules/printing_standard/backend/declarations.py`
+- Привязка печатных документов к операции: `modules/operations/backend/printing.py`,
+  `modules/operations/frontend/components/PrintDocumentsModal.tsx`
 - HTTP-клиент SPA: `frontend/src/api/client.ts`
 - Контекст аутентификации: `frontend/src/auth/AuthContext.tsx`
 - Реестр модулей SPA: `frontend/src/registry/index.ts`

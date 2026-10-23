@@ -157,6 +157,17 @@ stateDiagram-v2
 - Данные клиента хранятся **снимком** в операции; полноценного учёта клиентов
   (CRM) модуль не ведёт.
 
+## Печатные документы
+
+- Привязка печатных документов к типу операции хранится в `operations`
+  (`OperationPrintConfig`): тип печатного документа → код шаблона из модуля
+  `printing`. На одном типе операции может быть несколько типов документов.
+- После проведения `operations` передаёт модулю `printing` снимок операции и
+  включённые привязки; отрендеренные документы сохраняет `printing`
+  (`docs/adr/0023-print-documents.md`). Ошибка рендеринга не отменяет проведение.
+- В журнале отдаётся `has_print_documents`, по которому SPA включает повторную
+  печать. Подробности — в `docs/architecture-module-printing.md`.
+
 ## Связь со сменами
 
 - `core` владеет жизненным циклом смены; `operations` владеет **деньгами**:
@@ -282,10 +293,13 @@ stateDiagram-v2
 - Подготовка строк и форм: `modules/operations/backend/preparation.py`
 - Политика данных клиента: `modules/operations/backend/client_data.py`
 - Курсы обмена: `modules/operations/backend/exchange.py`
+- Печатные документы: `modules/operations/backend/printing.py`
 - Синхронизация типов: `modules/operations/backend/sync.py`
 - Комплектация кассы: `modules/operations/backend/config.py`
 - REST API: `modules/operations/backend/views.py`
 - Рабочее место кассира: `modules/operations/frontend/pages/OperationsWorkplacePage.tsx`
+- Показ и печать документов:
+  `modules/operations/frontend/components/PrintDocumentsModal.tsx`
 - Регистры: `modules/operations/backend/registers.py`
 - SPI-реестр: `modules/operations/backend/registry.py`
 - Каталог прав: `modules/operations/backend/permission_codes.py`

@@ -524,6 +524,35 @@ msgstr "Нет кассы, соответствующей запросу."
 msgid "The slot '%(slot)s' is not an exchange leg of the operation."
 msgstr "Слот «%(slot)s» не является стороной обмена этой операции."
 
+msgid "A list of print documents is expected."
+msgstr "Ожидается список печатных документов."
+
+msgid "Invalid print document entry."
+msgstr "Некорректная запись печатного документа."
+
+#, python-format
+msgid "Unknown print document type '%(code)s'."
+msgstr "Неизвестный тип печатного документа «%(code)s»."
+
+#, python-format
+msgid "Unknown print template '%(code)s'."
+msgstr "Неизвестный шаблон печатной формы «%(code)s»."
+
+msgid "The print document type is selected more than once."
+msgstr "Тип печатного документа выбран более одного раза."
+
+msgid "operation print document"
+msgstr "печатный документ операции"
+
+msgid "operation print documents"
+msgstr "печатные документы операции"
+
+msgid "document type"
+msgstr "тип документа"
+
+msgid "template"
+msgstr "шаблон"
+
 #~ msgid "requires client data"
 #~ msgstr "требуются данные клиента"
 

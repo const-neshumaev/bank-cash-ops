@@ -1,0 +1,29 @@
+{
+  "title": "Print forms",
+  "nav": {
+    "printTemplates": "Print templates"
+  },
+  "common": {
+    "error": "Error"
+  },
+  "templates": {
+    "title": "Print templates",
+    "hint": "The templates are predefined by the developer. Download a template, edit it in Word and upload it back; it is stored in the database.",
+    "empty": "No module declares any print form.",
+    "uploaded": "Template saved",
+    "noFile": "no file uploaded",
+    "inactive": "inactive",
+    "variables": "Variables",
+    "variablesHint": "Use these variables in the Word template as {{ variable_name }}.",
+    "templatesCount": "Templates: {{count}}",
+    "columns": {
+      "name": "Template",
+      "code": "Code",
+      "file": "File",
+      "updatedAt": "Updated",
+      "variable": "Variable",
+      "description": "Description",
+      "example": "Example"
+    }
+  }
+}

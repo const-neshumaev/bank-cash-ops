@@ -7,6 +7,8 @@ contract. Reads are narrowed to the cash desks the caller may access.
 
 from __future__ import annotations
 
+import logging
+
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -29,14 +31,22 @@ from modules.operations.backend.filters import CashBalanceFilter, OperationFilte
 from modules.operations.backend.models import (
     CashBalance,
     Operation,
+    OperationPrintConfig,
     OperationTemplate,
     OperationType,
 )
 from modules.operations.backend.permission_codes import PermissionCode
 from modules.operations.backend.preparation import prepare_operation
+from modules.operations.backend.printing import (
+    operation_ids_with_documents,
+    render_print_documents,
+)
 from modules.operations.backend.thresholds import THRESHOLD_TYPES
 from modules.operations.contracts import SlotValue
+from modules.printing.contracts import PRINT_DOCUMENT_SERVICE
 from modules.references.contracts import REFERENCE_DIRECTORY
+
+logger = logging.getLogger(__name__)
 
 
 def _org_directory():
@@ -118,6 +128,65 @@ def _current_shift(user):
     return shift
 
 
+def _print_service():
+    return registry.get(PRINT_DOCUMENT_SERVICE)
+
+
+def _print_template_payload(template) -> dict:
+    return {
+        "code": template.code,
+        "name": template.name,
+        "document_type": template.document_type,
+        "document_type_name": template.document_type_name,
+        "description": template.description,
+        "has_file": template.has_file,
+        "file_name": template.file_name,
+        "is_active": template.is_active,
+        "variables": [
+            {
+                "code": variable.code,
+                "description": str(variable.description),
+                "example": variable.example,
+            }
+            for variable in template.variables
+        ],
+    }
+
+
+def _print_document_types_payload() -> list[dict]:
+    document_types = _print_service().document_types()
+    return [
+        {
+            "code": document_type.code,
+            "name": document_type.name,
+            "description": document_type.description,
+            "numbering_scope": document_type.numbering_scope,
+            "is_active": document_type.is_active,
+            "templates": [
+                _print_template_payload(template) for template in document_type.templates
+            ],
+        }
+        for document_type in document_types
+    ]
+
+
+def _print_names_context(context: dict) -> dict:
+    """Add the printable names used by the nested print-config serializer."""
+    try:
+        document_types = _print_service().document_types()
+    except LookupError:
+        return context
+    context["print_document_type_names"] = {
+        document_type.code: document_type.name for document_type in document_types
+    }
+    context["print_template_names"] = {
+        template.code: template.name
+        for document_type in document_types
+        for template in document_type.templates
+    }
+    return context
+
+
 class OperationTypeViewSet(
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
@@ -131,7 +200,9 @@ class OperationTypeViewSet(
     ``operations.types.manage``. The declarative metadata is read-only.
     """
 
-    queryset = OperationType.objects.prefetch_related("slots", "translations").all()
+    queryset = OperationType.objects.prefetch_related(
+        "slots", "translations", "print_configs"
+    ).all()
     serializer_class = serializers.OperationTypeSerializer
     permission_classes = [PermissionRequired]
     required_permission = PermissionCode.VIEW
@@ -141,6 +212,7 @@ class OperationTypeViewSet(
         "update": PermissionCode.TYPES_MANAGE,
         "partial_update": PermissionCode.TYPES_MANAGE,
         "history": PermissionCode.VIEW,
+        "print_configs": PermissionCode.VIEW,
     }
     lookup_field = "code"
     filterset_fields = ("kind", "is_external", "client_data_policy", "is_active")
@@ -151,7 +223,12 @@ class OperationTypeViewSet(
     def get_serializer_class(self):
         if self.action == "history":
             return serializers.OperationTypeHistorySerializer
+        if self.action == "print_configs":
+            return serializers.OperationPrintConfigSerializer
         return super().get_serializer_class()
+
+    def get_serializer_context(self):
+        return _print_names_context(super().get_serializer_context())
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop("partial", False)
@@ -174,6 +251,67 @@ class OperationTypeViewSet(
         if page is not None:
             return self.get_paginated_response(serializer.data)
         return Response(serializer.data)
+
+    @action(detail=True, methods=["get", "put"], url_path="print-configs")
+    def print_configs(self, request, code=None):
+        """Read or replace the printed documents configured for the type."""
+        operation_type = self.get_object()
+        if request.method == "PUT":
+            if not request.user.has_permission(PermissionCode.TYPES_MANAGE):
+                raise PermissionDenied(_("You do not have permission to perform this action."))
+            rows = self._validate_print_configs(request.data.get("configs", []))
+            with transaction.atomic():
+                operation_type.print_configs.all().delete()
+                OperationPrintConfig.objects.bulk_create(
+                    [
+                        OperationPrintConfig(operation_type=operation_type, **row)
+                        for row in rows
+                    ]
+                )
+        configs = OperationPrintConfig.objects.filter(operation_type=operation_type)
+        serializer = self.get_serializer(configs, many=True)
+        return Response(serializer.data)
+
+    @staticmethod
+    def _validate_print_configs(rows) -> list[dict]:
+        """Check the bindings against the document types declared by ``printing``."""
+        if not isinstance(rows, list):
+            raise ValidationError({"configs": _("A list of print documents is expected.")})
+        document_types = {item.code: item for item in _print_service().document_types()}
+        result: list[dict] = []
+        seen: set[str] = set()
+        for row in rows:
+            if not isinstance(row, dict):
+                raise ValidationError({"configs": _("Invalid print document entry.")})
+            document_type = str(row.get("document_type") or "").strip()
+            template = str(row.get("template") or "").strip()
+            if document_type not in document_types:
+                raise ValidationError(
+                    {
+                        "document_type": _("Unknown print document type '%(code)s'.")
+                        % {"code": document_type}
+                    }
+                )
+            available = {
+                item.code for item in document_types[document_type].templates if item.is_active
+            }
+            if template not in available:
+                raise ValidationError(
+                    {"template": _("Unknown print template '%(code)s'.") % {"code": template}}
+                )
+            if document_type in seen:
+                raise ValidationError(
+                    {"document_type": _("The print document type is selected more than once.")}
+                )
+            seen.add(document_type)
+            result.append(
+                {
+                    "document_type": document_type,
+                    "template_code": template,
+                    "is_active": bool(row.get("is_active", True)),
+                }
+            )
+        return result
 
 
 class ThresholdTypeListView(APIView):
@@ -238,6 +376,20 @@ class OperationViewSet(
     filterset_class = OperationFilter
     ordering_fields = ("posted_at", "number", "id")
     ordering = ("-posted_at", "-id")
+
+    def list(self, request, *args, **kwargs):
+        """List operations, marking which of them already have printed documents."""
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        rows = page if page is not None else list(queryset)
+        context = self.get_serializer_context()
+        context["print_operation_ids"] = operation_ids_with_documents(
+            operation.id for operation in rows
+        )
+        serializer = self.get_serializer(rows, many=True, context=context)
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -337,10 +489,18 @@ class OperationViewSet(
             idempotency_key=data["idempotency_key"],
             basis_slot=data["basis_slot"],
         )
-        return Response(
-            serializers.OperationSerializer(operation).data,
-            status=status.HTTP_201_CREATED,
-        )
+        print_documents = ()
+        try:
+            print_documents = render_print_documents(operation, user_id=request.user.id)
+        except Exception:  # a print failure must not undo a posted operation
+            logger.exception("Could not render print documents for operation %s", operation.id)
+        payload = serializers.OperationSerializer(
+            operation, context=self.get_serializer_context()
+        ).data
+        payload["print_documents"] = serializers.PrintDocumentInfoSerializer(
+            print_documents, many=True
+        ).data
+        return Response(payload, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])
     def reverse(self, request, pk=None):
@@ -469,6 +629,17 @@ class BranchOperationTemplateView(APIView):
             raise PermissionDenied(_("You do not have permission to perform this action."))
         config.delete_template(branch_id)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class PrintTemplateListView(APIView):
+    """Available printed document types and print forms for configuration."""
+
+    permission_classes = [PermissionRequired]
+    required_permission = PermissionCode.VIEW
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    def get(self, request):
+        return Response(_print_document_types_payload())
 
 
 class WorkplaceView(APIView):

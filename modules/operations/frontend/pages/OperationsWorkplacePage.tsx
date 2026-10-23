@@ -16,7 +16,7 @@ import {
   Title,
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
-import { IconAlertCircle } from '@tabler/icons-react'
+import { IconAlertCircle, IconPrinter } from '@tabler/icons-react'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -25,6 +25,7 @@ import { NavLink as RouterNavLink } from 'react-router-dom'
 import { extractErrorMessage } from '@app/api/errors'
 import { useAuth } from '@app/auth/AuthContext'
 
+import { PrintDocumentsModal } from '../components/PrintDocumentsModal'
 import * as operationsApi from '../api/operations'
 import type {
   ClientDataRequirement,
@@ -32,6 +33,7 @@ import type {
   Operation,
   OperationLine,
   PreviewOperation,
+  PrintDocument,
   WorkplaceContext,
   WorkplaceOperation,
 } from '../api/operations'
@@ -110,6 +112,8 @@ export function OperationsWorkplacePage() {
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   const [reverseTarget, setReverseTarget] = useState<Operation | null>(null)
+  const [printDocuments, setPrintDocuments] = useState<PrintDocument[]>([])
+  const [printModalOpen, setPrintModalOpen] = useState(false)
 
   const selectedOperation = useMemo<WorkplaceOperation | undefined>(
     () => context?.operations.find((item) => item.code === operationCode),
@@ -465,7 +469,7 @@ export function OperationsWorkplacePage() {
     if (!pendingPreview) return
     setSubmitting(true)
     try {
-      await operationsApi.postOperation({
+      const posted = await operationsApi.postOperation({
         operation_type: pendingPreview.operation_type,
         lines: pendingPreview.lines.map((line) => ({
           slot: line.slot,
@@ -483,6 +487,10 @@ export function OperationsWorkplacePage() {
       notifications.show({ color: 'green', message: t('workplace.posted') })
       setConfirmOpen(false)
       closeOperationModal()
+      if (posted.print_documents && posted.print_documents.length > 0) {
+        setPrintDocuments(posted.print_documents)
+        setPrintModalOpen(true)
+      }
       await load()
     } catch (error) {
       notifications.show({
@@ -492,6 +500,24 @@ export function OperationsWorkplacePage() {
       })
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const openPrintDocuments = async (operation: Operation) => {
+    try {
+      const documents = await operationsApi.listOperationDocuments(operation.id)
+      if (documents.length === 0) {
+        notifications.show({ color: 'yellow', message: t('workplace.print.empty') })
+        return
+      }
+      setPrintDocuments(documents)
+      setPrintModalOpen(true)
+    } catch (error) {
+      notifications.show({
+        color: 'red',
+        title: t('common.error'),
+        message: extractErrorMessage(error),
+      })
     }
   }
 
@@ -992,16 +1018,28 @@ export function OperationsWorkplacePage() {
                       </Badge>
                     </Table.Td>
                     <Table.Td>
-                      {operation.status === 'posted' && hasPermission('operations.reverse') && (
-                        <Button
-                          size="compact-sm"
-                          variant="subtle"
-                          color="red"
-                          onClick={() => setReverseTarget(operation)}
-                        >
-                          {t('workplace.reverse')}
-                        </Button>
-                      )}
+                      <Group gap={4} justify="flex-end" wrap="nowrap">
+                        {operation.has_print_documents && hasPermission('printing.print') && (
+                          <Button
+                            size="compact-sm"
+                            variant="subtle"
+                            leftSection={<IconPrinter size={14} />}
+                            onClick={() => void openPrintDocuments(operation)}
+                          >
+                            {t('workplace.print.reprint')}
+                          </Button>
+                        )}
+                        {operation.status === 'posted' && hasPermission('operations.reverse') && (
+                          <Button
+                            size="compact-sm"
+                            variant="subtle"
+                            color="red"
+                            onClick={() => setReverseTarget(operation)}
+                          >
+                            {t('workplace.reverse')}
+                          </Button>
+                        )}
+                      </Group>
                     </Table.Td>
                   </Table.Tr>
                 ))}
@@ -1010,6 +1048,12 @@ export function OperationsWorkplacePage() {
           )}
         </Stack>
       </Card>
+
+      <PrintDocumentsModal
+        opened={printModalOpen}
+        documents={printDocuments}
+        onClose={() => setPrintModalOpen(false)}
+      />
     </Stack>
   )
 }

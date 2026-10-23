@@ -43,16 +43,24 @@ graph TD
         O_FE[frontend]
         O_CT[contracts]
     end
+    subgraph Print["printing"]
+        P_BE[backend] --> P_DB[(схема printing)]
+        P_FE[frontend]
+        P_CT[contracts]
+    end
     subgraph Rep["reports"]
         R_BE[backend] --> R_DB[(схема reports)]
         R_CT[contracts]
     end
     O_CT -. "только через contracts" .-> C_CT
+    O_CT -. "только через contracts" .-> P_CT
+    P_CT -. "только через contracts" .-> C_CT
     R_CT -. "только через contracts" .-> O_CT
     C_BE -. "доменные события" .-> O_BE
     O_BE -. "доменные события" .-> R_BE
     Comp -. "выбирает и конфигурирует" .-> Core
     Comp -. "выбирает и конфигурирует" .-> Ops
+    Comp -. "выбирает и конфигурирует" .-> Print
     Comp -. "выбирает и конфигурирует" .-> Rep
 ```
 
@@ -82,6 +90,8 @@ graph TD
 | --- | --- | --- |
 | `references` | Общесистемные справочники (валюты ISO 4217, типы курсов) | всем заказчикам |
 | `core` | Пользователи, аутентификация, роли, оргструктура (отделения, кассы), кассовые смены | всем заказчикам |
+| `printing` | Печатные документы: шаблоны Word, нумерация и повторная печать | опционально |
+| `printing_standard` | Базовые типы печатных документов и шаблоны (кассовый чек) | с `printing` |
 | `operations` | Кассовые операции (приход/расход) | опционально |
 | `reports` | Отчётность (read-model) | опционально |
 | `audit` | Журнал аудита | опционально |
@@ -96,6 +106,8 @@ graph TD
 | --- | --- |
 | `references` | `docs/architecture-module-references.md` |
 | `core` | `docs/architecture-module-core.md` |
+| `printing` | `docs/architecture-module-printing.md` |
+| `printing_standard` | `docs/architecture-module-printing-standard.md` |
 | `operations` | `docs/architecture-module-operations.md` |
 | `operations_standard` | `docs/architecture-module-operations-standard.md` |
 
@@ -168,7 +180,7 @@ SPA хранит токены в `localStorage` и автоматически о
 ## Развитие
 
 Модули добавляются независимо. Текущее состояние: техническая библиотека
-`common` и доменные модули `references`, `core`, `operations` и
+`common` и доменные модули `references`, `core`, `printing`, `operations` и
 `operations_standard` уже живут в `modules/`. Модуль `references` владеет
 общесистемными справочниками (валюты ISO 4217 и типы курсов) и поставляет их
 другим модулям через контракт (`docs/adr/0017-references-module.md`). В `core`
@@ -186,6 +198,9 @@ SPA хранит токены в `localStorage` и автоматически о
 декларативные формы операций, много­валютные подкрепление и инкассация, а также
 расчёт курсов обмена и индивидуальный курс
 (`docs/adr/0021-operation-forms-client-data-and-rates.md`);
-`operations_standard` объявляет базовый набор кассовых операций. Реализован
-outbox (`common`): `core` и `operations` публикуют доменные события. Далее —
-отчётность и аудит.
+`operations_standard` объявляет базовый набор кассовых операций. В `printing`
+реализованы типы печатных документов, шаблоны Word в базе, банковская нумерация
+и повторная печать, а `printing_standard` объявляет кассовый чек и шаблоны для
+операций обмена валют (`docs/adr/0023-print-documents.md`). Реализован outbox
+(`common`): `core` и `operations` публикуют доменные события. Далее — отчётность
+и аудит.

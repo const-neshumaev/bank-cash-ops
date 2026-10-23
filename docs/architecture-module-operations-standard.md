@@ -31,6 +31,11 @@ graph LR
 - **обмен** — слоты `received` и `issued`, проводки `cash`/`turnover` в двух
   направлениях.
 
+Обменные операции также объявляют печатный документ по умолчанию
+(`print_configs`): кассовый чек с шаблоном `printing_standard` для покупки,
+продажи и конвертации. Привязка создаётся при первом создании типа операции и
+дальше управляется администратором (`docs/architecture-module-printing.md`).
+
 Объявления лежат в `modules/operations_standard/backend/declarations.py`. В
 `AppConfig.ready()` модуль регистрирует их в SPI-реестре `operations` (имя
 `operations.types`). Хранит объявления у себя `operations`: по команде

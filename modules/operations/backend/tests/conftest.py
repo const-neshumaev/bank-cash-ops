@@ -57,7 +57,15 @@ class FakeOrgDirectory:
     def get_cash_desk(self, cash_desk_id):
         if cash_desk_id != CASH_DESK or self.branch_id is None:
             return None
-        return CashDeskDTO(id=cash_desk_id, branch_id=self.branch_id, is_active=True)
+        return CashDeskDTO(
+            id=cash_desk_id,
+            branch_id=self.branch_id,
+            is_active=True,
+            name="Касса 7",
+            code="K7",
+            branch_name="Отделение 1",
+            bank_name="Банк",
+        )
 
     def accessible_cash_desk_ids(self, user_id):
         return self.accessible

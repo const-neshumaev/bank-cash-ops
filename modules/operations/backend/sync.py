@@ -8,7 +8,9 @@ declared, because posted operations reference it (``PROTECT``).
 
 from __future__ import annotations
 
+from modules.common.contracts import registry
 from modules.operations.backend.models import (
+    OperationPrintConfig,
     OperationType,
     OperationTypeTranslation,
     SlotDef,
@@ -17,6 +19,7 @@ from modules.operations.backend.models import (
 from modules.operations.backend.registry import operation_type_registry
 from modules.operations.backend.thresholds import ClientDataPolicy
 from modules.operations.contracts.dto import OperationTypeSpec
+from modules.printing.contracts import PRINT_TEMPLATE_REGISTRY
 
 #: Fields owned by the declaring module: synchronisation always refreshes them.
 DECLARATIVE_FIELDS = (
@@ -61,6 +64,7 @@ def sync_operation_types() -> int:
             )
             operation_type.clean()
             operation_type.save()
+            _seed_print_configs(operation_type, spec)
         else:
             for field, value in defaults.items():
                 setattr(operation_type, field, value)
@@ -71,6 +75,30 @@ def sync_operation_types() -> int:
         _sync_slots(operation_type, spec)
         synced += 1
     return synced
+
+
+def _seed_print_configs(operation_type: OperationType, spec: OperationTypeSpec) -> None:
+    """Create the printed documents declared as defaults for a new type.
+
+    The declarations are validated against the ``printing`` template registry;
+    a missing template (for example when ``printing_standard`` is not installed)
+    is skipped instead of breaking the synchronisation.
+    """
+    if not spec.print_configs:
+        return
+    try:
+        templates = registry.get(PRINT_TEMPLATE_REGISTRY)
+    except LookupError:
+        return
+    for binding in spec.print_configs:
+        template_spec = templates.get_template_spec(binding.template)
+        if template_spec is None or template_spec.document_type != binding.document_type:
+            continue
+        OperationPrintConfig.objects.get_or_create(
+            operation_type=operation_type,
+            document_type=binding.document_type,
+            defaults={"template_code": binding.template, "is_active": binding.is_active},
+        )
 
 
 def _sync_slots(operation_type: OperationType, spec: OperationTypeSpec) -> None:

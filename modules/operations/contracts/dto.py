@@ -80,6 +80,21 @@ class OperationRatePrinciple:
 
 
 @dataclass(frozen=True)
+class PrintBindingSpec:
+    """A printed document declared as the default for an operation type.
+
+    The binding only references the ``printing`` module by stable codes; the
+    template itself is declared there. The defaults are seeded when the
+    operation type is first materialised and are not restored afterwards, so an
+    administrator may remove or change them.
+    """
+
+    document_type: str
+    template: str
+    is_active: bool = True
+
+
+@dataclass(frozen=True)
 class OperationTypeDTO:
     """Immutable view of an operation type crossing the module boundary."""
 
@@ -214,3 +229,5 @@ class OperationTypeSpec:
     threshold_currency: str = ""
     permission_code: str = ""
     translations: dict[str, str] = field(default_factory=dict)
+    #: Default printed documents, seeded on creation (see ``PrintBindingSpec``).
+    print_configs: tuple[PrintBindingSpec, ...] = ()

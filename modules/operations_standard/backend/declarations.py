@@ -16,6 +16,7 @@ from modules.operations.contracts import (
     OperationKind,
     OperationRatePrinciple,
     OperationTypeSpec,
+    PrintBindingSpec,
     RegisterCode,
     SlotAmountMode,
     SlotComputation,
@@ -193,6 +194,7 @@ def _exchange(
     translations: dict[str, str],
     slots: tuple[SlotSpec, ...],
     rate_principle: str,
+    print_configs: tuple[PrintBindingSpec, ...] = (),
 ):
     return OperationTypeSpec(
         code=code,
@@ -205,7 +207,13 @@ def _exchange(
         requires_client=True,
         permission_code=PERMISSION,
         translations=translations,
+        print_configs=print_configs,
     )
+
+
+def _cash_receipt(template: str) -> tuple[PrintBindingSpec, ...]:
+    """The cash receipt template declared by ``printing_standard``."""
+    return (PrintBindingSpec(document_type="cash_receipt", template=template),)
 
 
 #: The baseline operation types declared to the operations engine.
@@ -300,6 +308,7 @@ OPERATION_TYPES: tuple[OperationTypeSpec, ...] = (
         translations=_en("Currency sale to client"),
         slots=_sale_slots(),
         rate_principle=OperationRatePrinciple.SELL,
+        print_configs=_cash_receipt("cash_receipt_currency_sale"),
     ),
     _exchange(
         "currency_purchase",
@@ -307,6 +316,7 @@ OPERATION_TYPES: tuple[OperationTypeSpec, ...] = (
         translations=_en("Currency purchase from client"),
         slots=_purchase_slots(),
         rate_principle=OperationRatePrinciple.BUY,
+        print_configs=_cash_receipt("cash_receipt_currency_purchase"),
     ),
     _exchange(
         "currency_conversion",
@@ -314,6 +324,7 @@ OPERATION_TYPES: tuple[OperationTypeSpec, ...] = (
         translations=_en("Currency conversion"),
         slots=_conversion_slots(),
         rate_principle=OperationRatePrinciple.CONVERSION,
+        print_configs=_cash_receipt("cash_receipt_currency_conversion"),
     ),
     _exchange(
         "fractional_currency_purchase",

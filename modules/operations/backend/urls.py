@@ -14,6 +14,7 @@ from modules.operations.backend.views import (
     OperationTemplateListView,
     OperationTypeViewSet,
     OperationViewSet,
+    PrintTemplateListView,
     ThresholdTypeListView,
     WorkplaceView,
 )
@@ -25,6 +26,11 @@ router.register("operations", OperationViewSet, basename="operation")
 
 urlpatterns = [
     path("workplace/", WorkplaceView.as_view(), name="operations-workplace"),
+    path(
+        "print-templates/",
+        PrintTemplateListView.as_view(),
+        name="print-template-list",
+    ),
     path(
         "threshold-types/",
         ThresholdTypeListView.as_view(),

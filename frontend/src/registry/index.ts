@@ -1,6 +1,7 @@
 import i18n from '@app/i18n'
 import { coreFrontend } from '@modules/core/frontend'
 import { operationsFrontend } from '@modules/operations/frontend'
+import { printingFrontend } from '@modules/printing/frontend'
 import { referencesFrontend } from '@modules/references/frontend'
 
 import type { FrontendModule, ModuleNavItem } from './contract'
@@ -14,6 +15,7 @@ import type { FrontendModule, ModuleNavItem } from './contract'
 export const enabledModules: FrontendModule[] = [
   referencesFrontend,
   coreFrontend,
+  printingFrontend,
   operationsFrontend,
 ]
 

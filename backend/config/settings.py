@@ -56,6 +56,8 @@ INSTALLED_APPS = [
     "modules.common.backend",
     "modules.references.backend",
     "modules.core.backend",
+    "modules.printing.backend",
+    "modules.printing_standard.backend",
     "modules.operations.backend",
     "modules.operations_standard.backend",
 ]

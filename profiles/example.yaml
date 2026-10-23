@@ -8,18 +8,32 @@ modules:
     version: 0.3.0
 
   - name: core
-    version: 0.6.0
+    version: 0.7.0
     connections:
       references:
         access: inprocess
 
+  - name: printing
+    version: 0.1.0
+    connections:
+      core:
+        access: inprocess
+
+  - name: printing_standard
+    version: 0.1.0
+    connections:
+      printing:
+        access: inprocess
+
   - name: operations
-    version: 0.3.0
+    version: 0.4.0
     connections:
       core:
         access: inprocess
         # url: http://core:8000    # обязателен при access: http
       references:
+        access: inprocess
+      printing:
         access: inprocess
 
   - name: reports

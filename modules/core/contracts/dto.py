@@ -29,11 +29,20 @@ class UserDTO:
 
 @dataclass(frozen=True)
 class CashDeskDTO:
-    """Immutable view of a cashier workstation."""
+    """Immutable view of a cashier workstation.
+
+    The names are provided for documents (printed forms) so a consumer does not
+    have to reach into the organisation tables. ``bank_name`` is the name of the
+    root branch (the head office).
+    """
 
     id: int
     branch_id: int
     is_active: bool
+    name: str = ""
+    code: str = ""
+    branch_name: str = ""
+    bank_name: str = ""
 
 
 @dataclass(frozen=True)
