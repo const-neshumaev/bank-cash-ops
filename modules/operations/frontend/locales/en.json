@@ -87,7 +87,7 @@
     },
     "recent": {
       "title": "Recent operations",
-      "empty": "No operations at this cash desk yet.",
+      "empty": "No operations in the current shift yet.",
       "number": "No.",
       "operation": "Operation",
       "amounts": "Amounts",

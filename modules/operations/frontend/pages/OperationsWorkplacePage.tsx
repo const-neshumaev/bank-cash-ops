@@ -171,7 +171,11 @@ export function OperationsWorkplacePage() {
     try {
       const data = await operationsApi.fetchWorkplace()
       setContext(data)
-      setJournal(data.cash_desk_id === null ? [] : await operationsApi.listOperations(data.cash_desk_id))
+      setJournal(
+        data.cash_desk_id === null || data.shift_id === null
+          ? []
+          : await operationsApi.listOperations(data.cash_desk_id, data.shift_id),
+      )
     } catch (error) {
       notifications.show({ color: 'red', title: t('common.error'), message: extractErrorMessage(error) })
     } finally {
