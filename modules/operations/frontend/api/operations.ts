@@ -143,9 +143,9 @@ export async function fetchWorkplace(): Promise<WorkplaceContext> {
   return data
 }
 
-export async function listOperations(cashDesk: number): Promise<Operation[]> {
+export async function listOperations(cashDesk: number, shift: number): Promise<Operation[]> {
   const { data } = await api.get<Paginated<Operation>>('/operations/operations/', {
-    params: { cash_desk: cashDesk, page_size: 20, ordering: '-posted_at' },
+    params: { cash_desk: cashDesk, shift, page_size: 20, ordering: '-posted_at' },
   })
   return data.results
 }
