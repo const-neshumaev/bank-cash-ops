@@ -17,9 +17,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { extractErrorMessage } from '@app/api/errors'
+import { useAuth } from '@app/auth/AuthContext'
 
 import * as rateTypesApi from '../api/rateTypes'
 import { RateTypeFormModal } from '../components/RateTypeFormModal'
+
+const MANAGE_PERMISSION = 'references.manage'
 
 const PRINCIPLE_COLORS: Record<rateTypesApi.RatePrinciple, string> = {
   official: 'blue',
@@ -30,6 +33,8 @@ const PRINCIPLE_COLORS: Record<rateTypesApi.RatePrinciple, string> = {
 
 export function RateTypesPage() {
   const { t } = useTranslation('references')
+  const { hasPermission } = useAuth()
+  const canManage = hasPermission(MANAGE_PERMISSION)
   const [rateTypes, setRateTypes] = useState<rateTypesApi.RateType[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -83,9 +88,11 @@ export function RateTypesPage() {
     <Stack>
       <Group justify="space-between">
         <Title order={3}>{t('rateTypes.title')}</Title>
-        <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
-          {t('common.add')}
-        </Button>
+        {canManage && (
+          <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
+            {t('common.add')}
+          </Button>
+        )}
       </Group>
 
       <Text size="sm" c="dimmed">
@@ -155,27 +162,29 @@ export function RateTypesPage() {
                   </Badge>
                 </Table.Td>
                 <Table.Td>
-                  <Group gap={4} justify="flex-end">
-                    <Tooltip label={t('common.edit')}>
-                      <ActionIcon variant="subtle" onClick={() => openEdit(rateType)}>
-                        <IconEdit size={16} />
-                      </ActionIcon>
-                    </Tooltip>
-                    <Tooltip
-                      label={
-                        rateType.is_system ? t('rateTypes.systemDeleteHint') : t('common.delete')
-                      }
-                    >
-                      <ActionIcon
-                        variant="subtle"
-                        color="red"
-                        disabled={rateType.is_system}
-                        onClick={() => void handleDelete(rateType)}
+                  {canManage && (
+                    <Group gap={4} justify="flex-end">
+                      <Tooltip label={t('common.edit')}>
+                        <ActionIcon variant="subtle" onClick={() => openEdit(rateType)}>
+                          <IconEdit size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                      <Tooltip
+                        label={
+                          rateType.is_system ? t('rateTypes.systemDeleteHint') : t('common.delete')
+                        }
                       >
-                        <IconTrash size={16} />
-                      </ActionIcon>
-                    </Tooltip>
-                  </Group>
+                        <ActionIcon
+                          variant="subtle"
+                          color="red"
+                          disabled={rateType.is_system}
+                          onClick={() => void handleDelete(rateType)}
+                        >
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Group>
+                  )}
                 </Table.Td>
               </Table.Tr>
             ))

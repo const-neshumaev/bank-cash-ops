@@ -21,6 +21,7 @@ import { useTranslation } from 'react-i18next'
 
 import { extractErrorMessage } from '@app/api/errors'
 import type { Branch, CashDesk } from '@app/api/types'
+import { useAuth } from '@app/auth/AuthContext'
 
 import * as branchesApi from '../api/branches'
 import * as cashDesksApi from '../api/cashDesks'
@@ -28,6 +29,8 @@ import { CashDeskFormModal } from '../components/CashDeskFormModal'
 
 export function CashDesksPage() {
   const { t } = useTranslation('core')
+  const { hasPermission } = useAuth()
+  const canManage = hasPermission('core.structure.manage')
   const [cashDesks, setCashDesks] = useState<CashDesk[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(false)
@@ -89,9 +92,11 @@ export function CashDesksPage() {
     <Stack>
       <Group justify="space-between">
         <Title order={3}>{t('cashDesks.title')}</Title>
-        <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
-          {t('common.add')}
-        </Button>
+        {canManage && (
+          <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
+            {t('common.add')}
+          </Button>
+        )}
       </Group>
 
       <Group>
@@ -120,13 +125,13 @@ export function CashDesksPage() {
             <Table.Th>{t('cashDesks.columns.branch')}</Table.Th>
             <Table.Th>{t('cashDesks.columns.mac')}</Table.Th>
             <Table.Th>{t('cashDesks.columns.status')}</Table.Th>
-            <Table.Th />
+            {canManage && <Table.Th />}
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
           {loading ? (
             <Table.Tr>
-              <Table.Td colSpan={6}>
+              <Table.Td colSpan={canManage ? 6 : 5}>
                 <Center py="md">
                   <Loader size="sm" />
                 </Center>
@@ -134,7 +139,7 @@ export function CashDesksPage() {
             </Table.Tr>
           ) : cashDesks.length === 0 ? (
             <Table.Tr>
-              <Table.Td colSpan={6}>
+              <Table.Td colSpan={canManage ? 6 : 5}>
                 <Center py="md">
                   <Text c="dimmed">{t('cashDesks.empty')}</Text>
                 </Center>
@@ -153,22 +158,24 @@ export function CashDesksPage() {
                   </Badge>
                 </Table.Td>
                 <Table.Td>
-                  <Group gap={4} justify="flex-end">
-                    <Tooltip label={t('common.edit')}>
-                      <ActionIcon variant="subtle" onClick={() => openEdit(cashDesk)}>
-                        <IconEdit size={16} />
-                      </ActionIcon>
-                    </Tooltip>
-                    <Tooltip label={t('common.delete')}>
-                      <ActionIcon
-                        variant="subtle"
-                        color="red"
-                        onClick={() => void handleDelete(cashDesk)}
-                      >
-                        <IconTrash size={16} />
-                      </ActionIcon>
-                    </Tooltip>
-                  </Group>
+                  {canManage && (
+                    <Group gap={4} justify="flex-end">
+                      <Tooltip label={t('common.edit')}>
+                        <ActionIcon variant="subtle" onClick={() => openEdit(cashDesk)}>
+                          <IconEdit size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                      <Tooltip label={t('common.delete')}>
+                        <ActionIcon
+                          variant="subtle"
+                          color="red"
+                          onClick={() => void handleDelete(cashDesk)}
+                        >
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Group>
+                  )}
                 </Table.Td>
               </Table.Tr>
             ))

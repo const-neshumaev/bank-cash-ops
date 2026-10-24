@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { extractErrorMessage } from '@app/api/errors'
-import type { Branch, CashDesk } from '@app/api/types'
+import type { BranchOption, CashDesk } from '@app/api/types'
 
 import * as branchesApi from '../api/branches'
 import * as cashDesksApi from '../api/cashDesks'
@@ -43,7 +43,7 @@ export function CashDeskFormModal({ opened, cashDesk, onClose, onSaved }: CashDe
   const { t } = useTranslation('core')
   const isEdit = Boolean(cashDesk)
   const [submitting, setSubmitting] = useState(false)
-  const [branches, setBranches] = useState<Branch[]>([])
+  const [branches, setBranches] = useState<BranchOption[]>([])
 
   const form = useForm<FormValues>({
     initialValues: EMPTY_VALUES,
@@ -60,7 +60,7 @@ export function CashDeskFormModal({ opened, cashDesk, onClose, onSaved }: CashDe
   useEffect(() => {
     if (!opened) return
     void branchesApi
-      .listAllBranches()
+      .listStructureBranchOptions()
       .then(setBranches)
       .catch(() => setBranches([]))
   }, [opened])

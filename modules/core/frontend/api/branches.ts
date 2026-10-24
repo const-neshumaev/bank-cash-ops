@@ -37,6 +37,18 @@ export async function listBranchCatalog(): Promise<Branch[]> {
 }
 
 /**
+ * Fetch every branch for the structure editor select inputs (parent of a branch,
+ * branch of a cash desk). Requires the `core.structure.manage` permission and is
+ * intentionally unscoped: an editor may pick any branch.
+ */
+export async function listStructureBranchOptions(): Promise<BranchOption[]> {
+  const { data } = await api.get<Paginated<BranchOption>>('/branches/structure-options/', {
+    params: { page_size: 100 },
+  })
+  return data.results
+}
+
+/**
  * Fetch branches that have an active cash desk, for the workplace picker.
  * Available to any authenticated user, including cashiers.
  */

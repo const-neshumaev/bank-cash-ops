@@ -11,6 +11,7 @@ from rest_framework.test import APIClient
 
 from modules.core.backend import scoping
 from modules.core.backend.models import Branch, BranchAccess, CashDesk, Role, Shift
+from modules.core.backend.permission_codes import PermissionCode
 
 User = get_user_model()
 
@@ -273,6 +274,27 @@ class TestBranchScopingAPI:
         emails = {item["email"] for item in response.data["results"]}
         assert {"admin@example.com", "other@example.com"} <= emails
 
+    def test_branch_manager_may_read_but_not_change_structure(self, client, manager_user, branch):
+        desk = CashDesk.objects.create(branch=branch, code="C1", name="Касса 1")
+        login(client, manager_user.email)
+
+        branch_listing = client.get(BRANCHES_URL)
+        desk_listing = client.get(CASH_DESKS_URL)
+        branch_creating = client.post(
+            BRANCHES_URL,
+            {"code": "B9", "name": "Новое отделение", "parent": branch.id},
+            format="json",
+        )
+        desk_creating = client.post(
+            CASH_DESKS_URL, {"branch": branch.id, "name": "Касса 2"}, format="json"
+        )
+
+        assert branch_listing.status_code == 200, branch_listing.content
+        assert desk_listing.status_code == 200, desk_listing.content
+        assert [item["id"] for item in desk_listing.data["results"]] == [desk.id]
+        assert branch_creating.status_code == 403
+        assert desk_creating.status_code == 403
+
 
 class TestBranchCatalog:
     def test_catalog_lists_every_branch_for_user_managers(
@@ -292,3 +314,48 @@ class TestBranchCatalog:
         login(client, cashier.email)
 
         assert client.get(f"{BRANCHES_URL}catalog/").status_code == 403
+
+
+class TestStructureOptions:
+    @pytest.fixture
+    def structure_manager(self, branch):
+        role = Role.objects.create(
+            code="structure_manager",
+            name="Structure manager",
+            permissions=[PermissionCode.STRUCTURE_MANAGE],
+        )
+        user = make_user("editor@example.com")
+        user.roles.add(role)
+        grant(user, branch)
+        return user
+
+    def test_structure_manager_lists_every_branch(
+        self, client, structure_manager, branch, other_branch
+    ):
+        login(client, structure_manager.email)
+
+        response = client.get(f"{BRANCHES_URL}structure-options/")
+
+        assert response.status_code == 200, response.content
+        ids = {item["id"] for item in response.data["results"]}
+        assert {branch.id, other_branch.id} <= ids
+
+    def test_structure_options_require_structure_manage(self, client, branch):
+        manager = make_user("manager@example.com", "branch_manager")
+        grant(manager, branch)
+        login(client, manager.email)
+
+        assert client.get(f"{BRANCHES_URL}structure-options/").status_code == 403
+
+    def test_editor_may_pick_a_parent_outside_their_scope(
+        self, client, structure_manager, branch, other_branch
+    ):
+        login(client, structure_manager.email)
+
+        response = client.patch(
+            f"{BRANCHES_URL}{branch.id}/", {"parent": other_branch.id}, format="json"
+        )
+
+        assert response.status_code == 200, response.content
+        branch.refresh_from_db()
+        assert branch.parent_id == other_branch.id

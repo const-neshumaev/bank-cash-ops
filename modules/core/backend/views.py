@@ -329,6 +329,7 @@ class BranchViewSet(viewsets.ModelViewSet):
         "partial_update": PermissionCode.STRUCTURE_MANAGE,
         "destroy": PermissionCode.STRUCTURE_MANAGE,
         "catalog": PermissionCode.USERS_MANAGE,
+        "structure_options": PermissionCode.STRUCTURE_MANAGE,
     }
     filterset_fields = ["is_head_office", "is_active", "parent"]
     search_fields = ["name", "code", "address"]
@@ -337,9 +338,10 @@ class BranchViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        # The catalog is intentionally unscoped: assigning access needs the full
-        # branch tree, see the ``catalog`` action below.
-        if self.action == "catalog":
+        # The catalog and the structure options are intentionally unscoped:
+        # assigning access and picking a parent need the full branch tree, see the
+        # ``catalog`` and ``structure_options`` actions below.
+        if self.action in {"catalog", "structure_options"}:
             return queryset
         return scoping.scope_by_branch(queryset, self.request.user)
 
@@ -359,6 +361,23 @@ class BranchViewSet(viewsets.ModelViewSet):
             .order_by("name")
         )
         queryset = scoping.scope_by_branch(queryset, request.user)
+        search = request.query_params.get("search")
+        if search:
+            queryset = queryset.filter(Q(name__icontains=search) | Q(code__icontains=search))
+        page = self.paginate_queryset(queryset)
+        serializer = serializers.BranchOptionSerializer(page, many=True)
+        return self.get_paginated_response(serializer.data)
+
+    @action(detail=False, methods=["get"], url_path="structure-options")
+    def structure_options(self, request):
+        """List every branch for the structure editor select inputs.
+
+        A user allowed to manage the structure (``core.structure.manage``) may pick
+        any branch as a parent, even one outside their personal access scope. That
+        is why the caller's scope is ignored here: editing the hierarchy must not
+        depend on ``BranchAccess``.
+        """
+        queryset = Branch.objects.order_by("name")
         search = request.query_params.get("search")
         if search:
             queryset = queryset.filter(Q(name__icontains=search) | Q(code__icontains=search))

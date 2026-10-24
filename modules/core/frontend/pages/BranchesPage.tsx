@@ -20,12 +20,15 @@ import { useTranslation } from 'react-i18next'
 
 import { extractErrorMessage } from '@app/api/errors'
 import type { Branch } from '@app/api/types'
+import { useAuth } from '@app/auth/AuthContext'
 
 import * as branchesApi from '../api/branches'
 import { BranchFormModal } from '../components/BranchFormModal'
 
 export function BranchesPage() {
   const { t } = useTranslation('core')
+  const { hasPermission } = useAuth()
+  const canManage = hasPermission('core.structure.manage')
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
@@ -74,9 +77,11 @@ export function BranchesPage() {
     <Stack>
       <Group justify="space-between">
         <Title order={3}>{t('branches.title')}</Title>
-        <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
-          {t('common.add')}
-        </Button>
+        {canManage && (
+          <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
+            {t('common.add')}
+          </Button>
+        )}
       </Group>
 
       <TextInput
@@ -95,13 +100,13 @@ export function BranchesPage() {
             <Table.Th>{t('branches.columns.parent')}</Table.Th>
             <Table.Th>{t('branches.columns.address')}</Table.Th>
             <Table.Th>{t('branches.columns.status')}</Table.Th>
-            <Table.Th />
+            {canManage && <Table.Th />}
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
           {loading ? (
             <Table.Tr>
-              <Table.Td colSpan={6}>
+              <Table.Td colSpan={canManage ? 6 : 5}>
                 <Center py="md">
                   <Loader size="sm" />
                 </Center>
@@ -109,7 +114,7 @@ export function BranchesPage() {
             </Table.Tr>
           ) : branches.length === 0 ? (
             <Table.Tr>
-              <Table.Td colSpan={6}>
+              <Table.Td colSpan={canManage ? 6 : 5}>
                 <Center py="md">
                   <Text c="dimmed">{t('branches.empty')}</Text>
                 </Center>
@@ -137,22 +142,24 @@ export function BranchesPage() {
                   </Badge>
                 </Table.Td>
                 <Table.Td>
-                  <Group gap={4} justify="flex-end">
-                    <Tooltip label={t('common.edit')}>
-                      <ActionIcon variant="subtle" onClick={() => openEdit(branch)}>
-                        <IconEdit size={16} />
-                      </ActionIcon>
-                    </Tooltip>
-                    <Tooltip label={t('common.delete')}>
-                      <ActionIcon
-                        variant="subtle"
-                        color="red"
-                        onClick={() => void handleDelete(branch)}
-                      >
-                        <IconTrash size={16} />
-                      </ActionIcon>
-                    </Tooltip>
-                  </Group>
+                  {canManage && (
+                    <Group gap={4} justify="flex-end">
+                      <Tooltip label={t('common.edit')}>
+                        <ActionIcon variant="subtle" onClick={() => openEdit(branch)}>
+                          <IconEdit size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                      <Tooltip label={t('common.delete')}>
+                        <ActionIcon
+                          variant="subtle"
+                          color="red"
+                          onClick={() => void handleDelete(branch)}
+                        >
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Group>
+                  )}
                 </Table.Td>
               </Table.Tr>
             ))
