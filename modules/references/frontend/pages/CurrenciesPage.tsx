@@ -20,12 +20,17 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { extractErrorMessage } from '@app/api/errors'
+import { useAuth } from '@app/auth/AuthContext'
 
 import * as currenciesApi from '../api/currencies'
 import { CurrencyFormModal } from '../components/CurrencyFormModal'
 
+const MANAGE_PERMISSION = 'references.manage'
+
 export function CurrenciesPage() {
   const { t } = useTranslation('references')
+  const { hasPermission } = useAuth()
+  const canManage = hasPermission(MANAGE_PERMISSION)
   const [currencies, setCurrencies] = useState<currenciesApi.Currency[]>([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
@@ -87,9 +92,11 @@ export function CurrenciesPage() {
     <Stack>
       <Group justify="space-between">
         <Title order={3}>{t('currencies.title')}</Title>
-        <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
-          {t('common.add')}
-        </Button>
+        {canManage && (
+          <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
+            {t('common.add')}
+          </Button>
+        )}
       </Group>
 
       <Group>
@@ -152,22 +159,24 @@ export function CurrenciesPage() {
                   </Badge>
                 </Table.Td>
                 <Table.Td>
-                  <Group gap={4} justify="flex-end">
-                    <Tooltip label={t('common.edit')}>
-                      <ActionIcon variant="subtle" onClick={() => openEdit(currency)}>
-                        <IconEdit size={16} />
-                      </ActionIcon>
-                    </Tooltip>
-                    <Tooltip label={t('common.delete')}>
-                      <ActionIcon
-                        variant="subtle"
-                        color="red"
-                        onClick={() => void handleDelete(currency)}
-                      >
-                        <IconTrash size={16} />
-                      </ActionIcon>
-                    </Tooltip>
-                  </Group>
+                  {canManage && (
+                    <Group gap={4} justify="flex-end">
+                      <Tooltip label={t('common.edit')}>
+                        <ActionIcon variant="subtle" onClick={() => openEdit(currency)}>
+                          <IconEdit size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                      <Tooltip label={t('common.delete')}>
+                        <ActionIcon
+                          variant="subtle"
+                          color="red"
+                          onClick={() => void handleDelete(currency)}
+                        >
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Group>
+                  )}
                 </Table.Td>
               </Table.Tr>
             ))
