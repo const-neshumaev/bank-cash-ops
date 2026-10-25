@@ -882,9 +882,7 @@ class ConversionBulkSerializer(serializers.Serializer):
     def validate(self, attrs):
         bank_settings = BankSettings.load()
         if bank_settings.conversion_mode != BankSettings.ConversionMode.DIRECT:
-            raise serializers.ValidationError(
-                _("Direct conversion is not enabled for the bank.")
-            )
+            raise serializers.ValidationError(_("Direct conversion is not enabled for the bank."))
 
         pairs = attrs.get("pairs") or []
         if not pairs:

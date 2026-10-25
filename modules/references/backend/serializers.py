@@ -52,9 +52,7 @@ class CurrencyRateTypeSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """Apply the principle-dependent defaults when the client omits them."""
         principle = validated_data.get("principle", CurrencyRateType.Principle.OFFICIAL)
-        validated_data.setdefault(
-            "validity", CurrencyRateType.default_validity(principle)
-        )
+        validated_data.setdefault("validity", CurrencyRateType.default_validity(principle))
         validated_data.setdefault(
             "daily_required", CurrencyRateType.default_daily_required(principle)
         )

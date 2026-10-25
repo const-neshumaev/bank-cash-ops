@@ -9,6 +9,9 @@ select = ["E", "F", "I", "B", "UP"]
 [tool.black]
 line-length = 100
 target-version = ["py312"]
+# Existing migrations are never edited (see AGENTS.md); keep them out of the
+# formatter, as ruff already does.
+extend-exclude = "/migrations/"
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"

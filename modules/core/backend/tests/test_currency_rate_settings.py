@@ -314,9 +314,7 @@ def test_a_conversion_pair_is_resolved_per_side(admin_client):
     assert resolved.status_code == 200, resolved.content
     assert resolved.data["value"] == "1.080000"
     config = registry.get(CASH_DESK_CONFIG)
-    assert config.rate("EUR", "conversion_buy", target_currency="USD", at=at) == Decimal(
-        "1.080000"
-    )
+    assert config.rate("EUR", "conversion_buy", target_currency="USD", at=at) == Decimal("1.080000")
     assert config.rate("EUR", "conversion_sell", target_currency="USD", at=at) == Decimal(
         "1.120000"
     )

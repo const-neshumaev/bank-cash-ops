@@ -55,9 +55,7 @@ class TestBankSettings:
         assert response.data["base_currency"] == "USD"
         assert BankSettings.load().base_currency == "USD"
 
-    def test_a_user_without_permission_cannot_change_the_base_currency(
-        self, client, cashier_user
-    ):
+    def test_a_user_without_permission_cannot_change_the_base_currency(self, client, cashier_user):
         client.force_authenticate(cashier_user)
 
         response = client.patch(SETTINGS_URL, {"base_currency": "USD"}, format="json")
@@ -72,9 +70,7 @@ class TestBankSettings:
         assert response.status_code == 400
         assert "base_currency" in response.data
 
-    def test_the_base_currency_cannot_change_while_rates_use_another_base(
-        self, client, admin_user
-    ):
+    def test_the_base_currency_cannot_change_while_rates_use_another_base(self, client, admin_user):
         CurrencyRate.objects.create(
             currency="USD",
             base_currency="BYN",
@@ -142,9 +138,7 @@ class TestBaseValues:
         client.force_authenticate(admin_user)
         value = BaseValue.objects.create(effective_from=date(2020, 1, 1), amount=Decimal("40.00"))
 
-        updated = client.patch(
-            f"{BASE_VALUES_URL}{value.id}/", {"amount": "42.00"}, format="json"
-        )
+        updated = client.patch(f"{BASE_VALUES_URL}{value.id}/", {"amount": "42.00"}, format="json")
         deleted = client.delete(f"{BASE_VALUES_URL}{value.id}/")
 
         assert updated.status_code == 400

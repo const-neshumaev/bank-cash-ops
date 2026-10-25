@@ -11,12 +11,8 @@ class CurrencyRateFilter(django_filters.FilterSet):
     """Filters shared by the rate journal and the current-rates view."""
 
     scope = django_filters.CharFilter(method="filter_scope")
-    effective_date_from = django_filters.DateFilter(
-        field_name="effective_date", lookup_expr="gte"
-    )
-    effective_date_to = django_filters.DateFilter(
-        field_name="effective_date", lookup_expr="lte"
-    )
+    effective_date_from = django_filters.DateFilter(field_name="effective_date", lookup_expr="gte")
+    effective_date_to = django_filters.DateFilter(field_name="effective_date", lookup_expr="lte")
     effective_from_from = django_filters.IsoDateTimeFilter(
         field_name="effective_from", lookup_expr="gte"
     )
