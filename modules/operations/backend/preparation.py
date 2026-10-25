@@ -195,8 +195,7 @@ def _apply_currency_policies(
                 line.currency == national_currency
             ):
                 raise ValidationError(
-                    _("The slot '%(slot)s' only accepts a foreign currency.")
-                    % {"slot": line.slot}
+                    _("The slot '%(slot)s' only accepts a foreign currency.") % {"slot": line.slot}
                 )
         result.append(line)
     return tuple(result)
@@ -223,8 +222,7 @@ def exchange_layout(operation_type: OperationType, basis_slot: str = "") -> Exch
     requested = (basis_slot or "").strip()
     if requested and requested not in (source.code, target.code):
         raise ValidationError(
-            _("The slot '%(slot)s' is not an exchange leg of the operation.")
-            % {"slot": requested}
+            _("The slot '%(slot)s' is not an exchange leg of the operation.") % {"slot": requested}
         )
 
     if requested == target.code:
@@ -336,7 +334,5 @@ def _normalise_exchange(
                 )
             )
         else:
-            result.append(
-                replace(line, rate=None, rate_type="", rate_is_individual=False)
-            )
+            result.append(replace(line, rate=None, rate_type="", rate_is_individual=False))
     return tuple(result)

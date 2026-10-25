@@ -163,9 +163,7 @@ class OperationTypeSerializer(serializers.ModelSerializer):
         )
 
         if policy == ClientDataPolicy.THRESHOLD:
-            errors = threshold_errors(
-                policy, threshold_type, threshold_value, threshold_currency
-            )
+            errors = threshold_errors(policy, threshold_type, threshold_value, threshold_currency)
             if errors:
                 raise serializers.ValidationError(errors)
             attrs["threshold_currency"] = (threshold_currency or "").strip().upper()
@@ -192,9 +190,7 @@ class OperationTypeSerializer(serializers.ModelSerializer):
             if principle and rate_type_dto.principle != principle:
                 raise serializers.ValidationError(
                     {
-                        "rate_type": _(
-                            "The rate type must use the '%(principle)s' principle."
-                        )
+                        "rate_type": _("The rate type must use the '%(principle)s' principle.")
                         % {"principle": principle}
                     }
                 )
@@ -324,9 +320,7 @@ class PostOperationSerializer(serializers.Serializer):
         slug_field="code", queryset=OperationType.objects.all()
     )
     lines = OperationLineInputSerializer(many=True)
-    basis_slot = serializers.CharField(
-        max_length=64, required=False, allow_blank=True, default=""
-    )
+    basis_slot = serializers.CharField(max_length=64, required=False, allow_blank=True, default="")
     client_name = serializers.CharField(
         max_length=255, required=False, allow_blank=True, default=""
     )

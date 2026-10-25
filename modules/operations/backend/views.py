@@ -263,10 +263,7 @@ class OperationTypeViewSet(
             with transaction.atomic():
                 operation_type.print_configs.all().delete()
                 OperationPrintConfig.objects.bulk_create(
-                    [
-                        OperationPrintConfig(operation_type=operation_type, **row)
-                        for row in rows
-                    ]
+                    [OperationPrintConfig(operation_type=operation_type, **row) for row in rows]
                 )
         configs = OperationPrintConfig.objects.filter(operation_type=operation_type)
         serializer = self.get_serializer(configs, many=True)
@@ -455,9 +452,7 @@ class OperationViewSet(
             {
                 "operation_type": operation_type.code,
                 "operation_type_name": operation_type.localized_name(),
-                "lines": serializers.OperationLineSerializer(
-                    prepared.lines, many=True
-                ).data,
+                "lines": serializers.OperationLineSerializer(prepared.lines, many=True).data,
                 "client_data": {
                     "policy": requirement.policy,
                     "required": requirement.required,
@@ -721,9 +716,7 @@ class WorkplaceView(APIView):
                         "currency": rate.currency_code,
                         "base_currency": rate.base_currency_code,
                         "rate_type": rate.rate_type,
-                        "rate_type_display": rate_type_names.get(
-                            rate.rate_type, rate.rate_type
-                        ),
+                        "rate_type_display": rate_type_names.get(rate.rate_type, rate.rate_type),
                         "units": rate.units,
                         "value": str(rate.value),
                         "value_per_unit": str(rate.value_per_unit),

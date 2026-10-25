@@ -164,9 +164,7 @@ class BankSettingsService:
         settings = BankSettings.load()
         moment = on or timezone.localdate()
         base_value = (
-            BaseValue.objects.filter(effective_from__lte=moment)
-            .order_by("-effective_from")
-            .first()
+            BaseValue.objects.filter(effective_from__lte=moment).order_by("-effective_from").first()
         )
         return BankSettingsDTO(
             base_currency=settings.base_currency,

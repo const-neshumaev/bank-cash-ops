@@ -11,6 +11,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Install the dependencies with a current pip. pip is not kept in the final image
+# (see below), so this only makes the build use an up-to-date resolver.
+RUN pip install --upgrade "pip~=26.2"
+
 # ``gettext`` provides ``msgfmt``/``xgettext`` for ``compilemessages``/
 # ``makemessages`` (see the internationalisation section of docs/development.md).
 RUN apt-get update \
@@ -23,8 +27,16 @@ RUN pip install -r requirements.txt
 COPY backend/ ./
 COPY modules/ /app/modules/
 
+# ``collectstatic`` loads the settings, which require a DATABASE_URL even
+# though no database is contacted while collecting static files.
 RUN chmod +x /app/entrypoint.sh \
-    && DJANGO_SECRET_KEY=build-only python manage.py collectstatic --noinput
+    && DJANGO_SECRET_KEY=build-only \
+       DATABASE_URL=postgres://build:build@localhost:5432/build \
+       python manage.py collectstatic --noinput
+
+# The runtime image needs no package installation: dropping pip also drops the
+# outdated libraries it vendors (msgpack, setuptools, urllib3) from the image.
+RUN python -m pip uninstall -y pip
 
 EXPOSE 8000
 

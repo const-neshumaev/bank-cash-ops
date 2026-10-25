@@ -57,9 +57,7 @@ class CurrencyRateTypeAdmin(admin.ModelAdmin):
         initial = super().get_changeform_initial_data(request)
         principle = initial.get("principle", CurrencyRateType.Principle.OFFICIAL)
         initial.setdefault("validity", CurrencyRateType.default_validity(principle))
-        initial.setdefault(
-            "daily_required", CurrencyRateType.default_daily_required(principle)
-        )
+        initial.setdefault("daily_required", CurrencyRateType.default_daily_required(principle))
         return initial
 
     def save_model(self, request, obj, form, change):

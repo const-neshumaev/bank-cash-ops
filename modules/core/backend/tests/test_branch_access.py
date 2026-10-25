@@ -154,9 +154,7 @@ class TestUserBranchAccessAPI:
             {"branch": branch.id, "include_descendants": True}
         ]
 
-    def test_admin_replaces_branch_access_on_update(
-        self, client, admin_user, branch, other_branch
-    ):
+    def test_admin_replaces_branch_access_on_update(self, client, admin_user, branch, other_branch):
         target = make_user("operator@example.com")
         grant(target, branch)
         login(client, admin_user.email, ADMIN_PASSWORD)
@@ -175,9 +173,7 @@ class TestUserBranchAccessAPI:
         grant(target, branch)
         login(client, admin_user.email, ADMIN_PASSWORD)
 
-        response = client.patch(
-            f"{USERS_URL}{target.id}/", {"first_name": "Pavel"}, format="json"
-        )
+        response = client.patch(f"{USERS_URL}{target.id}/", {"first_name": "Pavel"}, format="json")
 
         assert response.status_code == 200, response.content
         assert [entry["branch"] for entry in response.data["branch_access"]] == [branch.id]
@@ -243,9 +239,7 @@ class TestBranchScopingAPI:
         assert response.status_code == 400
         assert "cash_desk" in response.data
 
-    def test_inactive_branch_stays_readable_but_cannot_host_a_shift(
-        self, client, branch
-    ):
+    def test_inactive_branch_stays_readable_but_cannot_host_a_shift(self, client, branch):
         cashier = make_user("cashier@example.com", "cashier")
         grant(cashier, branch)
         desk = CashDesk.objects.create(branch=branch, code="C1", name="Касса 1")
@@ -297,9 +291,7 @@ class TestBranchScopingAPI:
 
 
 class TestBranchCatalog:
-    def test_catalog_lists_every_branch_for_user_managers(
-        self, client, branch, other_branch
-    ):
+    def test_catalog_lists_every_branch_for_user_managers(self, client, branch, other_branch):
         admin = make_user("admin@example.com", "administrator")
         login(client, admin.email)
 

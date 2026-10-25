@@ -447,18 +447,14 @@ def bulk_set_conversion_pairs(
     """
     bank_settings = BankSettings.load()
     if bank_settings.conversion_mode != BankSettings.ConversionMode.DIRECT:
-        raise ValidationError(
-            _("Direct conversion is not enabled for the bank.")
-        )
+        raise ValidationError(_("Direct conversion is not enabled for the bank."))
     if not pairs:
         raise ValidationError({"pairs": _("At least one conversion pair is required.")})
 
     buy_type = rate_type(SystemRateTypeCode.CONVERSION_BUY)
     sell_type = rate_type(SystemRateTypeCode.CONVERSION_SELL)
     if buy_type is None or sell_type is None or not buy_type.is_active or not sell_type.is_active:
-        raise ValidationError(
-            _("The conversion rate types are not available.")
-        )
+        raise ValidationError(_("The conversion rate types are not available."))
 
     normalized: list[dict] = []
     seen: set[tuple[str, str]] = set()

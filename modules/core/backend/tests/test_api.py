@@ -337,9 +337,7 @@ class TestStructurePickers:
         assert response.status_code == 200, response.content
         assert [item["id"] for item in response.data["results"]] == [desk.id]
 
-    def test_selectable_cash_desks_reject_a_non_numeric_branch(
-        self, client, cashier_user
-    ):
+    def test_selectable_cash_desks_reject_a_non_numeric_branch(self, client, cashier_user):
         login(client, cashier_user.email, CASHIER_PASSWORD)
 
         response = client.get(f"{CASH_DESKS_URL}selectable/", {"branch": "abc"})

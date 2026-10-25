@@ -10,6 +10,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Install the dependencies with a current pip. pip is not kept in the final image
+# (see below), so this only makes the build use an up-to-date resolver.
+RUN pip install --upgrade "pip~=26.2"
+
 # ``gettext`` provides ``msgfmt``/``xgettext`` for ``compilemessages``/
 # ``makemessages`` (see the internationalisation section of docs/development.md).
 RUN apt-get update \
@@ -23,6 +27,11 @@ COPY backend/ ./
 COPY modules/ /app/modules/
 
 RUN chmod +x /app/entrypoint.sh
+
+# Dependencies are baked into the image and installed by rebuilding it, so pip is
+# not needed at runtime. Dropping it also drops the outdated libraries it vendors
+# (msgpack, setuptools, urllib3), which scanners report as vulnerable.
+RUN python -m pip uninstall -y pip
 
 EXPOSE 8000
 

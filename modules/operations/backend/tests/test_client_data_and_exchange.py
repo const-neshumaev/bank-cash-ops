@@ -159,9 +159,7 @@ def test_sale_divides_the_received_national_amount_by_the_sell_rate(auth_client,
     operation_type = _exchange_type(
         code="currency_sale", principle=OperationRatePrinciple.SELL, rate_type="sell"
     )
-    operation_type.slots.filter(code="received").update(
-        currency_policy="base", stores_rate=False
-    )
+    operation_type.slots.filter(code="received").update(currency_policy="base", stores_rate=False)
     operation_type.slots.filter(code="issued").update(
         currency_policy="foreign", stores_rate=True, computation="divide"
     )
@@ -252,15 +250,11 @@ def test_purchase_computes_the_received_amount_when_the_issued_amount_is_known(
     assert CashBalance.objects.get(cash_desk_id=7, currency="USD").amount == Decimal("100.00")
 
 
-def test_sale_computes_the_received_amount_when_the_issued_amount_is_known(
-    auth_client, contracts
-):
+def test_sale_computes_the_received_amount_when_the_issued_amount_is_known(auth_client, contracts):
     operation_type = _exchange_type(
         code="currency_sale", principle=OperationRatePrinciple.SELL, rate_type="sell"
     )
-    operation_type.slots.filter(code="received").update(
-        currency_policy="base", stores_rate=False
-    )
+    operation_type.slots.filter(code="received").update(currency_policy="base", stores_rate=False)
     operation_type.slots.filter(code="issued").update(
         currency_policy="foreign", stores_rate=True, computation="divide"
     )

@@ -58,9 +58,7 @@ class OperationTypeAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         before = history_service.snapshot(type(obj).objects.get(pk=obj.pk)) if change else None
         super().save_model(request, obj, form, change)
-        history_service.record_settings_change(
-            obj, before=before, user=request.user
-        )
+        history_service.record_settings_change(obj, before=before, user=request.user)
 
 
 @admin.register(SlotDef)
