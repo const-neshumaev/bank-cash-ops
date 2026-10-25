@@ -10,6 +10,9 @@
 **/.ruff_cache
 **/node_modules
 **/dist
+# Compiled translation catalogs are build artefacts, not sources: the backend
+# images regenerate them from the committed ``.po`` files.
+**/*.mo
 docs
 profiles
 .env
