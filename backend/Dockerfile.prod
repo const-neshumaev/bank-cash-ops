@@ -15,9 +15,17 @@ WORKDIR /app
 # (see below), so this only makes the build use an up-to-date resolver.
 RUN pip install --upgrade "pip~=26.2"
 
-# ``gettext`` provides ``msgfmt``/``xgettext`` for ``compilemessages``/
-# ``makemessages`` (see the internationalisation section of docs/development.md).
+# Patch the Debian packages of the base image and install the translation
+# toolchain in a single layer. The floating ``python:3.12-slim`` tag may keep a
+# cached image alive whose OS libraries already have published vulnerabilities.
+#
+# ``gettext`` provides ``msgfmt``/``xgettext`` for ``compilemessages`` (see the
+# internationalisation section of docs/development.md). Unlike the development
+# image it is not needed at runtime: the catalogs are compiled below and the
+# toolchain is then removed, so the shipped image carries neither gettext nor the
+# ``libxml2`` it pulls in.
 RUN apt-get update \
+    && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends gettext \
     && rm -rf /var/lib/apt/lists/*
 
@@ -26,6 +34,16 @@ RUN pip install -r requirements.txt
 
 COPY backend/ ./
 COPY modules/ /app/modules/
+
+# Compile the translation catalogs into the image (``.mo`` files are not
+# committed, and the runtime has no translations toolchain), then drop gettext
+# together with the dependencies only it needed. ``compilemessages`` loads the
+# settings, which require a DATABASE_URL even though no database is contacted.
+RUN DJANGO_SECRET_KEY=build-only \
+    DATABASE_URL=postgres://build:build@localhost:5432/build \
+    python manage.py compilemessages \
+    && apt-get purge -y --auto-remove gettext \
+    && rm -rf /var/lib/apt/lists/*
 
 # ``collectstatic`` loads the settings, which require a DATABASE_URL even
 # though no database is contacted while collecting static files.

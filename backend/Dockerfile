@@ -14,9 +14,18 @@ WORKDIR /app
 # (see below), so this only makes the build use an up-to-date resolver.
 RUN pip install --upgrade "pip~=26.2"
 
+# Patch the Debian packages of the base image in the same layer as the install:
+# the floating ``python:3.12-slim`` tag may keep a cached image alive whose OS
+# libraries already have published vulnerabilities (the Alpine images are
+# patched the same way).
+#
 # ``gettext`` provides ``msgfmt``/``xgettext`` for ``compilemessages``/
 # ``makemessages`` (see the internationalisation section of docs/development.md).
+# It stays in this image: the sources are bind-mounted, so the catalogs are
+# compiled at every start (``entrypoint.sh``) instead of being baked at build
+# time.
 RUN apt-get update \
+    && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends gettext \
     && rm -rf /var/lib/apt/lists/*
 
