@@ -227,6 +227,25 @@ docker compose exec -T db psql -U bankcashops -d bankcashops < backup.sql
 docker compose exec db pg_dump -U bankcashops -n core bankcashops > core.sql
 ```
 
+## Docker-образы
+
+Backend и frontend собираются из `backend/Dockerfile`, `frontend/Dockerfile` и их
+`*.prod` вариантов. Образ базы данных собирается из `db/Dockerfile`: за основу
+берётся `postgres:16-alpine`, но вшитый в upstream-образ `gosu` пересобирается
+актуальной версией Go. Иначе сканеры уязвимостей показывают в образе CVE
+стандартной библиотеки Go, вшитой в готовый бинарник.
+
+Тег `postgres:16-alpine` плавающий, и Docker может держать устаревший слой,
+поэтому при проверке сканером пересоберите образ с `--pull`:
+
+```bash
+docker compose build --pull db
+docker compose up -d db
+```
+
+При смене версии `gosu` или Go правьте `db/Dockerfile` (аргумент
+`GOSU_VERSION` и тег builder-образа) и пересобирайте образ.
+
 ## Промышленная сборка
 
 ```bash
@@ -245,3 +264,4 @@ DJANGO_SECRET_KEY="<длинный-случайный-ключ>" docker compose 
 | Backend перезапускается при старте | Посмотрите `docker compose logs backend`: обычно ошибка настроек или БД |
 | Порт занят | Измените публикуемый порт в `docker-compose.yml` или остановите конфликтующий процесс |
 | Изменения в зависимостях не применяются | Пересоберите образы и обновите том `node_modules`: `docker compose up --build -d --renew-anon-volumes` |
+| Сканер уязвимостей показывает старые пакеты в образе БД | Локальный слой `postgres:16-alpine` устарел: `docker compose build --pull db` |
