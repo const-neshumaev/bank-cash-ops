@@ -8,7 +8,12 @@ name: bankcashops-prod
 #   docker compose -f docker-compose.prod.yml up --build -d
 services:
   db:
-    image: postgres:16-alpine
+    # Built from db/Dockerfile: the upstream postgres:16-alpine image is used as
+    # the base, but its bundled gosu is rebuilt with a current Go toolchain so
+    # the image does not carry the toolchain vulnerabilities scanners report.
+    build:
+      context: ./db
+      dockerfile: Dockerfile
     environment:
       POSTGRES_DB: "${POSTGRES_DB:-bankcashops}"
       POSTGRES_USER: "${POSTGRES_USER:-bankcashops}"

@@ -61,6 +61,8 @@ BankCashOps/
 │   │   └── registry/         # Реестр модулей (композиция маршрутов и навигации)
 │   ├── Dockerfile            # Vite dev-сервер
 │   └── Dockerfile.prod       # Сборка и раздача через nginx
+├── db/
+│   └── Dockerfile            # PostgreSQL: upstream-образ с пересобранным gosu
 ├── modules/                  # Вертикальные модули (backend + frontend + contracts)
 │   ├── common/               # Техническая библиотека (модели, права, пагинация, контракты)
 │   ├── core/                 # Ядро: пользователи, роли, оргструктура, кассовые смены
@@ -108,6 +110,16 @@ docker compose exec frontend npm run build
 `POSTGRES_*` (см. `.env.example`), а backend получает их через `DATABASE_URL`.
 Каждый модуль хранит данные в своей схеме PostgreSQL (`core`, `operations`,
 `common`), которая создаётся автоматически при миграциях.
+
+Образ `db` собирается из `db/Dockerfile`: за основу взят `postgres:16-alpine`, но
+вшитый в него бинарник `gosu` пересобран актуальной версией Go. Так сканеры
+уязвимостей не находят в образе проблем устаревшей инструментальной цепочки.
+Обновить базовый образ вместе с пакетами Alpine:
+
+```bash
+docker compose build --pull db
+docker compose up -d db
+```
 
 Сбросить базу разработки (том `postgres_data` удаляется):
 
