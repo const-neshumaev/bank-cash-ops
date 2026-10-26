@@ -30,6 +30,18 @@ def test_codes_are_unique():
     assert len(codes) == len(set(codes))
 
 
+def test_the_catalogue_holds_only_the_implemented_operations():
+    codes = {spec.code for spec in OPERATION_TYPES}
+
+    assert codes == {
+        "cash_replenishment",
+        "cash_handover",
+        "currency_purchase",
+        "currency_sale",
+        "currency_conversion",
+    }
+
+
 def test_templates_reference_declared_slots_and_known_registers():
     for spec in OPERATION_TYPES:
         slot_codes = {slot.code for slot in spec.slots}
