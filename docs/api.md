@@ -677,7 +677,7 @@ POST /api/operations/operations/
 Content-Type: application/json
 
 {
-  "operation_type": "cash_receipt",
+  "operation_type": "cash_replenishment",
   "lines": [
     {
       "slot": "amount",
@@ -687,8 +687,6 @@ Content-Type: application/json
       "rate_is_individual": false
     }
   ],
-  "client_name": "Иванов И. И.",
-  "client_document": "AB 1234567",
   "comment": "",
   "idempotency_key": "<уникальный ключ операции>"
 }
@@ -829,7 +827,7 @@ Content-Type: application/json
 PUT /api/operations/cash-desks/7/operations/
 Content-Type: application/json
 
-{ "operations": ["cash_receipt", "cash_handover"] }
+{ "operations": ["cash_replenishment", "cash_handover"] }
 ```
 
 ```json
@@ -839,7 +837,7 @@ Content-Type: application/json
   "source": "bank",
   "template_branch_id": null,
   "operations": [
-    { "code": "cash_receipt", "name": "Приход наличных от клиента", "kind": "income" }
+    { "code": "cash_replenishment", "name": "Подкрепление кассы", "kind": "income" }
   ]
 }
 ```

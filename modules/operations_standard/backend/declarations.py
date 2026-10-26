@@ -27,9 +27,6 @@ from modules.operations.contracts import (
 #: Permission a user needs to perform the baseline operations.
 PERMISSION = "operations.create"
 
-#: Currency of the operations that are defined for the national currency only.
-BASE_CURRENCY = "BYN"
-
 
 def _en(name: str) -> dict[str, str]:
     """Return a translations mapping holding only the English name."""
@@ -217,6 +214,10 @@ def _cash_receipt(template: str) -> tuple[PrintBindingSpec, ...]:
 
 
 #: The baseline operation types declared to the operations engine.
+#:
+#: The catalogue is deliberately limited to the implemented operations: cash
+#: replenishment and collection, currency purchase, sale and conversion. New
+#: types are added here once the corresponding business flow is implemented.
 OPERATION_TYPES: tuple[OperationTypeSpec, ...] = (
     # Income
     _income(
@@ -226,74 +227,7 @@ OPERATION_TYPES: tuple[OperationTypeSpec, ...] = (
         form=OperationForm.MULTI_CURRENCY,
         multiple=True,
     ),
-    _income(
-        "cash_receipt",
-        "Приход наличных от клиента",
-        translations=_en("Cash receipt from client"),
-        requires_client=True,
-    ),
-    _income(
-        "utility_payment",
-        "Приём коммунальных платежей",
-        translations=_en("Utility payments acceptance"),
-        currency=BASE_CURRENCY,
-        requires_client=True,
-    ),
-    _income(
-        "loan_repayment",
-        "Погашение кредита наличными",
-        translations=_en("Loan repayment in cash"),
-        currency=BASE_CURRENCY,
-        requires_client=True,
-    ),
-    _income(
-        "deposit_topup",
-        "Пополнение вклада наличными",
-        translations=_en("Deposit top-up in cash"),
-        currency=BASE_CURRENCY,
-        requires_client=True,
-    ),
-    _income(
-        "fee_income",
-        "Приём комиссии",
-        translations=_en("Fee collection"),
-        requires_client=True,
-    ),
     # Expense
-    _expense(
-        "cash_disbursement",
-        "Выдача наличных клиенту",
-        translations=_en("Cash disbursement to client"),
-        requires_client=True,
-    ),
-    _expense(
-        "deposit_withdrawal",
-        "Снятие вклада наличными",
-        translations=_en("Deposit withdrawal in cash"),
-        currency=BASE_CURRENCY,
-        requires_client=True,
-    ),
-    _expense(
-        "loan_issuance",
-        "Выдача кредита наличными",
-        translations=_en("Loan issuance in cash"),
-        currency=BASE_CURRENCY,
-        requires_client=True,
-    ),
-    _expense(
-        "salary_payment",
-        "Выплата заработной платы",
-        translations=_en("Salary payment"),
-        currency=BASE_CURRENCY,
-        requires_client=True,
-    ),
-    _expense(
-        "pension_payment",
-        "Выплата пенсии и пособий",
-        translations=_en("Pension and benefit payment"),
-        currency=BASE_CURRENCY,
-        requires_client=True,
-    ),
     _expense(
         "cash_handover",
         "Инкассация кассы",
@@ -325,12 +259,5 @@ OPERATION_TYPES: tuple[OperationTypeSpec, ...] = (
         slots=_conversion_slots(),
         rate_principle=OperationRatePrinciple.CONVERSION,
         print_configs=_cash_receipt("cash_receipt_currency_conversion"),
-    ),
-    _exchange(
-        "fractional_currency_purchase",
-        "Покупка дробной части валюты",
-        translations=_en("Fractional currency purchase"),
-        slots=_purchase_slots(),
-        rate_principle=OperationRatePrinciple.BUY,
     ),
 )
