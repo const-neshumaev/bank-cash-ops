@@ -18,7 +18,14 @@ import {
   Tooltip,
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
-import { IconAlertCircle, IconEdit, IconHistory, IconPrinter } from '@tabler/icons-react'
+import {
+  IconAlertCircle,
+  IconEdit,
+  IconHistory,
+  IconPlus,
+  IconPrinter,
+  IconTrash,
+} from '@tabler/icons-react'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -42,6 +49,12 @@ import type {
 const MANAGE_PERMISSION = 'operations.types.manage'
 
 const POLICY_OPTIONS: ClientDataPolicy[] = ['never', 'always', 'threshold']
+
+interface PrintDocumentSelection {
+  documentType: string | null
+  template: string | null
+  isActive: boolean
+}
 
 function formatDateTime(value: string): string {
   return dayjs(value).format('DD.MM.YYYY HH:mm')
@@ -78,9 +91,7 @@ export function OperationTypesPage() {
   const [historyLoading, setHistoryLoading] = useState(false)
 
   const [printTarget, setPrintTarget] = useState<OperationTypeSettings | null>(null)
-  const [printSelection, setPrintSelection] = useState<
-    Record<string, { template: string | null; isActive: boolean }>
-  >({})
+  const [printSelection, setPrintSelection] = useState<PrintDocumentSelection[]>([])
   const [printLoading, setPrintLoading] = useState(false)
   const [printSaving, setPrintSaving] = useState(false)
 
@@ -207,20 +218,13 @@ export function OperationTypesPage() {
     setPrintLoading(true)
     try {
       const configs = await operationTypesApi.fetchOperationPrintConfigs(operationType.code)
-      const saved = new Map(
-        configs.map((config) => [
-          config.document_type,
-          { template: config.template as string | null, isActive: config.is_active },
-        ]),
+      setPrintSelection(
+        configs.map((config) => ({
+          documentType: config.document_type,
+          template: config.template,
+          isActive: config.is_active,
+        })),
       )
-      const selection: Record<string, { template: string | null; isActive: boolean }> = {}
-      for (const documentType of printTypes) {
-        selection[documentType.code] = saved.get(documentType.code) ?? {
-          template: null,
-          isActive: true,
-        }
-      }
-      setPrintSelection(selection)
     } catch (error) {
       notifyError(error)
     } finally {
@@ -230,17 +234,34 @@ export function OperationTypesPage() {
 
   const closePrintConfig = () => {
     setPrintTarget(null)
-    setPrintSelection({})
+    setPrintSelection([])
+  }
+
+  const addPrintDocument = () => {
+    setPrintSelection((current) => [
+      ...current,
+      { documentType: null, template: null, isActive: true },
+    ])
+  }
+
+  const updatePrintDocument = (index: number, patch: Partial<PrintDocumentSelection>) => {
+    setPrintSelection((current) =>
+      current.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)),
+    )
+  }
+
+  const removePrintDocument = (index: number) => {
+    setPrintSelection((current) => current.filter((_row, rowIndex) => rowIndex !== index))
   }
 
   const savePrintConfig = async () => {
     if (!printTarget) return
-    const configs: OperationPrintConfigPayload[] = Object.entries(printSelection)
-      .filter(([, value]) => Boolean(value.template))
-      .map(([documentType, value]) => ({
-        document_type: documentType,
-        template: value.template as string,
-        is_active: value.isActive,
+    const configs: OperationPrintConfigPayload[] = printSelection
+      .filter((row) => Boolean(row.documentType && row.template))
+      .map((row) => ({
+        document_type: row.documentType as string,
+        template: row.template as string,
+        is_active: row.isActive,
       }))
     setPrintSaving(true)
     try {
@@ -256,6 +277,22 @@ export function OperationTypesPage() {
   }
 
   const policyLabel = (value: ClientDataPolicy) => t(`operationTypes.policy.${value}`)
+
+  const allTemplateCodes = new Set(
+    printTypes.flatMap((documentType) =>
+      documentType.templates
+        .filter((template) => template.is_active)
+        .map((template) => template.code),
+    ),
+  )
+  const selectedTemplateCodes = new Set(
+    printSelection
+      .map((row) => row.template)
+      .filter((code): code is string => Boolean(code)),
+  )
+  const allTemplatesSelected =
+    allTemplateCodes.size === 0 ||
+    [...allTemplateCodes].every((code) => selectedTemplateCodes.has(code))
 
   const thresholdSummary = (operationType: OperationTypeSettings) => {
     if (operationType.client_data_policy !== 'threshold') {
@@ -560,52 +597,72 @@ export function OperationTypesPage() {
                 {t('operationTypes.print.empty')}
               </Alert>
             )}
-            {printTypes.map((documentType) => {
-              const selection = printSelection[documentType.code]
-              const selectedTemplate = documentType.templates.find(
-                (template) => template.code === selection?.template,
+            {printSelection.length === 0 && (
+              <Text size="xs" c="dimmed">
+                {t('operationTypes.print.noDocuments')}
+              </Text>
+            )}
+            {printSelection.map((row, index) => {
+              const documentType = printTypes.find((item) => item.code === row.documentType)
+              const templates = (documentType?.templates ?? []).filter(
+                (template) => template.is_active,
+              )
+              const selectedTemplate = templates.find((template) => template.code === row.template)
+              const usedByOtherRows = new Set(
+                printSelection
+                  .filter((_item, rowIndex) => rowIndex !== index)
+                  .map((item) => item.template)
+                  .filter((code): code is string => Boolean(code)),
+              )
+              const availableTemplates = templates.filter(
+                (template) =>
+                  template.code === row.template || !usedByOtherRows.has(template.code),
               )
               return (
-                <Stack key={documentType.code} gap="xs">
-                  <Group justify="space-between">
-                    <Stack gap={0}>
-                      <Text fw={500}>{documentType.name}</Text>
-                      <Text size="xs" c="dimmed">
-                        {documentType.description || documentType.code}
-                      </Text>
-                    </Stack>
-                    <Badge variant="light">{documentType.code}</Badge>
+                <Stack key={index} gap={4}>
+                  <Group align="flex-end" wrap="nowrap">
+                    <Select
+                      style={{ flex: 1 }}
+                      label={t('operationTypes.print.documentType')}
+                      placeholder={t('operationTypes.print.documentTypePlaceholder')}
+                      data={printTypes.map((item) => ({
+                        value: item.code,
+                        label: item.name,
+                      }))}
+                      value={row.documentType}
+                      onChange={(value) =>
+                        updatePrintDocument(index, { documentType: value, template: null })
+                      }
+                      clearable
+                    />
+                    <Select
+                      style={{ flex: 1 }}
+                      label={t('operationTypes.print.template')}
+                      placeholder={t('operationTypes.print.noTemplate')}
+                      data={availableTemplates.map((template) => ({
+                        value: template.code,
+                        label: template.name,
+                      }))}
+                      value={row.template}
+                      onChange={(value) => updatePrintDocument(index, { template: value })}
+                      disabled={!row.documentType || availableTemplates.length === 0}
+                      clearable
+                    />
+                    <ActionIcon
+                      color="red"
+                      variant="subtle"
+                      aria-label={t('operationTypes.print.remove')}
+                      onClick={() => removePrintDocument(index)}
+                    >
+                      <IconTrash size={16} />
+                    </ActionIcon>
                   </Group>
-                  <Select
-                    label={t('operationTypes.print.template')}
-                    placeholder={t('operationTypes.print.noTemplate')}
-                    data={documentType.templates
-                      .filter((template) => template.is_active)
-                      .map((template) => ({ value: template.code, label: template.name }))}
-                    value={selection?.template ?? null}
-                    onChange={(value) =>
-                      setPrintSelection((current) => ({
-                        ...current,
-                        [documentType.code]: {
-                          template: value,
-                          isActive: current[documentType.code]?.isActive ?? true,
-                        },
-                      }))
-                    }
-                    clearable
-                  />
                   {selectedTemplate && (
                     <Switch
                       label={t('operationTypes.print.active')}
-                      checked={selection?.isActive ?? true}
+                      checked={row.isActive}
                       onChange={(event) =>
-                        setPrintSelection((current) => ({
-                          ...current,
-                          [documentType.code]: {
-                            template: current[documentType.code]?.template ?? null,
-                            isActive: event.currentTarget.checked,
-                          },
-                        }))
+                        updatePrintDocument(index, { isActive: event.currentTarget.checked })
                       }
                     />
                   )}
@@ -617,11 +674,24 @@ export function OperationTypesPage() {
                 </Stack>
               )
             })}
+            <Button
+              variant="light"
+              size="xs"
+              leftSection={<IconPlus size={14} />}
+              disabled={allTemplatesSelected}
+              onClick={addPrintDocument}
+            >
+              {t('operationTypes.print.addDocument')}
+            </Button>
             <Group justify="flex-end">
               <Button variant="default" onClick={closePrintConfig}>
                 {t('common.cancel')}
               </Button>
-              <Button loading={printSaving} disabled={!canManage} onClick={() => void savePrintConfig()}>
+              <Button
+                loading={printSaving}
+                disabled={!canManage}
+                onClick={() => void savePrintConfig()}
+              >
                 {t('common.save')}
               </Button>
             </Group>

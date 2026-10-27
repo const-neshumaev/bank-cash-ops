@@ -126,11 +126,19 @@ export function PrintDocumentsModal({ opened, documents, onClose }: PrintDocumen
             <Stack gap={0}>
               <Text fw={500}>{document.document_type_name}</Text>
               <Text size="xs" c="dimmed">
-                {t('workplace.print.document', {
-                  number: document.number,
-                  index: index + 1,
-                  total: documents.length,
-                })}
+                {document.template_name}
+              </Text>
+              <Text size="xs" c="dimmed">
+                {document.number === null
+                  ? t('workplace.print.documentWithoutNumber', {
+                      index: index + 1,
+                      total: documents.length,
+                    })
+                  : t('workplace.print.document', {
+                      number: document.number,
+                      index: index + 1,
+                      total: documents.length,
+                    })}
               </Text>
             </Stack>
             <Group gap="xs">

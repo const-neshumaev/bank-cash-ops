@@ -96,8 +96,11 @@ def _seed_print_configs(operation_type: OperationType, spec: OperationTypeSpec) 
             continue
         OperationPrintConfig.objects.get_or_create(
             operation_type=operation_type,
-            document_type=binding.document_type,
-            defaults={"template_code": binding.template, "is_active": binding.is_active},
+            template_code=binding.template,
+            defaults={
+                "document_type": binding.document_type,
+                "is_active": binding.is_active,
+            },
         )
 
 

@@ -18,7 +18,9 @@ from modules.operations.backend.models import (
 )
 from modules.operations.backend.permission_codes import PermissionCode
 from modules.operations.contracts.dto import OperationKind, OperationRatePrinciple
+from modules.printing.backend.registry import print_template_registry
 from modules.printing.backend.sync import sync_print_templates
+from modules.printing.contracts import PrintDocumentTypeSpec, PrintTemplateSpec
 
 User = get_user_model()
 
@@ -29,6 +31,65 @@ OPERATIONS_URL = "/api/operations/operations/"
 
 CASH_RECEIPT = "cash_receipt"
 PURCHASE_TEMPLATE = "cash_receipt_currency_purchase"
+SALE_TEMPLATE = "cash_receipt_currency_sale"
+CASH_ORDER = "cash_order"
+CASH_ORDER_TEMPLATE = "cash_order_default"
+STATEMENT = "account_statement"
+STATEMENT_TEMPLATE = "account_statement_default"
+
+
+@pytest.fixture
+def second_document_type():
+    """Declare an extra printed document type for the duration of a test."""
+    purchase = print_template_registry.get_template_spec(PURCHASE_TEMPLATE)
+    assert purchase is not None
+    print_template_registry.register_document_type(
+        PrintDocumentTypeSpec(code=CASH_ORDER, name="Приходный кассовый ордер")
+    )
+    print_template_registry.register_template(
+        PrintTemplateSpec(
+            code=CASH_ORDER_TEMPLATE,
+            name="Приходный кассовый ордер",
+            document_type=CASH_ORDER,
+            provider="cash_receipt_exchange",
+            default_file_path=purchase.default_file_path,
+        )
+    )
+    try:
+        sync_print_templates()
+        yield
+    finally:
+        print_template_registry.unregister_template(CASH_ORDER_TEMPLATE)
+        print_template_registry.unregister_document_type(CASH_ORDER)
+
+
+@pytest.fixture
+def unnumbered_document_type():
+    """Declare a document type without numbering for the duration of a test."""
+    purchase = print_template_registry.get_template_spec(PURCHASE_TEMPLATE)
+    assert purchase is not None
+    print_template_registry.register_document_type(
+        PrintDocumentTypeSpec(
+            code=STATEMENT,
+            name="Выписка по счёту",
+            numbering_scope="none",
+        )
+    )
+    print_template_registry.register_template(
+        PrintTemplateSpec(
+            code=STATEMENT_TEMPLATE,
+            name="Выписка по счёту",
+            document_type=STATEMENT,
+            provider="cash_receipt_exchange",
+            default_file_path=purchase.default_file_path,
+        )
+    )
+    try:
+        sync_print_templates()
+        yield
+    finally:
+        print_template_registry.unregister_template(STATEMENT_TEMPLATE)
+        print_template_registry.unregister_document_type(STATEMENT)
 
 
 def _exchange_type() -> OperationType:
@@ -115,6 +176,78 @@ def test_print_configs_can_be_saved_and_read(auth_client):
     assert read.data[0]["template"] == PURCHASE_TEMPLATE
 
 
+def test_multiple_print_documents_can_be_saved_and_read(auth_client, second_document_type):
+    operation_type = _exchange_type()
+
+    update = auth_client.put(
+        f"{TYPES_URL}{operation_type.code}/print-configs/",
+        {
+            "configs": [
+                {
+                    "document_type": CASH_RECEIPT,
+                    "template": PURCHASE_TEMPLATE,
+                    "is_active": True,
+                },
+                {
+                    "document_type": CASH_RECEIPT,
+                    "template": SALE_TEMPLATE,
+                    "is_active": True,
+                },
+                {
+                    "document_type": CASH_ORDER,
+                    "template": CASH_ORDER_TEMPLATE,
+                    "is_active": False,
+                },
+            ]
+        },
+        format="json",
+    )
+
+    assert update.status_code == 200, update.content
+    assert {row["template"] for row in update.data} == {
+        PURCHASE_TEMPLATE,
+        SALE_TEMPLATE,
+        CASH_ORDER_TEMPLATE,
+    }
+    assert OperationPrintConfig.objects.filter(operation_type=operation_type).count() == 3
+
+    read = auth_client.get(f"{TYPES_URL}{operation_type.code}/print-configs/")
+
+    assert read.status_code == 200
+    assert {row["template"] for row in read.data} == {
+        PURCHASE_TEMPLATE,
+        SALE_TEMPLATE,
+        CASH_ORDER_TEMPLATE,
+    }
+
+
+def test_the_same_print_template_cannot_be_selected_twice(auth_client):
+    sync_print_templates()
+    operation_type = _exchange_type()
+
+    response = auth_client.put(
+        f"{TYPES_URL}{operation_type.code}/print-configs/",
+        {
+            "configs": [
+                {
+                    "document_type": CASH_RECEIPT,
+                    "template": PURCHASE_TEMPLATE,
+                    "is_active": True,
+                },
+                {
+                    "document_type": CASH_RECEIPT,
+                    "template": PURCHASE_TEMPLATE,
+                    "is_active": True,
+                },
+            ]
+        },
+        format="json",
+    )
+
+    assert response.status_code == 400
+    assert "template" in response.data
+
+
 def test_an_unknown_template_is_rejected(auth_client):
     sync_print_templates()
     operation_type = _exchange_type()
@@ -174,6 +307,65 @@ def test_posting_generates_the_configured_cash_receipt(auth_client, contracts):
 
     operation = Operation.objects.get(pk=response.data["id"])
     assert operation.number == 1
+
+
+def test_posting_generates_documents_of_every_configured_type(
+    auth_client, contracts, second_document_type
+):
+    operation_type = _exchange_type()
+    OperationPrintConfig.objects.create(
+        operation_type=operation_type,
+        document_type=CASH_RECEIPT,
+        template_code=PURCHASE_TEMPLATE,
+    )
+    OperationPrintConfig.objects.create(
+        operation_type=operation_type,
+        document_type=CASH_RECEIPT,
+        template_code=SALE_TEMPLATE,
+    )
+    OperationPrintConfig.objects.create(
+        operation_type=operation_type,
+        document_type=CASH_ORDER,
+        template_code=CASH_ORDER_TEMPLATE,
+    )
+    CashBalance.objects.create(cash_desk_id=7, currency="BYN", amount=Decimal("1000.00"))
+    contracts.cash_desk_config.currency_rates = {("USD", "buy", None): Decimal("3.25")}
+
+    response = _post_purchase(auth_client)
+
+    assert response.status_code == 201, response.content
+    documents = response.data["print_documents"]
+    assert len(documents) == 3
+    assert {document["template_code"] for document in documents} == {
+        PURCHASE_TEMPLATE,
+        SALE_TEMPLATE,
+        CASH_ORDER_TEMPLATE,
+    }
+    receipt_numbers = sorted(
+        document["number"] for document in documents if document["document_type"] == CASH_RECEIPT
+    )
+    assert receipt_numbers == [1, 2]
+    order = next(document for document in documents if document["document_type"] == CASH_ORDER)
+    assert order["number"] == 1
+
+
+def test_an_unnumbered_document_has_no_number(auth_client, contracts, unnumbered_document_type):
+    operation_type = _exchange_type()
+    OperationPrintConfig.objects.create(
+        operation_type=operation_type,
+        document_type=STATEMENT,
+        template_code=STATEMENT_TEMPLATE,
+    )
+    CashBalance.objects.create(cash_desk_id=7, currency="BYN", amount=Decimal("1000.00"))
+    contracts.cash_desk_config.currency_rates = {("USD", "buy", None): Decimal("3.25")}
+
+    response = _post_purchase(auth_client)
+
+    assert response.status_code == 201, response.content
+    documents = response.data["print_documents"]
+    assert len(documents) == 1
+    assert documents[0]["document_type"] == STATEMENT
+    assert documents[0]["number"] is None
 
 
 def test_the_journal_marks_operations_with_printed_documents(auth_client, contracts):

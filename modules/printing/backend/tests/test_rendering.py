@@ -89,6 +89,73 @@ def test_successive_documents_share_the_bank_wide_sequence(synced_templates):
     assert PrintNumberSequence.objects.get(document_type="cash_receipt").last_number == 2
 
 
+def test_several_forms_of_one_document_type_are_rendered(synced_templates):
+    bindings = [
+        _binding(),
+        PrintBinding(
+            document_type="cash_receipt",
+            template="cash_receipt_currency_sale",
+        ),
+    ]
+
+    documents = print_document_service.render_operation(_operation(), bindings)
+
+    assert len(documents) == 2
+    assert {document.document_type for document in documents} == {"cash_receipt"}
+    assert {document.template_code for document in documents} == {
+        "cash_receipt_currency_purchase",
+        "cash_receipt_currency_sale",
+    }
+    assert sorted(document.number for document in documents) == [1, 2]
+    assert PrintDocument.objects.count() == 2
+
+    stored = print_document_service.operation_documents(_operation().id)
+    assert {document.template_code for document in stored} == {
+        "cash_receipt_currency_purchase",
+        "cash_receipt_currency_sale",
+    }
+
+
+def test_documents_of_different_types_are_rendered(synced_templates, second_document_type):
+    bindings = [
+        _binding(),
+        PrintBinding(
+            document_type="cash_order",
+            template="cash_order_default",
+        ),
+    ]
+
+    documents = print_document_service.render_operation(_operation(), bindings)
+
+    assert len(documents) == 2
+    assert {document.document_type for document in documents} == {"cash_receipt", "cash_order"}
+    assert {document.template_code for document in documents} == {
+        "cash_receipt_currency_purchase",
+        "cash_order_default",
+    }
+
+
+def test_an_unnumbered_document_type_renders_without_numbers(
+    synced_templates, unnumbered_document_type
+):
+    bindings = [
+        PrintBinding(
+            document_type="account_statement",
+            template="account_statement_default",
+        ),
+        PrintBinding(
+            document_type="account_statement",
+            template="account_statement_detailed",
+        ),
+    ]
+
+    documents = print_document_service.render_operation(_operation(), bindings)
+
+    assert len(documents) == 2
+    assert {document.number for document in documents} == {None}
+    assert not PrintNumberSequence.objects.filter(document_type="account_statement").exists()
+
+
 def test_the_same_operation_is_not_rendered_twice(synced_templates):
     first = print_document_service.render_operation(_operation(1), [_binding()])
     again = print_document_service.render_operation(_operation(1), [_binding()])

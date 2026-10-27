@@ -99,7 +99,7 @@ class PrintRenderingService:
             if not template.file:
                 continue
             if PrintDocument.objects.filter(
-                operation_id=operation.id, document_type=template.document_type
+                operation_id=operation.id, template_code=template.code
             ).exists():
                 continue
 
@@ -124,7 +124,7 @@ class PrintRenderingService:
 
             try:
                 with transaction.atomic():
-                    number = self._next_number(document_type.code)
+                    number = self._next_number(document_type)
                     header = PrintDocumentHeader(
                         number=number,
                         document_type=document_type.code,
@@ -143,14 +143,18 @@ class PrintRenderingService:
                         operation_type_code=operation.operation_type_code,
                         cash_desk_id=operation.cash_desk_id,
                         number=number,
-                        file_name=f"{document_type.code}_{number}.docx",
+                        file_name=(
+                            f"{document_type.code}_{template.code}.docx"
+                            if number is None
+                            else f"{document_type.code}_{number}.docx"
+                        ),
                         content=content,
                         context=_json_safe(context),
                         created_by_id=user_id,
                     )
             except IntegrityError:
-                # A concurrent request rendered the same operation first; the
-                # unique (operation, document type) constraint keeps one copy.
+                # A concurrent request rendered the same form first; the unique
+                # (operation, template) constraint keeps one copy.
                 logger.warning(
                     "Print template %s was already rendered for operation %s",
                     template.code,
@@ -223,9 +227,13 @@ class PrintRenderingService:
         )
 
     @staticmethod
-    def _next_number(document_type: str) -> int:
-        PrintNumberSequence.objects.get_or_create(document_type=document_type)
-        sequence = PrintNumberSequence.objects.select_for_update().get(document_type=document_type)
+    def _next_number(document_type: PrintDocumentType) -> int | None:
+        if not document_type.requires_numbering:
+            return None
+        PrintNumberSequence.objects.get_or_create(document_type=document_type.code)
+        sequence = PrintNumberSequence.objects.select_for_update().get(
+            document_type=document_type.code
+        )
         sequence.last_number += 1
         sequence.save(update_fields=["last_number", "updated_at"])
         return sequence.last_number

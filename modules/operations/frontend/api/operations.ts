@@ -93,7 +93,7 @@ export interface PrintDocument {
   operation_id: number
   operation_type_code: string
   cash_desk_id: number
-  number: number
+  number: number | null
   file_name: string
   created_at: string
 }

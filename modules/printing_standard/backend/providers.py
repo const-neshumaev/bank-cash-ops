@@ -82,7 +82,7 @@ class CashReceiptProvider:
             "issued_currency": issued.currency_name if issued else "",
             "issued_currency_code": issued.currency if issued else "",
             "rate": _rate(operation),
-            "document_number": str(document.number),
+            "document_number": "" if document.number is None else str(document.number),
             "operation_number": str(operation.number),
             "client_name": operation.client_name,
             "client_document": operation.client_document,

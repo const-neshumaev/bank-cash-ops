@@ -627,12 +627,24 @@ Content-Type: application/json
       "document_type": "cash_receipt",
       "template": "cash_receipt_currency_purchase",
       "is_active": true
+    },
+    {
+      "document_type": "cash_receipt",
+      "template": "cash_receipt_currency_sale",
+      "is_active": true
+    },
+    {
+      "document_type": "cash_order",
+      "template": "cash_order_default",
+      "is_active": true
     }
   ]
 }
 ```
 
-Список заменяется целиком: отсутствующий тип документа больше не печатается.
+Можно указать несколько печатных документов, в том числе несколько форм одного
+типа документа; каждый шаблон выбирается не более одного раза. Список
+заменяется целиком: отсутствующая форма больше не печатается.
 Шаблон должен принадлежать выбранному типу документа (проверяется по контракту
 `printing`). Ответ — массив `{document_type, document_type_name, template,
 template_name, is_active}`. `print_configs` также входит в ответ типа операции.
