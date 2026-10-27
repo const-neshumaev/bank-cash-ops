@@ -157,6 +157,58 @@ def test_operation_documents_are_listed_for_an_accessible_cash_desk(
     assert response.data[0]["number"] == 1
 
 
+def test_operation_documents_include_every_printed_form(
+    auth_client, contracts, synced_templates, second_document_type
+):
+    print_document_service.render_operation(
+        _operation(),
+        [
+            PrintBinding(
+                document_type="cash_receipt",
+                template="cash_receipt_currency_purchase",
+            ),
+            PrintBinding(
+                document_type="cash_receipt",
+                template="cash_receipt_currency_sale",
+            ),
+            PrintBinding(
+                document_type="cash_order",
+                template="cash_order_default",
+            ),
+        ],
+    )
+    contracts.org.accessible = {CASH_DESK}
+
+    response = auth_client.get(DOCUMENTS_URL)
+
+    assert response.status_code == 200, response.content
+    assert {row["template_code"] for row in response.data} == {
+        "cash_receipt_currency_purchase",
+        "cash_receipt_currency_sale",
+        "cash_order_default",
+    }
+
+
+def test_an_unnumbered_document_is_served_without_a_number(
+    auth_client, contracts, synced_templates, unnumbered_document_type
+):
+    print_document_service.render_operation(
+        _operation(),
+        [
+            PrintBinding(
+                document_type="account_statement",
+                template="account_statement_default",
+            )
+        ],
+    )
+    contracts.org.accessible = {CASH_DESK}
+
+    response = auth_client.get(DOCUMENTS_URL)
+
+    assert response.status_code == 200, response.content
+    assert response.data[0]["number"] is None
+
+
 def test_operation_documents_are_hidden_for_an_inaccessible_cash_desk(
     auth_client, contracts, synced_templates
 ):

@@ -93,6 +93,6 @@ class PrintDocumentInfoSerializer(serializers.Serializer):
     operation_id = serializers.IntegerField()
     operation_type_code = serializers.CharField()
     cash_desk_id = serializers.IntegerField()
-    number = serializers.IntegerField()
+    number = serializers.IntegerField(allow_null=True)
     file_name = serializers.CharField()
     created_at = serializers.DateTimeField()

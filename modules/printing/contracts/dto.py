@@ -52,9 +52,12 @@ class PrintTemplateSpec:
 
 @dataclass(frozen=True)
 class PrintDocumentHeader:
-    """The identity of the document being rendered."""
+    """The identity of the document being rendered.
 
-    number: int
+    ``number`` is ``None`` for document types that are not numbered.
+    """
+
+    number: int | None
     document_type: str
     document_type_name: str
     template_code: str
@@ -152,7 +155,7 @@ class PrintDocumentInfo:
     operation_id: int
     operation_type_code: str
     cash_desk_id: int
-    number: int
+    number: int | None
     file_name: str
     created_at: datetime
 

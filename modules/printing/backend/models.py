@@ -24,12 +24,14 @@ class PrintDocumentType(TimeStampedModel):
     """A kind of printed document (a cash receipt, an order, and so on).
 
     The type is declared by a module (see ``printing_standard``) and owns the
-    bank-wide document number sequence. Only bank-wide numbering is implemented
-    at the moment; ``numbering_scope`` reserves the place for other scopes.
+    document number sequence. ``numbering_scope`` says whether the type is
+    numbered and, in the future, on which level. A type with ``none`` is not
+    numbered at all (a statement, a certificate and so on).
     """
 
     class NumberingScope(models.TextChoices):
         BANK = "bank", _("Bank-wide")
+        NONE = "none", _("No numbering")
 
     code = models.SlugField(_("code"), max_length=64, unique=True)
     name = models.CharField(_("name"), max_length=150)
@@ -58,6 +60,10 @@ class PrintDocumentType(TimeStampedModel):
             ((row.language, row.name) for row in self.translations.all()),
             language,
         )
+
+    @property
+    def requires_numbering(self) -> bool:
+        return self.numbering_scope != self.NumberingScope.NONE
 
 
 class PrintDocumentTypeTranslation(TimeStampedModel):
@@ -189,7 +195,9 @@ class PrintDocument(TimeStampedModel):
     The rendered Word file is kept so a reprint reproduces exactly what the
     cashier printed when the operation was posted, even if the template has
     changed since then. Names and the cash desk are snapshotted for the same
-    reason.
+    reason. An operation may print several forms of the same document type, so
+    the uniqueness is per rendered template. ``number`` is empty for document
+    types that are not numbered.
     """
 
     document_type = models.CharField(_("document type"), max_length=64)
@@ -199,7 +207,7 @@ class PrintDocument(TimeStampedModel):
     operation_id = models.PositiveBigIntegerField(_("operation"))
     operation_type_code = models.CharField(_("operation type"), max_length=64)
     cash_desk_id = models.PositiveBigIntegerField(_("cash desk"))
-    number = models.PositiveBigIntegerField(_("number"))
+    number = models.PositiveBigIntegerField(_("number"), null=True, blank=True)
     file_name = models.CharField(_("file name"), max_length=255)
     content = models.BinaryField(_("content"))
     context = models.JSONField(_("context"), default=dict, blank=True)
@@ -217,13 +225,15 @@ class PrintDocument(TimeStampedModel):
         constraints = (
             models.UniqueConstraint(
                 fields=["document_type", "number"],
+                condition=models.Q(number__isnull=False),
                 name="printing_unique_document_number",
             ),
             models.UniqueConstraint(
-                fields=["operation_id", "document_type"],
-                name="printing_unique_operation_document_type",
+                fields=["operation_id", "template_code"],
+                name="printing_unique_operation_template",
             ),
         )
 
     def __str__(self):
-        return f"{self.document_type} #{self.number} ({self.operation_type_code})"
+        number = f"#{self.number}" if self.number is not None else "(no number)"
+        return f"{self.document_type} {number} ({self.operation_type_code})"

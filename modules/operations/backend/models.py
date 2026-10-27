@@ -616,7 +616,8 @@ class OperationPrintConfig(TimeStampedModel):
     The binding is owned by ``operations`` because it configures the operation
     type. The template itself belongs to the ``printing`` module and is
     referenced by its stable code; no ORM relation crosses the module boundary.
-    One template is selected per printed document type.
+    An operation type may print several forms, including several forms of the
+    same document type; each template is selected at most once.
     """
 
     operation_type = models.ForeignKey(
@@ -633,11 +634,11 @@ class OperationPrintConfig(TimeStampedModel):
         verbose_name = _("operation print document")
         verbose_name_plural = _("operation print documents")
         db_table = qualified_table("operations", "operations_operationprintconfig")
-        ordering = ("document_type",)
+        ordering = ("document_type", "template_code")
         constraints = (
             models.UniqueConstraint(
-                fields=["operation_type", "document_type"],
-                name="operations_unique_operation_print_document",
+                fields=["operation_type", "template_code"],
+                name="operations_unique_operation_print_template",
             ),
         )
 

@@ -296,11 +296,11 @@ class OperationTypeViewSet(
                 raise ValidationError(
                     {"template": _("Unknown print template '%(code)s'.") % {"code": template}}
                 )
-            if document_type in seen:
+            if template in seen:
                 raise ValidationError(
-                    {"document_type": _("The print document type is selected more than once.")}
+                    {"template": _("The print template is selected more than once.")}
                 )
-            seen.add(document_type)
+            seen.add(template)
             result.append(
                 {
                     "document_type": document_type,
