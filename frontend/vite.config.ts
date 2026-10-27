@@ -24,6 +24,12 @@ export default defineConfig(({ mode }) => {
       host: true,
       port: 5173,
       strictPort: true,
+      // Docker Desktop on Windows does not always deliver filesystem events
+      // from bind mounts, so Vite misses edits and keeps serving stale modules.
+      // Polling makes hot reload reliable in development.
+      watch: {
+        usePolling: true,
+      },
       // The HMR client reloads the whole page whenever its websocket drops.
       // Docker Desktop on Windows may close an idle socket long before the
       // default 30s keep-alive ping, so ping much more often to keep it alive.
